@@ -225,6 +225,9 @@ class BackgroundWorker {
 **Q: Why Jina AI instead of simple HTTP fetch?**
 A: Jina handles JavaScript-rendered sites, has built-in PDF/image support, and is more reliable than raw HTML parsing.
 
+**Q: Should we use Jina MCP server instead of direct API?**
+A: No. The MCP (Model Context Protocol) server is designed for AI assistants (Claude, Cursor) to use during conversations. For our backend service, direct API calls are simpler, faster (one less hop), and more appropriate. MCP adds unnecessary complexity for automated background processing.
+
 **Q: Why background processing instead of real-time?**
 A: User never waits, more reliable (retryable), no tab dependency, handles rate limits gracefully.
 
