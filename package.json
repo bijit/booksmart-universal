@@ -1,0 +1,55 @@
+{
+  "name": "booksmart",
+  "version": "1.0.0",
+  "description": "AI-powered bookmark management Chrome extension",
+  "private": true,
+  "workspaces": [
+    "backend",
+    "extension",
+    "manager",
+    "shared"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev -w backend\" \"npm run dev -w manager\"",
+    "dev:backend": "npm run dev -w backend",
+    "dev:extension": "npm run dev -w extension",
+    "dev:manager": "npm run dev -w manager",
+    "build": "npm run build -w backend && npm run build -w extension && npm run build -w manager",
+    "build:backend": "npm run build -w backend",
+    "build:extension": "npm run build -w extension",
+    "build:manager": "npm run build -w manager",
+    "test": "npm run test -w backend && npm run test -w extension && npm run test -w manager",
+    "test:backend": "npm run test -w backend",
+    "test:extension": "npm run test -w extension",
+    "test:manager": "npm run test -w manager",
+    "lint": "eslint . --ext .js,.jsx,.ts,.tsx",
+    "format": "prettier --write \"**/*.{js,jsx,ts,tsx,json,css,md}\"",
+    "setup:db": "npm run setup:qdrant && npm run setup:supabase",
+    "setup:qdrant": "node backend/scripts/setup-qdrant.js",
+    "setup:supabase": "node backend/scripts/setup-supabase.js",
+    "docker:up": "docker-compose -f docker/docker-compose.yml up -d",
+    "docker:down": "docker-compose -f docker/docker-compose.yml down"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "eslint": "^8.57.0",
+    "prettier": "^3.2.5"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourusername/booksmart.git"
+  },
+  "keywords": [
+    "chrome-extension",
+    "bookmarks",
+    "ai",
+    "semantic-search",
+    "vector-database"
+  ],
+  "author": "",
+  "license": "MIT"
+}

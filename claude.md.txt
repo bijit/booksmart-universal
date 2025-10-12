@@ -1,0 +1,163 @@
+# BookSmart Engineering Standards
+
+You are an expert software engineer building BookSmart, a Chrome extension for AI-powered bookmark management.
+
+## Tech Stack
+- Chrome Extension (Manifest V3), React, Node.js
+- Qdrant Cloud (vector database), Supabase (PostgreSQL + auth)
+- Google Gemini Flash (AI), Vercel (hosting)
+
+## Architecture Principles
+
+1. **Data Storage Split**
+   - Qdrant: All bookmark content, vectors, summaries
+   - Supabase: User auth, preferences, search history only
+
+2. **Processing Flow**
+   - Instant save to Supabase → background processing → never block user
+   - Content extraction via Chrome content scripts (NOT fetch API)
+
+3. **Search**
+   - Hybrid: 60% semantic (vector) + 40% full-text
+   - Always filter by user_id
+   - Target: <500ms response
+
+## Core Engineering Standards
+
+### 1. Testing First
+- Write unit tests for ALL business logic
+- Test before integration
+- Mock external dependencies (APIs, databases)
+- Test edge cases and error conditions
+- Aim for 80%+ coverage on core functions
+- Use descriptive test names that explain the scenario
+
+### 2. Error Handling
+- Always catch and handle errors specifically
+- Provide actionable error messages with context
+- Never swallow errors silently
+- Fail fast with clear reasons
+- Log what operation failed and with what input
+
+### 3. Idempotent Operations
+- All database scripts must be safe to re-run
+- Check existence before creating
+- Handle "already exists" gracefully
+- No destructive operations without confirmation
+
+### 4. Async Operations
+- Always use async/await (never callbacks)
+- Handle Promise rejections explicitly
+- Use Promise.all() for parallel independent operations
+- Don't block on I/O unnecessarily
+
+### 5. Environment Variables
+- Validate ALL required env vars at startup
+- Fail fast if any are missing with clear message
+- Never hardcode credentials or URLs
+- Use dotenv for local development
+
+### 6. Security
+- Validate and sanitize ALL user inputs
+- Use parameterized queries (Supabase handles this)
+- Never expose service_role key to client
+- Always filter by authenticated user_id in queries
+- Implement Supabase RLS policies
+
+### 7. Chrome Extension Rules (Manifest V3)
+- Use chrome.storage.local (NEVER localStorage)
+- Service workers are ephemeral - no global state
+- Content scripts for page access
+- Message passing for background ↔ content communication
+
+### 8. Functions
+- Single responsibility per function
+- Small, pure functions when possible
+- Separate I/O operations from business logic
+- Export functions for testing
+- Descriptive names: verb + noun
+
+### 9. Console Output
+- Use clear indicators: 🔧 starting, ✅ success,⚠️ warning, ❌ error
+- Show progress for long operations
+- Include relevant context in messages
+- No cryptic abbreviations
+
+### 10. Code Quality
+- Production-ready code only - no TODOs or placeholders
+- Self-documenting code with meaningful names
+- Comments explain "why" not "what"
+- No commented-out code in final deliverables
+- Explicit over clever
+
+## Critical Project Rules
+
+### Never Do
+- Use localStorage in extension (breaks Manifest V3)
+- Mix Qdrant and Supabase concerns
+- Block user on AI processing
+- Trust user input without validation
+- Forget user_id filters in multi-tenant queries
+- Use fetch for content extraction (won't see rendered content)
+
+### Always Do
+- Run and test code after writing it
+- Validate environment variables at startup
+- Handle database "already exists" errors
+- Make scripts idempotent
+- Write unit tests for business logic
+- Log errors with context
+
+## Testing Standards
+
+### What to Test
+- Business logic functions (pure functions especially)
+- Data transformations
+- Validation functions
+- Error handling paths
+- Edge cases (empty input, null, undefined, malformed data)
+
+### Testing Pattern
+- Arrange: Set up test data
+- Act: Call the function
+- Assert: Verify result
+
+### Mock External Dependencies
+- Database calls (Qdrant, Supabase)
+- API calls (Gemini, embeddings)
+- Chrome APIs
+- File system operations
+
+### Test File Naming
+- Same name as source: `extractor.js` → `extractor.test.js`
+- Place tests next to source or in `__tests__` folder
+
+## Task Completion Checklist
+
+Before marking any task complete:
+- [ ] Code runs without errors
+- [ ] Unit tests written and passing
+- [ ] Error handling implemented
+- [ ] Environment variables validated
+- [ ] No hardcoded values
+- [ ] Console output is clear
+- [ ] Idempotent (safe to re-run)
+- [ ] Follows all standards above
+
+## When Unclear
+
+1. Check Implementation Quick Reference document first
+2. State the ambiguity clearly
+3. Suggest best option with reasoning
+4. Ask for confirmation before proceeding
+
+## Development Philosophy
+
+Quality over speed. Build production-ready code from day 1. Write code that:
+- Won't cause 3am bugs
+- Another engineer can understand immediately
+- Handles edge cases gracefully
+- Fails fast with clear errors
+- Can be tested in isolation
+
+Every line of code matters. Get it right the first time.
