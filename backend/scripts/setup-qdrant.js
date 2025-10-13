@@ -9,8 +9,16 @@
  * Run with: node backend/scripts/setup-qdrant.js
  */
 
-import 'dotenv/config';
+import { config } from 'dotenv';
+import { resolve, dirname } from 'path';
+import { fileURLToPath } from 'url';
 import { QdrantClient } from '@qdrant/js-client-rest';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+// Load .env.local from project root (two levels up from scripts/)
+config({ path: resolve(__dirname, '../../.env.local') });
 
 // Validate environment variables
 function validateEnv() {

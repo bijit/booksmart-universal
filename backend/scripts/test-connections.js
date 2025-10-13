@@ -13,7 +13,15 @@
  * Run with: node backend/scripts/test-connections.js
  */
 
-import 'dotenv/config';
+import { config } from 'dotenv';
+import { resolve, dirname } from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+// Load .env.local from project root
+config({ path: resolve(__dirname, '../../.env.local') });
 
 console.log('🧪 Testing connections to all services...\n');
 
@@ -90,7 +98,7 @@ async function testGemini() {
     }
 
     const genAI = new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY);
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
     const result = await model.generateContent('Say "Hello"');
     const response = await result.response;
@@ -168,10 +176,11 @@ async function runTests() {
     process.stdout.write(`Testing ${test.name}... `);
     await test.fn();
 
-    const result = results[test.name.toLowerCase().replace(/\s+/g, '')];
-    if (result.status === 'success') {
+    const resultKey = test.name.toLowerCase().replace(/\s+/g, '').replace('cloud', '');
+    const result = results[resultKey];
+    if (result && result.status === 'success') {
       console.log(`✅ ${result.message}`);
-    } else if (result.status === 'error') {
+    } else if (result && result.status === 'error') {
       console.log(`❌ ${result.message}`);
     }
   }

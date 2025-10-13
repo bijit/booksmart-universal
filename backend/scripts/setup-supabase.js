@@ -7,14 +7,17 @@
  * Run with: node backend/scripts/setup-supabase.js
  */
 
-import 'dotenv/config';
+import { config } from 'dotenv';
 import { createClient } from '@supabase/supabase-js';
 import { readFileSync, readdirSync } from 'fs';
-import { join, dirname } from 'path';
+import { join, dirname, resolve } from 'path';
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+
+// Load .env.local from project root
+config({ path: resolve(__dirname, '../../.env.local') });
 
 // Validate environment variables
 function validateEnv() {
