@@ -5,6 +5,17 @@
  */
 
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { config } from 'dotenv';
+import { resolve, dirname } from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+// Load .env.local if not already loaded
+if (!process.env.GOOGLE_AI_API_KEY) {
+  config({ path: resolve(__dirname, '../../../.env.local') });
+}
 
 // Validate API key
 if (!process.env.GOOGLE_AI_API_KEY) {
