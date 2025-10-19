@@ -13,6 +13,7 @@ import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import authRoutes from './routes/auth.routes.js';
 import bookmarksRoutes from './routes/bookmarks.routes.js';
+import { startWorker } from './workers/bookmark.worker.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -110,6 +111,9 @@ app.listen(PORT, () => {
   console.log(`🏥 Health check: http://localhost:${PORT}/api/health`);
   console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
+
+  // Start background worker
+  startWorker();
 });
 
 export default app;
