@@ -13,6 +13,7 @@ import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import authRoutes from './routes/auth.routes.js';
 import bookmarksRoutes from './routes/bookmarks.routes.js';
+import searchRoutes from './routes/search.routes.js';
 import { startWorker } from './workers/bookmark.worker.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -50,6 +51,7 @@ app.use(morgan('dev')); // HTTP request logging
 // Mount routes
 app.use('/api/auth', authRoutes);
 app.use('/api/bookmarks', bookmarksRoutes);
+app.use('/api/search', searchRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
