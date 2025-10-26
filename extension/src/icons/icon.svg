@@ -1,0 +1,14 @@
+<svg width="128" height="128" viewBox="0 0 128 128" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background circle -->
+  <circle cx="64" cy="64" r="60" fill="#3B82F6"/>
+
+  <!-- Bookmark shape -->
+  <path d="M45 35C45 32.2386 47.2386 30 50 30H78C80.7614 30 83 32.2386 83 35V95L64 82L45 95V35Z"
+        fill="white"
+        stroke="white"
+        stroke-width="2"/>
+
+  <!-- Bookmark notch detail -->
+  <path d="M64 82L45 95V35C45 32.2386 47.2386 30 50 30H78C80.7614 30 83 32.2386 83 35V95L64 82Z"
+        fill="white"/>
+</svg>

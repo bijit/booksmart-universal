@@ -237,6 +237,18 @@ function createBookmarkCard(bookmark) {
   const status = bookmark.processing_status || 'completed';
   const statusText = status === 'pending' ? 'Processing...' : '';
 
+  // Format description (truncate if too long)
+  const description = bookmark.description ?
+    (bookmark.description.length > 120 ?
+      bookmark.description.substring(0, 120) + '...' :
+      bookmark.description) : '';
+
+  // Format tags
+  const tags = bookmark.tags && bookmark.tags.length > 0 ?
+    bookmark.tags.slice(0, 3).map(tag =>
+      `<span class="bookmark-tag">${escapeHtml(tag)}</span>`
+    ).join('') : '';
+
   card.innerHTML = `
     <div class="bookmark-favicon">
       <img src="https://www.google.com/s2/favicons?domain=${domain}&sz=32"
@@ -245,7 +257,9 @@ function createBookmarkCard(bookmark) {
     </div>
     <div class="bookmark-content">
       <div class="bookmark-title">${escapeHtml(bookmark.title || bookmark.url)}</div>
+      ${description ? `<div class="bookmark-description">${escapeHtml(description)}</div>` : ''}
       <div class="bookmark-url">${domain}</div>
+      ${tags ? `<div class="bookmark-tags">${tags}</div>` : ''}
       <div class="bookmark-meta">
         <span class="bookmark-time">${timeAgo}</span>
         ${statusText ? `<span class="bookmark-status ${status}">${statusText}</span>` : ''}
