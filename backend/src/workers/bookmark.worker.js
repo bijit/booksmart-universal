@@ -57,7 +57,7 @@ async function processBookmark(bookmark) {
       description: aiResult.description,
       content: extracted.content,
       embedding: aiResult.embedding,
-      tags: [], // No tags initially, user can add later
+      tags: aiResult.tags || [], // AI-generated tags
       favicon_url: extracted.favicon || null
     });
 

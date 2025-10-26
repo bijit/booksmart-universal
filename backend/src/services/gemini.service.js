@@ -47,8 +47,10 @@ export async function summarizeContent(content, url) {
 Given the following webpage content, generate:
 1. A SHORT, descriptive title (max 80 characters)
 2. A brief description/summary (max 200 characters)
+3. 3-5 relevant tags (lowercase, hyphenated keywords like "machine-learning", "web-development", "data-science")
 
 The title should be clear and informative. The description should capture the main topic or purpose.
+Tags should be specific, searchable keywords that describe the content's main topics and themes.
 
 URL: ${url}
 
@@ -58,7 +60,8 @@ ${truncatedContent}
 Respond in JSON format:
 {
   "title": "your generated title here",
-  "description": "your generated description here"
+  "description": "your generated description here",
+  "tags": ["tag1", "tag2", "tag3"]
 }`;
 
     const result = await model.generateContent(prompt);
@@ -82,7 +85,18 @@ Respond in JSON format:
     summary.title = summary.title.substring(0, 80);
     summary.description = summary.description.substring(0, 200);
 
-    console.log(`[Gemini] Successfully generated summary: "${summary.title}"`);
+    // Process tags
+    if (Array.isArray(summary.tags)) {
+      // Clean and validate tags
+      summary.tags = summary.tags
+        .filter(tag => tag && typeof tag === 'string')
+        .map(tag => tag.toLowerCase().trim())
+        .slice(0, 5); // Max 5 tags
+    } else {
+      summary.tags = [];
+    }
+
+    console.log(`[Gemini] Successfully generated summary: "${summary.title}" with ${summary.tags.length} tags`);
 
     return summary;
 
