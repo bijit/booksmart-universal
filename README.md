@@ -75,73 +75,156 @@ booksmart_v1.0/
 
 ---
 
-## Getting Started
+## Quick Start (For New Users)
 
 ### Prerequisites
 
 - Node.js >= 18.0.0
 - npm >= 9.0.0
+- Chrome browser
 - Git
 
-### 1. Clone Repository
+### Step 1: Clone and Setup
 
 ```bash
-git clone https://github.com/yourusername/booksmart.git
+# Clone the repository
+git clone https://github.com/kniyogi/booksmart.git
 cd booksmart_v1.0
-```
 
-### 2. Install Dependencies
-
-```bash
+# Install backend dependencies
+cd backend
 npm install
 ```
 
-This will install dependencies for all workspaces (backend, extension, manager).
+### Step 2: Configure Environment Variables
 
-### 3. Set Up Environment Variables
+Create a `.env` file in the `backend` directory:
 
 ```bash
-cp .env.example .env.local
+cd backend
+cp .env.example .env
 ```
 
-Edit `.env.local` and fill in your API keys:
+Edit `backend/.env` and add your API keys:
 
-**Required Services:**
-- **Qdrant Cloud**: https://cloud.qdrant.io/ (free tier: 1GB)
-- **Supabase**: https://supabase.com/ (free tier: 500MB)
-- **Google AI Studio**: https://makersuite.google.com/app/apikey
-- **Google OAuth**: https://console.cloud.google.com/apis/credentials
-- **Jina AI** (optional): https://jina.ai/
+```env
+# Required - Get from https://supabase.com
+SUPABASE_URL=your_supabase_url
+SUPABASE_ANON_KEY=your_anon_key
+SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
 
-### 4. Initialize Databases
+# Required - Get from https://cloud.qdrant.io
+QDRANT_URL=your_qdrant_cluster_url
+QDRANT_API_KEY=your_qdrant_api_key
 
-```bash
-# Create Qdrant collection
-npm run setup:qdrant
+# Required - Get from https://makersuite.google.com/app/apikey
+GEMINI_API_KEY=your_gemini_api_key
 
-# Run Supabase migrations
-npm run setup:supabase
+# Optional - Get from https://jina.ai (free tier: 1000 requests/day)
+JINA_API_KEY=your_jina_api_key
+
+PORT=3000
+NODE_ENV=development
 ```
 
-### 5. Start Development
+**Where to get API keys:**
+- **Supabase**: Sign up at https://supabase.com (free tier), create a project, get keys from Project Settings → API
+- **Qdrant**: Sign up at https://cloud.qdrant.io (free tier: 1GB), create a cluster, get URL and API key
+- **Gemini**: Get API key from https://makersuite.google.com/app/apikey (Google AI Studio)
+- **Jina AI** (optional): Sign up at https://jina.ai/reader for content extraction
+
+### Step 3: Initialize Databases
 
 ```bash
-# Start all services
+# From backend directory
+cd backend
+
+# Create Qdrant collection (vector database)
+node scripts/setup-qdrant.js
+
+# Initialize Supabase tables
+node scripts/setup-supabase.js
+```
+
+### Step 4: Start the Backend Server
+
+```bash
+# From backend directory
 npm run dev
-
-# Or start individually:
-npm run dev:backend    # Backend API (port 3000)
-npm run dev:manager    # Manager page (port 5173)
-npm run dev:extension  # Extension (watch mode)
 ```
 
-### 6. Load Extension in Chrome
+You should see:
+```
+🚀 BookSmart API Server
+📡 Server running on: http://localhost:3000
+```
 
-1. Open Chrome and go to `chrome://extensions/`
-2. Enable "Developer mode" (top right)
-3. Click "Load unpacked"
-4. Select the `extension/dist` folder
-5. Extension icon should appear in toolbar
+Keep this terminal running.
+
+### Step 5: Load Extension in Chrome
+
+1. Open Chrome and navigate to `chrome://extensions/`
+2. Enable **"Developer mode"** (toggle in top right)
+3. Click **"Load unpacked"**
+4. Navigate to and select: `booksmart_v1.0/extension/` folder
+5. The BookSmart extension icon should appear in your toolbar
+
+### Step 6: Create Your Account
+
+1. Click the BookSmart extension icon in Chrome toolbar
+2. Click **"Create account"** link
+3. Fill in:
+   - Full Name
+   - Email address
+   - Password (minimum 8 characters)
+4. Click **"Create Account"**
+5. You'll be automatically logged in!
+
+### Step 7: Start Bookmarking!
+
+1. Navigate to any webpage (e.g., Wikipedia article, blog post, PDF)
+2. Click the Chrome ★ star icon (or press Ctrl+D / Cmd+D)
+3. Save the bookmark
+4. BookSmart will:
+   - Extract the content (takes 5-10 seconds)
+   - Generate an AI summary
+   - Create searchable tags
+   - Make it semantically searchable
+
+5. Open the BookSmart popup to see your bookmarks with tags
+6. Use the search box to find bookmarks by concept, not just keywords!
+
+---
+
+## Detailed Setup (For Developers)
+
+### Database Schema Setup
+
+The setup scripts automatically create these tables in Supabase:
+
+```sql
+-- Bookmarks metadata
+bookmarks (
+  id UUID PRIMARY KEY,
+  user_id UUID REFERENCES auth.users,
+  url TEXT NOT NULL,
+  title TEXT,
+  qdrant_point_id UUID,
+  processing_status TEXT,
+  extraction_method TEXT,
+  retry_count INTEGER,
+  error_message TEXT,
+  tags TEXT[],
+  description TEXT,
+  created_at TIMESTAMP,
+  updated_at TIMESTAMP
+)
+```
+
+The Qdrant collection stores:
+- 768-dimensional embeddings (Google Text Embeddings)
+- Full page content and metadata
+- Tags and descriptions for semantic search
 
 ---
 
