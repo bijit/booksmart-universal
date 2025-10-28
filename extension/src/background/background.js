@@ -28,10 +28,14 @@ chrome.bookmarks.onCreated.addListener(async (id, bookmark) => {
   }
 });
 
-// Listen to bookmarks being removed (optional: sync delete)
+// Listen to bookmarks being removed - sync deletion to backend
 chrome.bookmarks.onRemoved.addListener(async (id, removeInfo) => {
-  console.log('Bookmark removed:', id);
-  // TODO: Optionally sync deletion to backend
+  console.log('Bookmark removed:', id, removeInfo);
+
+  // Only process if it has a URL (folders don't have URLs)
+  if (removeInfo.node && removeInfo.node.url) {
+    await handleDeletedBookmark(removeInfo.node.url);
+  }
 });
 
 // Handle new bookmark
@@ -79,6 +83,59 @@ async function handleNewBookmark(bookmark) {
 
     // Retry logic could be added here
     showNotification('Network error', 'Could not connect to BookSmart server.', 'error');
+  }
+}
+
+// Handle deleted bookmark
+async function handleDeletedBookmark(url) {
+  try {
+    // Check if user is authenticated
+    const authData = await chrome.storage.local.get(['auth_token']);
+
+    if (!authData.auth_token) {
+      console.log('User not authenticated, skipping bookmark deletion sync');
+      return;
+    }
+
+    // Find bookmark by URL
+    const searchResponse = await fetch(`${API_BASE_URL}/bookmarks?url=${encodeURIComponent(url)}`, {
+      headers: {
+        'Authorization': `Bearer ${authData.auth_token}`
+      }
+    });
+
+    if (searchResponse.ok) {
+      const searchData = await searchResponse.json();
+
+      // If bookmark exists in our backend, delete it
+      if (searchData.bookmarks && searchData.bookmarks.length > 0) {
+        const bookmarkId = searchData.bookmarks[0].id;
+
+        // Delete bookmark from backend
+        const deleteResponse = await fetch(`${API_BASE_URL}/bookmarks/${bookmarkId}`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${authData.auth_token}`
+          }
+        });
+
+        if (deleteResponse.ok) {
+          console.log('Bookmark deleted from BookSmart:', bookmarkId);
+
+          // Show success notification
+          showNotification('Bookmark deleted', 'Removed from BookSmart');
+
+          // Update badge count
+          updateBadgeCount();
+        } else {
+          console.error('Failed to delete bookmark from backend');
+        }
+      } else {
+        console.log('Bookmark not found in BookSmart, nothing to delete');
+      }
+    }
+  } catch (error) {
+    console.error('Error handling deleted bookmark:', error);
   }
 }
 

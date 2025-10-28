@@ -3,10 +3,14 @@
 
 // DOM Elements
 const loginScreen = document.getElementById('loginScreen');
+const registerScreen = document.getElementById('registerScreen');
 const mainScreen = document.getElementById('mainScreen');
 const loginForm = document.getElementById('loginForm');
 const loginError = document.getElementById('loginError');
+const registerForm = document.getElementById('registerForm');
+const registerError = document.getElementById('registerError');
 const registerLink = document.getElementById('registerLink');
+const backToLoginLink = document.getElementById('backToLoginLink');
 const searchInput = document.getElementById('searchInput');
 const bookmarksList = document.getElementById('bookmarksList');
 const loadingState = document.getElementById('loadingState');
@@ -51,10 +55,19 @@ function setupEventListeners() {
   // Login form submission
   loginForm.addEventListener('submit', handleLogin);
 
-  // Register link
+  // Register form submission
+  registerForm.addEventListener('submit', handleRegister);
+
+  // Register link - show register screen
   registerLink.addEventListener('click', (e) => {
     e.preventDefault();
-    openManager('/register');
+    showRegisterScreen();
+  });
+
+  // Back to login link
+  backToLoginLink.addEventListener('click', (e) => {
+    e.preventDefault();
+    showLoginScreen();
   });
 
   // Search input
@@ -115,6 +128,50 @@ async function handleLogin(e) {
   } catch (error) {
     console.error('Login error:', error);
     showError('Network error. Please check your connection.');
+  }
+}
+
+// Handle register form submission
+async function handleRegister(e) {
+  e.preventDefault();
+
+  const name = document.getElementById('registerName').value;
+  const email = document.getElementById('registerEmail').value;
+  const password = document.getElementById('registerPassword').value;
+
+  // Hide any previous errors
+  registerError.classList.add('hidden');
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/auth/register`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ name, email, password })
+    });
+
+    const data = await response.json();
+
+    if (response.ok) {
+      // Auto-login after successful registration
+      await chrome.storage.local.set({
+        auth_token: data.session.access_token,
+        refresh_token: data.session.refresh_token,
+        user: data.user,
+        token_expires_at: data.session.expires_at
+      });
+
+      // Show main screen
+      showMainScreen();
+      loadRecentBookmarks();
+    } else {
+      // Show error
+      showRegisterError(data.message || 'Registration failed. Please try again.');
+    }
+  } catch (error) {
+    console.error('Registration error:', error);
+    showRegisterError('Network error. Please check your connection.');
   }
 }
 
@@ -237,15 +294,9 @@ function createBookmarkCard(bookmark) {
   const status = bookmark.processing_status || 'completed';
   const statusText = status === 'pending' ? 'Processing...' : '';
 
-  // Format description (truncate if too long)
-  const description = bookmark.description ?
-    (bookmark.description.length > 120 ?
-      bookmark.description.substring(0, 120) + '...' :
-      bookmark.description) : '';
-
-  // Format tags
+  // Format tags (show up to 5 tags)
   const tags = bookmark.tags && bookmark.tags.length > 0 ?
-    bookmark.tags.slice(0, 3).map(tag =>
+    bookmark.tags.slice(0, 5).map(tag =>
       `<span class="bookmark-tag">${escapeHtml(tag)}</span>`
     ).join('') : '';
 
@@ -257,7 +308,6 @@ function createBookmarkCard(bookmark) {
     </div>
     <div class="bookmark-content">
       <div class="bookmark-title">${escapeHtml(bookmark.title || bookmark.url)}</div>
-      ${description ? `<div class="bookmark-description">${escapeHtml(description)}</div>` : ''}
       <div class="bookmark-url">${domain}</div>
       ${tags ? `<div class="bookmark-tags">${tags}</div>` : ''}
       <div class="bookmark-meta">
@@ -306,11 +356,25 @@ function openManager(path = '') {
 // UI State Management
 function showLoginScreen() {
   loginScreen.classList.remove('hidden');
+  registerScreen.classList.add('hidden');
   mainScreen.classList.add('hidden');
+  // Clear any errors
+  loginError.classList.add('hidden');
+  registerError.classList.add('hidden');
+}
+
+function showRegisterScreen() {
+  loginScreen.classList.add('hidden');
+  registerScreen.classList.remove('hidden');
+  mainScreen.classList.add('hidden');
+  // Clear any errors
+  loginError.classList.add('hidden');
+  registerError.classList.add('hidden');
 }
 
 function showMainScreen() {
   loginScreen.classList.add('hidden');
+  registerScreen.classList.add('hidden');
   mainScreen.classList.remove('hidden');
 }
 
@@ -339,4 +403,9 @@ function showError(message) {
   loginError.textContent = message;
   loginError.classList.remove('hidden');
   hideLoading();
+}
+
+function showRegisterError(message) {
+  registerError.textContent = message;
+  registerError.classList.remove('hidden');
 }

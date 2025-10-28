@@ -33,6 +33,32 @@
       </div>
     </div>
 
+    <!-- Register Screen -->
+    <div id="registerScreen" class="screen hidden">
+      <div class="login-content">
+        <div class="logo">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M19 21H5C3.89543 21 3 20.1046 3 19V5C3 3.89543 3.89543 3 5 3H19C20.1046 3 21 3.89543 21 5V19C21 20.1046 20.1046 21 19 21Z" stroke="#3B82F6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M7 7H17M7 12H17M7 17H13" stroke="#3B82F6" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <h1>Create Account</h1>
+        <p class="subtitle">Join BookSmart</p>
+
+        <form id="registerForm" class="login-form">
+          <input type="text" id="registerName" placeholder="Full Name" required autocomplete="name">
+          <input type="email" id="registerEmail" placeholder="Email" required autocomplete="email">
+          <input type="password" id="registerPassword" placeholder="Password (min 8 characters)" required autocomplete="new-password" minlength="8">
+          <button type="submit" class="btn btn-primary">Create Account</button>
+          <div id="registerError" class="error-message hidden"></div>
+        </form>
+
+        <div class="login-footer">
+          <a href="#" id="backToLoginLink" class="link">Back to login</a>
+        </div>
+      </div>
+    </div>
+
     <!-- Main Screen (shown when authenticated) -->
     <div id="mainScreen" class="screen hidden">
       <!-- Header with Search -->

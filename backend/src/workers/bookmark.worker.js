@@ -9,7 +9,7 @@
  */
 
 import { extractContent } from '../services/jina.service.js';
-import { processContent } from '../services/gemini.service.js';
+import { processContent, summarizeFromMetadata, generateEmbedding } from '../services/gemini.service.js';
 import { createBookmark } from '../services/qdrant.service.js';
 import {
   getUserBookmarkRecords,
@@ -25,13 +25,59 @@ let isProcessing = false;
 let workerRunning = false;
 
 /**
+ * Process bookmark using metadata-only (fallback when content extraction fails)
+ */
+async function processMetadataOnly(id, url, title, user_id) {
+  try {
+    console.log(`[Worker] Processing ${id} with metadata-only mode...`);
+
+    // Step 1: Generate summary/tags from URL + title only
+    console.log(`[Worker] Step 1/3: Generating metadata-based summary...`);
+    const summary = await summarizeFromMetadata(url, title);
+
+    // Step 2: Generate embedding from metadata (URL + title + description)
+    console.log(`[Worker] Step 2/3: Generating embedding from metadata...`);
+    const metadataText = `${url}\n${summary.title}\n${summary.description}\n${summary.tags.join(' ')}`;
+    const embedding = await generateEmbedding(metadataText);
+
+    // Step 3: Store in Qdrant
+    console.log(`[Worker] Step 3/3: Storing in vector database...`);
+    const qdrantPointId = await createBookmark(user_id, {
+      url: url,
+      title: summary.title,
+      description: summary.description,
+      content: `Metadata-only bookmark. URL: ${url}`, // Minimal content
+      embedding: embedding,
+      tags: summary.tags || [],
+      favicon_url: null
+    });
+
+    // Step 4: Update Supabase with completion
+    await updateBookmarkRecord(id, {
+      title: summary.title,
+      qdrant_point_id: qdrantPointId,
+      processing_status: 'completed',
+      extraction_method: 'metadata-only', // Mark as fallback method
+      error_message: 'Content extraction failed, processed using metadata only'
+    });
+
+    console.log(`[Worker] ✅ Successfully processed ${id} using metadata-only fallback`);
+    return true;
+
+  } catch (error) {
+    console.error(`[Worker] ❌ Metadata-only processing failed for ${id}:`, error.message);
+    throw error;
+  }
+}
+
+/**
  * Process a single bookmark through the AI pipeline
  *
  * @param {Object} bookmark - The bookmark record from Supabase
  * @returns {Promise<boolean>} True if successful, false if failed
  */
 async function processBookmark(bookmark) {
-  const { id, url, user_id, retry_count } = bookmark;
+  const { id, url, title, user_id, retry_count } = bookmark;
 
   console.log(`\n[Worker] Processing bookmark ${id}: ${url}`);
 
@@ -90,13 +136,20 @@ async function processBookmark(bookmark) {
       });
       console.log(`[Worker] Will retry bookmark ${id} (attempt ${newRetryCount}/${MAX_RETRIES})`);
     } else {
-      // Max retries exceeded, mark as failed
-      await updateBookmarkRecord(id, {
-        processing_status: 'failed',
-        retry_count: newRetryCount,
-        error_message: `Failed after ${MAX_RETRIES} retries: ${error.message}`
-      });
-      console.log(`[Worker] ❌ Bookmark ${id} failed permanently after ${MAX_RETRIES} retries`);
+      // Max retries exceeded, try metadata-only fallback
+      console.log(`[Worker] ⚠️  Max retries exceeded for ${id}, trying metadata-only fallback...`);
+      try {
+        const fallbackSuccess = await processMetadataOnly(id, url, title, user_id);
+        return fallbackSuccess;
+      } catch (fallbackError) {
+        // Even fallback failed, mark as truly failed
+        await updateBookmarkRecord(id, {
+          processing_status: 'failed',
+          retry_count: newRetryCount,
+          error_message: `Failed after ${MAX_RETRIES} retries and fallback: ${error.message}`
+        });
+        console.log(`[Worker] ❌ Bookmark ${id} failed permanently (even fallback failed)`);
+      }
     }
 
     return false;

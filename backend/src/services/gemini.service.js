@@ -167,12 +167,84 @@ export async function processContent(content, url) {
     return {
       title: summary.title,
       description: summary.description,
+      tags: summary.tags,
       embedding: embedding
     };
 
   } catch (error) {
     console.error('[Gemini] Error processing content:', error.message);
     throw error;
+  }
+}
+
+/**
+ * Generate summary and tags from URL + title only (fallback when content extraction fails)
+ *
+ * @param {string} url - The bookmark URL
+ * @param {string} title - The bookmark title (from Chrome)
+ * @returns {Promise<Object>} Summary with title, description, and tags
+ */
+export async function summarizeFromMetadata(url, title) {
+  try {
+    console.log(`[Gemini] Generating summary from metadata only for: ${url}`);
+
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+
+    const prompt = `You are a helpful assistant that creates summaries for bookmarks based on limited information.
+
+Given only the URL and title of a webpage, generate:
+1. An improved title (max 80 characters) - make it more descriptive if possible
+2. A brief description/summary (max 200 characters) - infer what the page is likely about
+3. 3-5 relevant tags (lowercase, hyphenated keywords)
+
+URL: ${url}
+Title: ${title || 'No title provided'}
+
+Respond in JSON format:
+{
+  "title": "your generated title here",
+  "description": "your inferred description here",
+  "tags": ["tag1", "tag2", "tag3"]
+}`;
+
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    const text = response.text();
+
+    // Parse JSON response
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      throw new Error('Failed to parse Gemini response as JSON');
+    }
+
+    const summary = JSON.parse(jsonMatch[0]);
+
+    // Validate response
+    if (!summary.title || !summary.description) {
+      throw new Error('Gemini response missing title or description');
+    }
+
+    // Enforce length limits
+    summary.title = summary.title.substring(0, 80);
+    summary.description = summary.description.substring(0, 200);
+
+    // Process tags
+    if (Array.isArray(summary.tags)) {
+      summary.tags = summary.tags
+        .filter(tag => tag && typeof tag === 'string')
+        .map(tag => tag.toLowerCase().trim())
+        .slice(0, 5);
+    } else {
+      summary.tags = [];
+    }
+
+    console.log(`[Gemini] Generated metadata-only summary: "${summary.title}" with ${summary.tags.length} tags`);
+
+    return summary;
+
+  } catch (error) {
+    console.error('[Gemini] Error generating metadata summary:', error.message);
+    throw new Error(`Gemini metadata summarization failed: ${error.message}`);
   }
 }
 

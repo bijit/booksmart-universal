@@ -88,6 +88,7 @@ router.post('/', async (req, res) => {
 /**
  * GET /api/bookmarks
  * List all bookmarks for authenticated user
+ * Query params: limit, offset, status, url
  */
 router.get('/', async (req, res) => {
   try {
@@ -95,14 +96,16 @@ router.get('/', async (req, res) => {
     const {
       limit = 50,
       offset = 0,
-      status = null
+      status = null,
+      url = null
     } = req.query;
 
     // Get bookmarks from Supabase
     const bookmarks = await getUserBookmarkRecords(userId, {
       limit: parseInt(limit),
       offset: parseInt(offset),
-      status
+      status,
+      url
     });
 
     // For completed bookmarks, enrich with Qdrant data

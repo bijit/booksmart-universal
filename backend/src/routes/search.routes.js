@@ -33,7 +33,7 @@ router.post('/', async (req, res) => {
     const options = {
       limit: parseInt(limit) || 10,
       tags: Array.isArray(tags) ? tags : null,
-      scoreThreshold: parseFloat(scoreThreshold) || 0.5
+      scoreThreshold: parseFloat(scoreThreshold) || 0.35  // Lower threshold for better recall
     };
 
     // Validate limits

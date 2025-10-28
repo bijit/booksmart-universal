@@ -96,7 +96,8 @@ export async function getUserBookmarkRecords(userId, options = {}) {
     const {
       limit = 50,
       offset = 0,
-      status = null
+      status = null,
+      url = null
     } = options;
 
     let query = supabaseAdmin
@@ -108,6 +109,10 @@ export async function getUserBookmarkRecords(userId, options = {}) {
 
     if (status) {
       query = query.eq('processing_status', status);
+    }
+
+    if (url) {
+      query = query.eq('url', url);
     }
 
     const { data, error } = await query;

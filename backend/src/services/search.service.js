@@ -22,7 +22,7 @@ export async function semanticSearch(userId, query, options = {}) {
     const {
       limit = 10,
       tags = null,
-      scoreThreshold = 0.5
+      scoreThreshold = 0.35  // Balanced threshold for good recall without noise
     } = options;
 
     console.log(`[Search] Semantic search: "${query}" for user ${userId}`);
@@ -73,7 +73,7 @@ export async function hybridSearch(userId, query, options = {}) {
     const {
       limit = 10,
       tags = null,
-      scoreThreshold = 0.3  // Lower threshold for hybrid
+      scoreThreshold = 0.25  // Lower threshold for hybrid (gets boosted by text matching)
     } = options;
 
     console.log(`[Search] Hybrid search: "${query}" for user ${userId}`);
