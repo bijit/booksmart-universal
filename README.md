@@ -75,7 +75,51 @@ booksmart_v1.0/
 
 ---
 
-## Quick Start (For New Users)
+## Quick Start (For End Users)
+
+Just want to use BookSmart? Follow these simple steps:
+
+### Step 1: Install the Chrome Extension
+
+1. Download the extension files from your BookSmart administrator
+2. Open Chrome and navigate to `chrome://extensions/`
+3. Enable **"Developer mode"** (toggle in top right)
+4. Click **"Load unpacked"**
+5. Select the `extension/` folder
+6. The BookSmart extension icon will appear in your toolbar
+
+### Step 2: Create Your Account
+
+1. Click the BookSmart extension icon in Chrome toolbar
+2. Click **"Create account"** link
+3. Fill in:
+   - Full Name
+   - Email address
+   - Password (minimum 8 characters)
+4. Click **"Create Account"**
+5. You'll be automatically logged in!
+
+### Step 3: Start Bookmarking!
+
+1. Navigate to any webpage (e.g., Wikipedia article, blog post, PDF)
+2. Click the Chrome ★ star icon (or press Ctrl+D / Cmd+D)
+3. Save the bookmark
+4. BookSmart will automatically:
+   - Extract the content (takes 5-10 seconds)
+   - Generate an AI summary
+   - Create searchable tags
+   - Make it semantically searchable
+
+5. Open the BookSmart popup to see your bookmarks with tags
+6. Use the search box to find bookmarks by concept, not just keywords!
+
+**That's it!** No API keys or database setup needed - the backend is already running.
+
+---
+
+## Self-Hosting / Development Setup
+
+Want to run your own BookSmart instance? Follow these detailed instructions:
 
 ### Prerequisites
 
