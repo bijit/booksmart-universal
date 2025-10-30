@@ -135,9 +135,11 @@ async function handleLogin(e) {
 async function handleRegister(e) {
   e.preventDefault();
 
-  const name = document.getElementById('registerName').value;
   const email = document.getElementById('registerEmail').value;
   const password = document.getElementById('registerPassword').value;
+
+  // Auto-generate name from email (e.g., "john@example.com" -> "john")
+  const name = email.split('@')[0];
 
   // Hide any previous errors
   registerError.classList.add('hidden');

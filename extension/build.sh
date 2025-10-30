@@ -17,8 +17,10 @@ cp src/icons/*.png dist/icons/
 # Copy config
 cp src/config.js dist/
 
-# Copy background script
+# Copy background script and fix import path
 cp src/background/background.js dist/
+# Fix the config.js import path (from ../config.js to ./config.js)
+sed -i "s|'../config.js'|'./config.js'|g" dist/background.js
 
 # Copy popup files
 cp src/popup/popup.html dist/
