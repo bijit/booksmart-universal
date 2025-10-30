@@ -15,7 +15,7 @@
   ],
   "host_permissions": [
     "http://localhost:3000/*",
-    "https://api.booksmart.app/*"
+    "https://booksmart-backend-production-fe49.up.railway.app/*"
   ],
   "background": {
     "service_worker": "background.js",
