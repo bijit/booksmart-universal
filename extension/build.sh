@@ -14,6 +14,9 @@ cp public/manifest.json dist/
 # Copy icons
 cp src/icons/*.png dist/icons/
 
+# Copy config
+cp src/config.js dist/
+
 # Copy background script
 cp src/background/background.js dist/
 

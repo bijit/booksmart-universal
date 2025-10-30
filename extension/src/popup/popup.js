@@ -18,8 +18,8 @@ const emptyState = document.getElementById('emptyState');
 const openManagerBtn = document.getElementById('openManagerBtn');
 const logoutBtn = document.getElementById('logoutBtn');
 
-// API Configuration
-const API_BASE_URL = 'http://localhost:3000/api';
+// API Configuration is now loaded from config.js
+// API_BASE_URL is available globally
 
 // Initialize popup
 document.addEventListener('DOMContentLoaded', async () => {

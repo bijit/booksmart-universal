@@ -1,0 +1,12 @@
+node_modules/
+.env
+.env.local
+*.log
+coverage/
+.DS_Store
+*.test.js
+test-*.js
+scripts/
+migrations/
+.gitignore
+README.md

@@ -1,8 +1,8 @@
 // BookSmart Background Service Worker
 // This script runs in the background and listens to Chrome bookmark events
 
-// API Configuration
-const API_BASE_URL = 'http://localhost:3000/api';
+// Import configuration
+import { API_BASE_URL } from '../config.js';
 
 // Extension Installation
 chrome.runtime.onInstalled.addListener((details) => {
