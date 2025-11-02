@@ -113,7 +113,10 @@ const useBookmarkStore = create((set, get) => ({
       })
 
       if (!response.ok) {
-        throw new Error('Failed to fetch bookmarks')
+        // Try to get the actual error message from the response
+        const errorData = await response.json().catch(() => null)
+        const errorMessage = errorData?.message || errorData?.error || 'Failed to fetch bookmarks'
+        throw new Error(errorMessage)
       }
 
       const data = await response.json()
