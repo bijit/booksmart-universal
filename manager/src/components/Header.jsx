@@ -1,11 +1,30 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Search, Moon, Sun, LogOut, Grid, List, Clock, Upload } from 'lucide-react'
 import useBookmarkStore from '../store/useBookmarkStore'
 
 function Header({ darkMode, toggleDarkMode, onLogout, onOpenImport }) {
   const { searchQuery, setSearchQuery, viewMode, setViewMode } = useBookmarkStore()
   const [searchFocused, setSearchFocused] = useState(false)
+  const [localSearchQuery, setLocalSearchQuery] = useState(searchQuery)
+  const searchTimeoutRef = useRef(null)
   const userName = localStorage.getItem('userName') || localStorage.getItem('userEmail') || 'User'
+
+  // Debounce search to avoid excessive API calls
+  useEffect(() => {
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current)
+    }
+
+    searchTimeoutRef.current = setTimeout(() => {
+      setSearchQuery(localSearchQuery)
+    }, 500) // 500ms debounce
+
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current)
+      }
+    }
+  }, [localSearchQuery, setSearchQuery])
 
   return (
     <header className="sticky top-0 z-50 bg-light-card dark:bg-dark-card border-b border-light-border dark:border-dark-border">
@@ -26,8 +45,8 @@ function Header({ darkMode, toggleDarkMode, onLogout, onOpenImport }) {
               <input
                 type="text"
                 placeholder="Search bookmarks..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                value={localSearchQuery}
+                onChange={(e) => setLocalSearchQuery(e.target.value)}
                 onFocus={() => setSearchFocused(true)}
                 onBlur={() => setSearchFocused(false)}
                 className="input pl-10 pr-4"

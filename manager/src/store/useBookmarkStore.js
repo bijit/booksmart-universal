@@ -26,7 +26,51 @@ const useBookmarkStore = create((set, get) => ({
   setError: (error) => set({ error }),
 
   // Search
-  setSearchQuery: (query) => set({ searchQuery: query }),
+  setSearchQuery: async (query) => {
+    set({ searchQuery: query })
+
+    // If there's a search query, use semantic search API
+    if (query.trim()) {
+      const store = get()
+      await store.performSearch(query)
+    } else {
+      // If search is cleared, reload all bookmarks
+      const store = get()
+      await store.fetchBookmarks()
+    }
+  },
+
+  // Perform semantic search using the API
+  performSearch: async (query) => {
+    set({ loading: true, error: null })
+
+    try {
+      const token = localStorage.getItem('authToken')
+      const response = await fetch(`${API_BASE_URL}/search`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          query,
+          limit: 50,
+          threshold: 0.3
+        })
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null)
+        const errorMessage = errorData?.message || errorData?.error || 'Search failed'
+        throw new Error(errorMessage)
+      }
+
+      const data = await response.json()
+      set({ bookmarks: data.results || [], loading: false, error: null })
+    } catch (error) {
+      set({ error: error.message, loading: false })
+    }
+  },
 
   // Tags
   toggleTag: (tag) => set((state) => {
@@ -51,20 +95,12 @@ const useBookmarkStore = create((set, get) => ({
 
   // Get filtered bookmarks
   getFilteredBookmarks: () => {
-    const { bookmarks, searchQuery, selectedTags, dateRange, sortBy } = get()
+    const { bookmarks, selectedTags, dateRange, sortBy } = get()
 
     let filtered = [...bookmarks]
 
-    // Filter by search query
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase()
-      filtered = filtered.filter(bookmark =>
-        bookmark.title?.toLowerCase().includes(query) ||
-        bookmark.description?.toLowerCase().includes(query) ||
-        bookmark.url?.toLowerCase().includes(query) ||
-        bookmark.tags?.some(tag => tag.toLowerCase().includes(query))
-      )
-    }
+    // Note: Search query filtering is handled by the API (performSearch)
+    // This function only handles client-side tag and date filtering
 
     // Filter by tags
     if (selectedTags.length > 0) {
