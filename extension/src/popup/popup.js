@@ -352,7 +352,7 @@ function escapeHtml(text) {
 
 // Open manager page
 function openManager(path = '') {
-  chrome.tabs.create({ url: `http://localhost:5173${path}` });
+  chrome.tabs.create({ url: `https://booksmart-backend-production-fe49.up.railway.app${path}` });
 }
 
 // UI State Management

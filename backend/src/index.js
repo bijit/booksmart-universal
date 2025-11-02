@@ -44,12 +44,14 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Middleware
-app.use(helmet()); // Security headers
+app.use(helmet({
+  contentSecurityPolicy: false, // Disable CSP for Vite's inline scripts
+})); // Security headers
 app.use(cors()); // Enable CORS
 app.use(express.json()); // Parse JSON bodies
 app.use(morgan('dev')); // HTTP request logging
 
-// Mount routes
+// Mount API routes (before static files)
 app.use('/api/auth', authRoutes);
 app.use('/api/bookmarks', bookmarksRoutes);
 app.use('/api/search', searchRoutes);
@@ -65,36 +67,23 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// Welcome endpoint
-app.get('/', (req, res) => {
-  res.json({
-    name: 'BookSmart API',
-    version: '1.0.0',
-    status: 'running',
-    endpoints: {
-      health: '/api/health',
-      auth: {
-        register: 'POST /api/auth/register',
-        login: 'POST /api/auth/login'
-      },
-      bookmarks: {
-        create: 'POST /api/bookmarks',
-        list: 'GET /api/bookmarks',
-        get: 'GET /api/bookmarks/:id',
-        delete: 'DELETE /api/bookmarks/:id'
-      },
-      search: 'GET /api/search'
-    }
-  });
-});
+// Serve static files from manager/dist (built React app)
+const managerPath = resolve(__dirname, '../../manager/dist');
+app.use(express.static(managerPath));
 
-// 404 handler
-app.use((req, res) => {
-  res.status(404).json({
-    error: 'Not Found',
-    message: `Cannot ${req.method} ${req.path}`,
-    timestamp: new Date().toISOString()
-  });
+// Serve index.html for all non-API routes (React Router support)
+app.get('*', (req, res) => {
+  // Don't serve index.html for API routes
+  if (req.path.startsWith('/api')) {
+    return res.status(404).json({
+      error: 'Not Found',
+      message: `Cannot ${req.method} ${req.path}`,
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  // Serve React app
+  res.sendFile(resolve(managerPath, 'index.html'));
 });
 
 // Error handler

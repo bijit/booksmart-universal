@@ -1,0 +1,126 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply font-sans antialiased;
+    @apply bg-light-bg text-light-text;
+    @apply dark:bg-dark-bg dark:text-dark-text;
+  }
+
+  /* Smooth transitions for theme changes */
+  body,
+  body * {
+    @apply transition-colors duration-200;
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 10px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-light-bg dark:bg-dark-bg;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-light-border dark:bg-dark-border rounded-full;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-gray-400 dark:bg-gray-600;
+  }
+}
+
+@layer components {
+  /* Card styles */
+  .card {
+    @apply bg-light-card dark:bg-dark-card;
+    @apply border border-light-border dark:border-dark-border;
+    @apply rounded-lg shadow-sm;
+    @apply transition-all duration-200;
+  }
+
+  .card:hover {
+    @apply shadow-md border-accent dark:border-accent-dark;
+    transform: translateY(-2px);
+  }
+
+  /* Button styles */
+  .btn {
+    @apply px-4 py-2 rounded-lg font-medium;
+    @apply transition-all duration-200;
+    @apply focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2;
+  }
+
+  .btn-primary {
+    @apply bg-accent hover:bg-accent-hover;
+    @apply text-white;
+  }
+
+  .btn-secondary {
+    @apply bg-light-card dark:bg-dark-card;
+    @apply border border-light-border dark:border-dark-border;
+    @apply hover:bg-gray-50 dark:hover:bg-gray-800;
+  }
+
+  /* Input styles */
+  .input {
+    @apply w-full px-4 py-2 rounded-lg;
+    @apply bg-light-card dark:bg-dark-card;
+    @apply border border-light-border dark:border-dark-border;
+    @apply focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent;
+    @apply transition-all duration-200;
+  }
+
+  /* Tag styles */
+  .tag {
+    @apply inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium;
+    @apply bg-gray-100 dark:bg-gray-800;
+    @apply text-gray-700 dark:text-gray-300;
+    @apply border border-gray-200 dark:border-gray-700;
+    @apply hover:bg-accent hover:text-white hover:border-accent;
+    @apply transition-all duration-200;
+    @apply cursor-pointer;
+  }
+}
+
+@layer utilities {
+  /* Text clamp utilities */
+  .line-clamp-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .line-clamp-3 {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  /* Smooth scrolling */
+  .smooth-scroll {
+    scroll-behavior: smooth;
+  }
+
+  /* Loading animation */
+  @keyframes shimmer {
+    0% {
+      background-position: -1000px 0;
+    }
+    100% {
+      background-position: 1000px 0;
+    }
+  }
+
+  .skeleton {
+    @apply bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200;
+    @apply dark:from-gray-800 dark:via-gray-700 dark:to-gray-800;
+    background-size: 1000px 100%;
+    animation: shimmer 2s infinite linear;
+  }
+}
