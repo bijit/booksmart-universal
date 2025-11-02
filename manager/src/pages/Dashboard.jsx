@@ -13,7 +13,10 @@ function Dashboard({ darkMode, toggleDarkMode, onLogout }) {
     error,
     fetchBookmarks,
     getFilteredBookmarks,
-    viewMode
+    viewMode,
+    dateRange,
+    selectedTags,
+    sortBy
   } = useBookmarkStore()
 
   useEffect(() => {
