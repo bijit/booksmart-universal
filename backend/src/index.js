@@ -67,8 +67,8 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// Serve static files from manager/dist (built React app)
-const managerPath = resolve(__dirname, '../../manager/dist');
+// Serve static files from backend/public (built React app)
+const managerPath = resolve(__dirname, '../public');
 app.use(express.static(managerPath));
 
 // Serve index.html for all non-API routes (React Router support)
