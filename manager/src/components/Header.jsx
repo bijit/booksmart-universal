@@ -5,6 +5,7 @@ import useBookmarkStore from '../store/useBookmarkStore'
 function Header({ darkMode, toggleDarkMode, onLogout }) {
   const { searchQuery, setSearchQuery, viewMode, setViewMode } = useBookmarkStore()
   const [searchFocused, setSearchFocused] = useState(false)
+  const userName = localStorage.getItem('userName') || 'User'
 
   return (
     <header className="sticky top-0 z-50 bg-light-card dark:bg-dark-card border-b border-light-border dark:border-dark-border">
@@ -71,6 +72,11 @@ function Header({ darkMode, toggleDarkMode, onLogout }) {
               >
                 <Clock className="w-4 h-4" />
               </button>
+            </div>
+
+            {/* User Name */}
+            <div className="hidden sm:flex items-center px-3 text-sm text-light-text-secondary dark:text-dark-text-secondary">
+              {userName}
             </div>
 
             {/* Dark Mode Toggle */}

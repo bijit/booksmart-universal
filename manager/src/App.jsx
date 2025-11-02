@@ -17,6 +17,22 @@ function App() {
     return !!localStorage.getItem('authToken')
   })
 
+  // Check for token in URL (from extension) and auto-login
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search)
+    const tokenFromUrl = urlParams.get('token')
+
+    if (tokenFromUrl && !isAuthenticated) {
+      // Store token and authenticate
+      localStorage.setItem('authToken', tokenFromUrl)
+      setIsAuthenticated(true)
+
+      // Clean up URL by removing token parameter
+      const newUrl = window.location.pathname
+      window.history.replaceState({}, document.title, newUrl)
+    }
+  }, [])
+
   // Apply dark mode class to document
   useEffect(() => {
     if (darkMode) {
@@ -31,13 +47,17 @@ function App() {
     setDarkMode(prev => !prev)
   }
 
-  const handleLogin = (token) => {
+  const handleLogin = (token, userName) => {
     localStorage.setItem('authToken', token)
+    if (userName) {
+      localStorage.setItem('userName', userName)
+    }
     setIsAuthenticated(true)
   }
 
   const handleLogout = () => {
     localStorage.removeItem('authToken')
+    localStorage.removeItem('userName')
     setIsAuthenticated(false)
   }
 

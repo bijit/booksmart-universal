@@ -47,8 +47,11 @@ function Login({ onLogin }) {
         throw new Error('No auth token received from server')
       }
 
+      // Extract user name
+      const userName = data.user?.name || data.user?.email?.split('@')[0] || 'User'
+
       // Store token and user info
-      onLogin(token)
+      onLogin(token, userName)
     } catch (err) {
       setError(err.message)
     } finally {

@@ -350,9 +350,18 @@ function escapeHtml(text) {
   return div.innerHTML;
 }
 
-// Open manager page
-function openManager(path = '') {
-  chrome.tabs.create({ url: `https://booksmart-backend-production-fe49.up.railway.app${path}` });
+// Open manager page with auto-login
+async function openManager(path = '') {
+  // Get the auth token from storage
+  const result = await chrome.storage.local.get(['authToken']);
+  const token = result.authToken;
+
+  // Pass token as URL parameter for seamless login
+  const url = token
+    ? `https://booksmart-backend-production-fe49.up.railway.app${path}?token=${encodeURIComponent(token)}`
+    : `https://booksmart-backend-production-fe49.up.railway.app${path}`;
+
+  chrome.tabs.create({ url });
 }
 
 // UI State Management
