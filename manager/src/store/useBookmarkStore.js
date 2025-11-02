@@ -120,7 +120,7 @@ const useBookmarkStore = create((set, get) => ({
       }
 
       const data = await response.json()
-      set({ bookmarks: data.bookmarks || [], loading: false })
+      set({ bookmarks: data.bookmarks || [], loading: false, error: null })
     } catch (error) {
       set({ error: error.message, loading: false })
     }
