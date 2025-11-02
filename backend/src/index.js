@@ -16,6 +16,7 @@ import bookmarksRoutes from './routes/bookmarks.routes.js';
 import searchRoutes from './routes/search.routes.js';
 import preferencesRoutes from './routes/preferences.routes.js';
 import importRoutes from './routes/import.routes.js';
+import debugRoutes from './routes/debug.routes.js';
 import { startWorker } from './workers/bookmark.worker.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -58,6 +59,7 @@ app.use('/api/bookmarks', bookmarksRoutes);
 app.use('/api/search', searchRoutes);
 app.use('/api/preferences', preferencesRoutes);
 app.use('/api/import', importRoutes);
+app.use('/api/debug', debugRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
