@@ -5,7 +5,7 @@ import useBookmarkStore from '../store/useBookmarkStore'
 function Header({ darkMode, toggleDarkMode, onLogout, onOpenImport }) {
   const { searchQuery, setSearchQuery, viewMode, setViewMode } = useBookmarkStore()
   const [searchFocused, setSearchFocused] = useState(false)
-  const userName = localStorage.getItem('userName') || 'User'
+  const userName = localStorage.getItem('userName') || localStorage.getItem('userEmail') || 'User'
 
   return (
     <header className="sticky top-0 z-50 bg-light-card dark:bg-dark-card border-b border-light-border dark:border-dark-border">

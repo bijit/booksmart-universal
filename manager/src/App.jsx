@@ -25,6 +25,21 @@ function App() {
     if (tokenFromUrl) {
       // Always store fresh token from URL (even if there's an old one)
       localStorage.setItem('authToken', tokenFromUrl)
+
+      // Try to extract email from JWT token payload
+      try {
+        const payload = JSON.parse(atob(tokenFromUrl.split('.')[1]))
+        if (payload.email) {
+          localStorage.setItem('userEmail', payload.email)
+          // Use email username as userName if not already set
+          if (!localStorage.getItem('userName')) {
+            localStorage.setItem('userName', payload.email.split('@')[0])
+          }
+        }
+      } catch (e) {
+        console.error('Failed to parse token:', e)
+      }
+
       setIsAuthenticated(true)
 
       // Clean up URL by removing token parameter
@@ -58,6 +73,7 @@ function App() {
   const handleLogout = () => {
     localStorage.removeItem('authToken')
     localStorage.removeItem('userName')
+    localStorage.removeItem('userEmail')
     setIsAuthenticated(false)
   }
 
