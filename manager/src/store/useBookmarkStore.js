@@ -106,7 +106,8 @@ const useBookmarkStore = create((set, get) => ({
 
     try {
       const token = localStorage.getItem('authToken')
-      const response = await fetch(`${API_BASE_URL}/bookmarks`, {
+      // Only fetch completed bookmarks by default (hide pending/failed/processing)
+      const response = await fetch(`${API_BASE_URL}/bookmarks?status=completed`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }

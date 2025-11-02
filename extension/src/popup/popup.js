@@ -207,7 +207,8 @@ async function loadRecentBookmarks() {
   try {
     const authData = await chrome.storage.local.get(['auth_token']);
 
-    const response = await fetch(`${API_BASE_URL}/bookmarks?limit=10&sort=created_at:desc`, {
+    // Only fetch completed bookmarks (hide pending/failed/processing)
+    const response = await fetch(`${API_BASE_URL}/bookmarks?limit=10&status=completed`, {
       headers: {
         'Authorization': `Bearer ${authData.auth_token}`
       }
