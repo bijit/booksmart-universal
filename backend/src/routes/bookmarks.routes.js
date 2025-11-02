@@ -108,21 +108,35 @@ router.get('/', async (req, res) => {
       url
     });
 
+    // Handle empty or null bookmarks
+    if (!bookmarks || !Array.isArray(bookmarks)) {
+      return res.json({
+        bookmarks: [],
+        pagination: {
+          limit: parseInt(limit),
+          offset: parseInt(offset),
+          total: 0
+        }
+      });
+    }
+
     // For completed bookmarks, enrich with Qdrant data
     const enrichedBookmarks = await Promise.all(
       bookmarks.map(async (bookmark) => {
         if (bookmark.processing_status === 'completed' && bookmark.qdrant_point_id) {
           try {
             const qdrantData = await getBookmarkById(bookmark.qdrant_point_id);
-            return {
-              ...bookmark,
-              description: qdrantData?.description,
-              tags: qdrantData?.tags || [],
-              favicon_url: qdrantData?.favicon_url
-            };
+            if (qdrantData) {
+              return {
+                ...bookmark,
+                description: qdrantData.description,
+                tags: qdrantData.tags || [],
+                favicon_url: qdrantData.favicon_url
+              };
+            }
           } catch (error) {
-            console.error(`Error fetching Qdrant data for ${bookmark.id}:`, error);
-            return bookmark;
+            console.error(`Error fetching Qdrant data for ${bookmark.id}:`, error.message);
+            // Return bookmark without enrichment on error
           }
         }
         return bookmark;
@@ -142,7 +156,8 @@ router.get('/', async (req, res) => {
     console.error('List bookmarks error:', error);
     return res.status(500).json({
       error: 'Internal Server Error',
-      message: 'Failed to fetch bookmarks'
+      message: error.message || 'Failed to fetch bookmarks',
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
   }
 });

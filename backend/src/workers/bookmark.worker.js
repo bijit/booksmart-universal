@@ -15,14 +15,18 @@ import {
   getUserBookmarkRecords,
   updateBookmarkRecord
 } from '../services/supabase.service.js';
+import { isQuotaError } from '../utils/errors.js';
 
 // Worker configuration
 const POLL_INTERVAL_MS = 5000; // Check for new bookmarks every 5 seconds
 const MAX_RETRIES = 3;
 const BATCH_SIZE = 5; // Process up to 5 bookmarks concurrently
+const QUOTA_BACKOFF_MS = 60 * 60 * 1000; // Back off for 1 hour when quota is hit
 
 let isProcessing = false;
 let workerRunning = false;
+let quotaExhausted = false;
+let quotaBackoffUntil = null;
 
 /**
  * Process bookmark using metadata-only (fallback when content extraction fails)
@@ -123,7 +127,25 @@ async function processBookmark(bookmark) {
   } catch (error) {
     console.error(`[Worker] ❌ Error processing bookmark ${id}:`, error.message);
 
-    // Determine if we should retry
+    // Check if this is a quota error
+    if (isQuotaError(error)) {
+      console.log(`[Worker] 🚫 Quota exceeded! Keeping bookmark ${id} in pending state for retry tomorrow`);
+
+      // Set quota backoff flag
+      quotaExhausted = true;
+      quotaBackoffUntil = Date.now() + QUOTA_BACKOFF_MS;
+
+      // Keep in pending state, DON'T increment retry count
+      await updateBookmarkRecord(id, {
+        processing_status: 'pending',
+        error_message: 'Quota exceeded - will retry when quota resets'
+      });
+
+      // Throw error to stop batch processing
+      throw new Error('QUOTA_EXHAUSTED');
+    }
+
+    // Determine if we should retry (for non-quota errors)
     const shouldRetry = retry_count < MAX_RETRIES;
     const newRetryCount = retry_count + 1;
 
@@ -142,7 +164,19 @@ async function processBookmark(bookmark) {
         const fallbackSuccess = await processMetadataOnly(id, url, title, user_id);
         return fallbackSuccess;
       } catch (fallbackError) {
-        // Even fallback failed, mark as truly failed
+        // Check if fallback also hit quota
+        if (isQuotaError(fallbackError)) {
+          console.log(`[Worker] 🚫 Quota exceeded during fallback! Keeping ${id} pending`);
+          quotaExhausted = true;
+          quotaBackoffUntil = Date.now() + QUOTA_BACKOFF_MS;
+          await updateBookmarkRecord(id, {
+            processing_status: 'pending',
+            error_message: 'Quota exceeded - will retry when quota resets'
+          });
+          throw new Error('QUOTA_EXHAUSTED');
+        }
+
+        // Even fallback failed (non-quota error), mark as truly failed
         await updateBookmarkRecord(id, {
           processing_status: 'failed',
           retry_count: newRetryCount,
@@ -162,6 +196,20 @@ async function processBookmark(bookmark) {
 async function pollAndProcess() {
   if (isProcessing) {
     return; // Already processing, skip this cycle
+  }
+
+  // Check if quota is exhausted and we're still in backoff period
+  if (quotaExhausted && quotaBackoffUntil && Date.now() < quotaBackoffUntil) {
+    const minutesRemaining = Math.ceil((quotaBackoffUntil - Date.now()) / 60000);
+    console.log(`[Worker] ⏸️  Quota exhausted. Resuming in ~${minutesRemaining} minutes`);
+    return;
+  }
+
+  // Reset quota flag if backoff period has passed
+  if (quotaExhausted && quotaBackoffUntil && Date.now() >= quotaBackoffUntil) {
+    console.log('[Worker] ✅ Quota backoff period ended. Resuming processing...');
+    quotaExhausted = false;
+    quotaBackoffUntil = null;
   }
 
   isProcessing = true;
@@ -184,15 +232,28 @@ async function pollAndProcess() {
     if (pendingBookmarks && pendingBookmarks.length > 0) {
       console.log(`\n[Worker] Found ${pendingBookmarks.length} pending bookmark(s)`);
 
-      // Process bookmarks in parallel (up to BATCH_SIZE)
-      const results = await Promise.allSettled(
-        pendingBookmarks.map(bookmark => processBookmark(bookmark))
-      );
+      // Process bookmarks sequentially to stop immediately on quota error
+      let successful = 0;
+      let failed = 0;
 
-      const successful = results.filter(r => r.status === 'fulfilled' && r.value === true).length;
-      const failed = results.length - successful;
+      for (const bookmark of pendingBookmarks) {
+        try {
+          const result = await processBookmark(bookmark);
+          if (result) {
+            successful++;
+          } else {
+            failed++;
+          }
+        } catch (error) {
+          if (error.message === 'QUOTA_EXHAUSTED') {
+            console.log(`[Worker] 🚫 Stopping batch processing due to quota exhaustion`);
+            break; // Stop processing more bookmarks
+          }
+          failed++;
+        }
+      }
 
-      console.log(`[Worker] Batch complete: ${successful} successful, ${failed} failed`);
+      console.log(`[Worker] Batch complete: ${successful} successful, ${failed} failed/pending`);
     }
 
   } catch (error) {
