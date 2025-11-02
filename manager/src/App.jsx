@@ -22,8 +22,8 @@ function App() {
     const urlParams = new URLSearchParams(window.location.search)
     const tokenFromUrl = urlParams.get('token')
 
-    if (tokenFromUrl && !isAuthenticated) {
-      // Store token and authenticate
+    if (tokenFromUrl) {
+      // Always store fresh token from URL (even if there's an old one)
       localStorage.setItem('authToken', tokenFromUrl)
       setIsAuthenticated(true)
 

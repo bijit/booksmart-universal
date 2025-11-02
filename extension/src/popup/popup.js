@@ -360,8 +360,8 @@ function escapeHtml(text) {
 // Open manager page with auto-login
 async function openManager(path = '') {
   // Get the auth token from storage
-  const result = await chrome.storage.local.get(['authToken']);
-  const token = result.authToken;
+  const result = await chrome.storage.local.get(['auth_token']);
+  const token = result.auth_token;
 
   // Pass token as URL parameter for seamless login
   const url = token
