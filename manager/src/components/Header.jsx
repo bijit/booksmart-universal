@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Search, Moon, Sun, LogOut, Grid, List, Clock, Upload } from 'lucide-react'
+import { Search, Moon, Sun, LogOut, Grid, List, Clock, Upload, X } from 'lucide-react'
 import useBookmarkStore from '../store/useBookmarkStore'
 
 function Header({ darkMode, toggleDarkMode, onLogout, onOpenImport }) {
@@ -49,8 +49,17 @@ function Header({ darkMode, toggleDarkMode, onLogout, onOpenImport }) {
                 onChange={(e) => setLocalSearchQuery(e.target.value)}
                 onFocus={() => setSearchFocused(true)}
                 onBlur={() => setSearchFocused(false)}
-                className="input pl-10 pr-4"
+                className="input pl-10 pr-10"
               />
+              {localSearchQuery && (
+                <button
+                  onClick={() => setLocalSearchQuery('')}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-light-text-secondary dark:text-dark-text-secondary hover:text-light-text dark:hover:text-dark-text transition-colors"
+                  title="Clear search"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
             </div>
           </div>
 

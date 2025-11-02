@@ -12,6 +12,7 @@ const registerError = document.getElementById('registerError');
 const registerLink = document.getElementById('registerLink');
 const backToLoginLink = document.getElementById('backToLoginLink');
 const searchInput = document.getElementById('searchInput');
+const clearSearchBtn = document.getElementById('clearSearchBtn');
 const bookmarksList = document.getElementById('bookmarksList');
 const loadingState = document.getElementById('loadingState');
 const emptyState = document.getElementById('emptyState');
@@ -76,10 +77,25 @@ function setupEventListeners() {
   // Search input
   let searchTimeout;
   searchInput.addEventListener('input', (e) => {
+    const value = e.target.value;
+    // Show/hide clear button
+    if (value) {
+      clearSearchBtn.classList.remove('hidden');
+    } else {
+      clearSearchBtn.classList.add('hidden');
+    }
+
     clearTimeout(searchTimeout);
     searchTimeout = setTimeout(() => {
-      handleSearch(e.target.value);
+      handleSearch(value);
     }, 300); // Debounce 300ms
+  });
+
+  // Clear search button
+  clearSearchBtn.addEventListener('click', () => {
+    searchInput.value = '';
+    clearSearchBtn.classList.add('hidden');
+    loadRecentBookmarks(); // Reload all bookmarks
   });
 
   // Open Manager button

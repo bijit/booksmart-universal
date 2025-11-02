@@ -55,7 +55,7 @@ function BookmarkCard({ bookmark }) {
 
         {/* Description */}
         {bookmark.description && (
-          <p className="text-sm text-light-text-secondary dark:text-dark-text-secondary line-clamp-3 mb-4">
+          <p className="text-sm text-light-text-secondary dark:text-dark-text-secondary line-clamp-5 mb-4">
             {bookmark.description}
           </p>
         )}

@@ -181,13 +181,18 @@ input::placeholder {
 /* Main Screen - Header */
 .header {
   display: flex;
-  align-items: center;
+  flex-direction: column;
   gap: 12px;
   padding: 16px;
   border-bottom: 1px solid #E5E7EB;
 }
 
-.open-manager-link {
+.header-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.open-manager-link, .btn-import {
   display: inline-flex;
   align-items: center;
   gap: 5px;
@@ -197,10 +202,13 @@ input::placeholder {
   border-radius: 6px;
   font-size: 13px;
   font-weight: 600;
-  color: #3B82F6;
   cursor: pointer;
   transition: all 0.2s;
   white-space: nowrap;
+}
+
+.open-manager-link {
+  color: #3B82F6;
 }
 
 .open-manager-link:hover {
@@ -208,7 +216,16 @@ input::placeholder {
   background: #EFF6FF;
 }
 
-.open-manager-link svg {
+.btn-import {
+  color: #059669;
+}
+
+.btn-import:hover {
+  color: #047857;
+  background: #D1FAE5;
+}
+
+.open-manager-link svg, .btn-import svg {
   flex-shrink: 0;
 }
 
@@ -227,7 +244,30 @@ input::placeholder {
 
 #searchInput {
   padding-left: 36px;
+  padding-right: 36px;
   width: 100%;
+}
+
+.clear-search-btn {
+  position: absolute;
+  right: 8px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: background 0.2s;
+}
+
+.clear-search-btn:hover {
+  background: #F3F4F6;
+}
+
+.clear-search-btn svg {
+  flex-shrink: 0;
 }
 
 /* Bookmarks Container */

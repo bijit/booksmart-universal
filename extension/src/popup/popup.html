@@ -62,19 +62,33 @@
     <div id="mainScreen" class="screen hidden">
       <!-- Header with Search -->
       <div class="header">
-        <button id="openManagerBtn" class="open-manager-link" title="Open full manager">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M10 6H6C4.89543 6 4 6.89543 4 8V18C4 19.1046 4.89543 20 6 20H16C17.1046 20 18 19.1046 18 18V14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-            <path d="M14 4H20M20 4V10M20 4L10 14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-          Manager
-        </button>
+        <div class="header-buttons">
+          <button id="openManagerBtn" class="open-manager-link" title="Open full manager">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M10 6H6C4.89543 6 4 6.89543 4 8V18C4 19.1046 4.89543 20 6 20H16C17.1046 20 18 19.1046 18 18V14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              <path d="M14 4H20M20 4V10M20 4L10 14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            Manager
+          </button>
+          <button id="importBtn" class="btn-import" title="Import Chrome Bookmarks">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M21 15V19C21 20.1046 20.1046 21 19 21H5C3.89543 21 3 20.1046 3 19V15" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              <path d="M17 8L12 3M12 3L7 8M12 3V15" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            Import
+          </button>
+        </div>
         <div class="search-container">
           <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
             <circle cx="11" cy="11" r="8" stroke="#6B7280" stroke-width="2"/>
             <path d="M21 21L16.65 16.65" stroke="#6B7280" stroke-width="2" stroke-linecap="round"/>
           </svg>
           <input type="text" id="searchInput" placeholder="Search bookmarks..." autocomplete="off">
+          <button id="clearSearchBtn" class="clear-search-btn hidden" title="Clear search">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M18 6L6 18M6 6L18 18" stroke="#6B7280" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+          </button>
         </div>
       </div>
 
@@ -116,7 +130,6 @@
 
       <!-- Footer -->
       <div class="footer">
-        <button id="importBtn" class="btn btn-secondary">Import Bookmarks</button>
         <button id="logoutBtn" class="btn btn-text">Logout</button>
       </div>
     </div>
