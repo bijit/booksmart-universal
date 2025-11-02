@@ -15,7 +15,10 @@ const searchInput = document.getElementById('searchInput');
 const bookmarksList = document.getElementById('bookmarksList');
 const loadingState = document.getElementById('loadingState');
 const emptyState = document.getElementById('emptyState');
+const importProgressState = document.getElementById('importProgressState');
 const openManagerBtn = document.getElementById('openManagerBtn');
+const importBtn = document.getElementById('importBtn');
+const importFromEmptyBtn = document.getElementById('importFromEmptyBtn');
 const logoutBtn = document.getElementById('logoutBtn');
 
 // API Configuration is now loaded from config.js
@@ -83,6 +86,10 @@ function setupEventListeners() {
   openManagerBtn.addEventListener('click', () => {
     openManager();
   });
+
+  // Import buttons
+  importBtn.addEventListener('click', handleImport);
+  importFromEmptyBtn.addEventListener('click', handleImport);
 
   // Logout button
   logoutBtn.addEventListener('click', handleLogout);
@@ -419,4 +426,165 @@ function showError(message) {
 function showRegisterError(message) {
   registerError.textContent = message;
   registerError.classList.remove('hidden');
+}
+
+// Import functionality
+async function handleImport() {
+  try {
+    // Get all Chrome bookmarks
+    const bookmarksTree = await chrome.bookmarks.getTree();
+
+    // Flatten the bookmark tree into a list of URLs
+    const bookmarks = flattenBookmarks(bookmarksTree);
+
+    if (bookmarks.length === 0) {
+      alert('No bookmarks found to import');
+      return;
+    }
+
+    // Confirm with user
+    const confirmed = confirm(`Import ${bookmarks.length} Chrome bookmarks to BookSmart?\n\nThis may take several minutes. You can close this popup and the import will continue in the background.`);
+
+    if (!confirmed) {
+      return;
+    }
+
+    // Show import progress
+    showImportProgress();
+
+    // Send bookmarks to backend in batches
+    await importBookmarksBatch(bookmarks);
+
+  } catch (error) {
+    console.error('Import error:', error);
+    alert('Failed to import bookmarks: ' + error.message);
+    hideImportProgress();
+  }
+}
+
+// Flatten Chrome bookmarks tree into array
+function flattenBookmarks(nodes) {
+  const bookmarks = [];
+
+  function traverse(node) {
+    if (node.url) {
+      // This is a bookmark (has URL)
+      bookmarks.push({
+        url: node.url,
+        title: node.title
+      });
+    }
+
+    // Recursively traverse children
+    if (node.children) {
+      node.children.forEach(child => traverse(child));
+    }
+  }
+
+  nodes.forEach(node => traverse(node));
+  return bookmarks;
+}
+
+// Import bookmarks in batches
+async function importBookmarksBatch(bookmarks) {
+  try {
+    const authData = await chrome.storage.local.get(['auth_token']);
+
+    // Send all bookmarks in one batch to the backend
+    // Backend will create them as "pending" and worker will process
+    const response = await fetch(`${API_BASE_URL}/import/batch`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${authData.auth_token}`
+      },
+      body: JSON.stringify({
+        bookmarks
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`Import failed: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    const jobId = data.jobId;
+
+    // Poll for progress
+    await pollImportProgress(jobId, bookmarks.length);
+
+  } catch (error) {
+    console.error('Batch import error:', error);
+    throw error;
+  }
+}
+
+// Poll import progress
+async function pollImportProgress(jobId, totalBookmarks) {
+  const authData = await chrome.storage.local.get(['auth_token']);
+  const pollInterval = 2000; // Poll every 2 seconds
+
+  return new Promise((resolve, reject) => {
+    const interval = setInterval(async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/import/${jobId}/status`, {
+          headers: {
+            'Authorization': `Bearer ${authData.auth_token}`
+          }
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to get import status');
+        }
+
+        const status = await response.json();
+
+        // Update progress UI
+        updateImportProgress(status.processedBookmarks, totalBookmarks, status.progress);
+
+        // Check if complete
+        if (status.status === 'completed') {
+          clearInterval(interval);
+          hideImportProgress();
+
+          // Show success message
+          alert(`Import complete!\n\n${status.successfulBookmarks} bookmarks imported successfully.\n${status.failedBookmarks} failed.\n\nBookmarks are now being processed by AI. Check back in a few minutes.`);
+
+          // Reload bookmarks
+          loadRecentBookmarks();
+
+          resolve();
+        }
+      } catch (error) {
+        clearInterval(interval);
+        hideImportProgress();
+        reject(error);
+      }
+    }, pollInterval);
+  });
+}
+
+// Show import progress UI
+function showImportProgress() {
+  bookmarksList.classList.add('hidden');
+  emptyState.classList.add('hidden');
+  loadingState.classList.add('hidden');
+  importProgressState.classList.remove('hidden');
+}
+
+// Hide import progress UI
+function hideImportProgress() {
+  importProgressState.classList.add('hidden');
+  bookmarksList.classList.remove('hidden');
+}
+
+// Update import progress
+function updateImportProgress(processed, total, percentage) {
+  const progressText = document.getElementById('importProgressText');
+  const progressFill = document.getElementById('importProgressFill');
+  const progressDetails = document.getElementById('importProgressDetails');
+
+  progressText.textContent = 'Importing bookmarks...';
+  progressFill.style.width = `${percentage}%`;
+  progressDetails.textContent = `${processed} / ${total} (${percentage}%)`;
 }

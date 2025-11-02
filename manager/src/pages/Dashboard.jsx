@@ -1,11 +1,13 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import Header from '../components/Header'
 import Sidebar from '../components/Sidebar'
 import BookmarkCard from '../components/BookmarkCard'
 import EmptyState from '../components/EmptyState'
+import ImportBookmarks from '../components/ImportBookmarks'
 import useBookmarkStore from '../store/useBookmarkStore'
 
 function Dashboard({ darkMode, toggleDarkMode, onLogout }) {
+  const [showImport, setShowImport] = useState(false)
   const {
     loading,
     error,
@@ -33,6 +35,7 @@ function Dashboard({ darkMode, toggleDarkMode, onLogout }) {
         darkMode={darkMode}
         toggleDarkMode={toggleDarkMode}
         onLogout={onLogout}
+        onOpenImport={() => setShowImport(true)}
       />
 
       <div className="flex flex-1 overflow-hidden">
@@ -135,6 +138,16 @@ function Dashboard({ darkMode, toggleDarkMode, onLogout }) {
           </div>
         </main>
       </div>
+
+      {/* Import Modal */}
+      {showImport && (
+        <ImportBookmarks
+          onClose={() => setShowImport(false)}
+          onImportComplete={() => {
+            fetchBookmarks()
+          }}
+        />
+      )}
     </div>
   )
 }

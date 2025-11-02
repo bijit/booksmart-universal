@@ -62,6 +62,13 @@
     <div id="mainScreen" class="screen hidden">
       <!-- Header with Search -->
       <div class="header">
+        <button id="openManagerBtn" class="open-manager-link" title="Open full manager">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M10 6H6C4.89543 6 4 6.89543 4 8V18C4 19.1046 4.89543 20 6 20H16C17.1046 20 18 19.1046 18 18V14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            <path d="M14 4H20M20 4V10M20 4L10 14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          Manager
+        </button>
         <div class="search-container">
           <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
             <circle cx="11" cy="11" r="8" stroke="#6B7280" stroke-width="2"/>
@@ -86,23 +93,30 @@
         <!-- Empty State -->
         <div id="emptyState" class="state-message hidden">
           <svg width="64" height="64" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M19 21H5C3.89543 21 3 20.1046 3 19V5C3 3.89543 3.89543 3 5 3H19C20.1046 3 21 3.89543 21 5V19C21 20.1046 20.1046 21 19 21Z" stroke="#D1D5DB" stroke-width="2"/>
+            <path d="M19 21H5C3.89543 21 3 20.1046 3 19V5C3.89543 3.89543 3.89543 3 5 3H19C20.1046 3 21 3.89543 21 5V19C21 20.1046 20.1046 21 19 21Z" stroke="#D1D5DB" stroke-width="2"/>
             <path d="M12 8V16M8 12H16" stroke="#D1D5DB" stroke-width="2" stroke-linecap="round"/>
           </svg>
           <p>No bookmarks yet</p>
           <p class="hint">Click the star in your address bar to save a bookmark</p>
+          <button id="importFromEmptyBtn" class="btn btn-primary" style="margin-top: 16px;">
+            Import Chrome Bookmarks
+          </button>
+        </div>
+
+        <!-- Import Progress State -->
+        <div id="importProgressState" class="state-message hidden">
+          <div class="spinner"></div>
+          <p id="importProgressText">Importing bookmarks...</p>
+          <div class="import-progress-bar">
+            <div id="importProgressFill" class="import-progress-fill"></div>
+          </div>
+          <p id="importProgressDetails" class="hint">0 / 0 (0%)</p>
         </div>
       </div>
 
       <!-- Footer -->
       <div class="footer">
-        <button id="openManagerBtn" class="btn btn-secondary">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M10 6H6C4.89543 6 4 6.89543 4 8V18C4 19.1046 4.89543 20 6 20H16C17.1046 20 18 19.1046 18 18V14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-            <path d="M14 4H20M20 4V10M20 4L10 14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-          Open Manager
-        </button>
+        <button id="importBtn" class="btn btn-secondary">Import Bookmarks</button>
         <button id="logoutBtn" class="btn btn-text">Logout</button>
       </div>
     </div>

@@ -1,8 +1,8 @@
 import { useState } from 'react'
-import { Search, Moon, Sun, LogOut, Grid, List, Clock } from 'lucide-react'
+import { Search, Moon, Sun, LogOut, Grid, List, Clock, Upload } from 'lucide-react'
 import useBookmarkStore from '../store/useBookmarkStore'
 
-function Header({ darkMode, toggleDarkMode, onLogout }) {
+function Header({ darkMode, toggleDarkMode, onLogout, onOpenImport }) {
   const { searchQuery, setSearchQuery, viewMode, setViewMode } = useBookmarkStore()
   const [searchFocused, setSearchFocused] = useState(false)
   const userName = localStorage.getItem('userName') || 'User'
@@ -73,6 +73,16 @@ function Header({ darkMode, toggleDarkMode, onLogout }) {
                 <Clock className="w-4 h-4" />
               </button>
             </div>
+
+            {/* Import Button */}
+            <button
+              onClick={onOpenImport}
+              className="hidden md:flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-light-bg dark:hover:bg-dark-bg transition-colors text-sm font-medium"
+              title="Import Bookmarks"
+            >
+              <Upload className="w-4 h-4" />
+              Import
+            </button>
 
             {/* User Name */}
             <div className="hidden sm:flex items-center px-3 text-sm text-light-text-secondary dark:text-dark-text-secondary">
