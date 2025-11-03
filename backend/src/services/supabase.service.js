@@ -97,7 +97,9 @@ export async function getUserBookmarkRecords(userId, options = {}) {
       limit = 50,
       offset = 0,
       status = null,
-      url = null
+      url = null,
+      start_date = null,
+      end_date = null
     } = options;
 
     let query = supabaseAdmin
@@ -113,6 +115,15 @@ export async function getUserBookmarkRecords(userId, options = {}) {
 
     if (url) {
       query = query.eq('url', url);
+    }
+
+    // Add date range filtering
+    if (start_date) {
+      query = query.gte('created_at', start_date);
+    }
+
+    if (end_date) {
+      query = query.lte('created_at', end_date);
     }
 
     const { data, error } = await query;

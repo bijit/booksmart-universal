@@ -88,7 +88,7 @@ router.post('/', async (req, res) => {
 /**
  * GET /api/bookmarks
  * List all bookmarks for authenticated user
- * Query params: limit, offset, status, url
+ * Query params: limit, offset, status, url, tags, start_date, end_date
  */
 router.get('/', async (req, res) => {
   try {
@@ -97,15 +97,23 @@ router.get('/', async (req, res) => {
       limit = 50,
       offset = 0,
       status = null,
-      url = null
+      url = null,
+      tags = null,
+      start_date = null,
+      end_date = null
     } = req.query;
 
-    // Get bookmarks from Supabase
+    // Parse tags if provided (comma-separated)
+    const tagArray = tags ? tags.split(',').map(t => t.trim()).filter(t => t) : null;
+
+    // Get bookmarks from Supabase with date filtering
     const bookmarks = await getUserBookmarkRecords(userId, {
       limit: parseInt(limit),
       offset: parseInt(offset),
       status,
-      url
+      url,
+      start_date,
+      end_date
     });
 
     // Handle empty or null bookmarks
@@ -143,12 +151,22 @@ router.get('/', async (req, res) => {
       })
     );
 
+    // Filter by tags if specified (client-side filtering after enrichment)
+    let filteredBookmarks = enrichedBookmarks;
+    if (tagArray && tagArray.length > 0) {
+      filteredBookmarks = enrichedBookmarks.filter(bookmark => {
+        if (!bookmark.tags || !Array.isArray(bookmark.tags)) return false;
+        // Check if bookmark has ANY of the requested tags
+        return tagArray.some(tag => bookmark.tags.includes(tag));
+      });
+    }
+
     res.json({
-      bookmarks: enrichedBookmarks,
+      bookmarks: filteredBookmarks,
       pagination: {
         limit: parseInt(limit),
         offset: parseInt(offset),
-        total: enrichedBookmarks.length
+        total: filteredBookmarks.length
       }
     });
 

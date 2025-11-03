@@ -78,19 +78,37 @@ const useBookmarkStore = create((set, get) => ({
   },
 
   // Tags
-  toggleTag: (tag) => set((state) => {
+  toggleTag: async (tag) => {
+    const state = get()
     const selectedTags = state.selectedTags.includes(tag)
       ? state.selectedTags.filter(t => t !== tag)
       : [...state.selectedTags, tag]
-    return { selectedTags }
-  }),
+    set({ selectedTags })
+    // Refetch with new filter
+    await state.fetchBookmarks()
+  },
 
-  clearTags: () => set({ selectedTags: [] }),
+  clearTags: async () => {
+    set({ selectedTags: [] })
+    // Refetch without tag filter
+    const state = get()
+    await state.fetchBookmarks()
+  },
 
   // Date range
-  setDateRange: (start, end) => set({ dateRange: { start, end } }),
+  setDateRange: async (start, end) => {
+    set({ dateRange: { start, end } })
+    // Refetch with new filter
+    const state = get()
+    await state.fetchBookmarks()
+  },
 
-  clearDateRange: () => set({ dateRange: { start: null, end: null } }),
+  clearDateRange: async () => {
+    set({ dateRange: { start: null, end: null } })
+    // Refetch without date filter
+    const state = get()
+    await state.fetchBookmarks()
+  },
 
   // Sort
   setSortBy: (sortBy) => set({ sortBy }),
@@ -100,29 +118,12 @@ const useBookmarkStore = create((set, get) => ({
 
   // Get filtered bookmarks
   getFilteredBookmarks: () => {
-    const { bookmarks, selectedTags, dateRange, sortBy } = get()
+    const { bookmarks, sortBy } = get()
 
     let filtered = [...bookmarks]
 
-    // Note: Search query filtering is handled by the API (performSearch)
-    // This function only handles client-side tag and date filtering
-
-    // Filter by tags
-    if (selectedTags.length > 0) {
-      filtered = filtered.filter(bookmark =>
-        selectedTags.some(tag => bookmark.tags?.includes(tag))
-      )
-    }
-
-    // Filter by date range
-    if (dateRange.start || dateRange.end) {
-      filtered = filtered.filter(bookmark => {
-        const bookmarkDate = new Date(bookmark.created_at)
-        if (dateRange.start && bookmarkDate < dateRange.start) return false
-        if (dateRange.end && bookmarkDate > dateRange.end) return false
-        return true
-      })
-    }
+    // Note: Search query, tags, and date filtering are handled by the API
+    // This function only handles client-side sorting
 
     // Sort
     filtered.sort((a, b) => {
@@ -143,14 +144,34 @@ const useBookmarkStore = create((set, get) => ({
 
   // Fetch bookmarks from API (reset pagination)
   fetchBookmarks: async () => {
-    const { pageSize } = get()
+    const { pageSize, selectedTags, dateRange } = get()
     set({ loading: true, error: null, currentOffset: 0 })
 
     try {
       const token = localStorage.getItem('authToken')
-      // Only fetch completed bookmarks by default (hide pending/failed/processing)
+
+      // Build query parameters
+      const params = new URLSearchParams({
+        status: 'completed',
+        limit: pageSize,
+        offset: 0
+      })
+
+      // Add tag filtering
+      if (selectedTags.length > 0) {
+        params.append('tags', selectedTags.join(','))
+      }
+
+      // Add date range filtering
+      if (dateRange.start) {
+        params.append('start_date', dateRange.start.toISOString())
+      }
+      if (dateRange.end) {
+        params.append('end_date', dateRange.end.toISOString())
+      }
+
       const response = await fetch(
-        `${API_BASE_URL}/bookmarks?status=completed&limit=${pageSize}&offset=0`,
+        `${API_BASE_URL}/bookmarks?${params.toString()}`,
         {
           headers: {
             'Authorization': `Bearer ${token}`
@@ -181,13 +202,34 @@ const useBookmarkStore = create((set, get) => ({
 
   // Load more bookmarks (append to existing)
   loadMoreBookmarks: async () => {
-    const { currentOffset, pageSize, bookmarks: existingBookmarks } = get()
+    const { currentOffset, pageSize, selectedTags, dateRange, bookmarks: existingBookmarks } = get()
     set({ loading: true, error: null })
 
     try {
       const token = localStorage.getItem('authToken')
+
+      // Build query parameters with same filters as initial fetch
+      const params = new URLSearchParams({
+        status: 'completed',
+        limit: pageSize,
+        offset: currentOffset
+      })
+
+      // Add tag filtering
+      if (selectedTags.length > 0) {
+        params.append('tags', selectedTags.join(','))
+      }
+
+      // Add date range filtering
+      if (dateRange.start) {
+        params.append('start_date', dateRange.start.toISOString())
+      }
+      if (dateRange.end) {
+        params.append('end_date', dateRange.end.toISOString())
+      }
+
       const response = await fetch(
-        `${API_BASE_URL}/bookmarks?status=completed&limit=${pageSize}&offset=${currentOffset}`,
+        `${API_BASE_URL}/bookmarks?${params.toString()}`,
         {
           headers: {
             'Authorization': `Bearer ${token}`
