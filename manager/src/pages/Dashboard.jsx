@@ -4,6 +4,7 @@ import Sidebar from '../components/Sidebar'
 import BookmarkCard from '../components/BookmarkCard'
 import EmptyState from '../components/EmptyState'
 import ImportBookmarks from '../components/ImportBookmarks'
+import Pagination from '../components/Pagination'
 import useBookmarkStore from '../store/useBookmarkStore'
 
 function Dashboard({ darkMode, toggleDarkMode, onLogout }) {
@@ -12,13 +13,14 @@ function Dashboard({ darkMode, toggleDarkMode, onLogout }) {
     loading,
     error,
     fetchBookmarks,
-    loadMoreBookmarks,
+    goToPage,
     getFilteredBookmarks,
     viewMode,
     dateRange,
     selectedTags,
     sortBy,
-    hasMore
+    currentPage,
+    totalPages
   } = useBookmarkStore()
 
   useEffect(() => {
@@ -86,17 +88,12 @@ function Dashboard({ darkMode, toggleDarkMode, onLogout }) {
                     <BookmarkCard key={bookmark.id} bookmark={bookmark} />
                   ))}
                 </div>
-                {hasMore && (
-                  <div className="mt-8 text-center">
-                    <button
-                      onClick={loadMoreBookmarks}
-                      disabled={loading}
-                      className="px-6 py-3 bg-accent text-white rounded-lg hover:bg-accent/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                    >
-                      {loading ? 'Loading...' : 'Load More'}
-                    </button>
-                  </div>
-                )}
+                <Pagination
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  onPageChange={goToPage}
+                  loading={loading}
+                />
               </>
             )}
 
@@ -108,17 +105,12 @@ function Dashboard({ darkMode, toggleDarkMode, onLogout }) {
                     <BookmarkCard key={bookmark.id} bookmark={bookmark} />
                   ))}
                 </div>
-                {hasMore && (
-                  <div className="mt-8 text-center">
-                    <button
-                      onClick={loadMoreBookmarks}
-                      disabled={loading}
-                      className="px-6 py-3 bg-accent text-white rounded-lg hover:bg-accent/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                    >
-                      {loading ? 'Loading...' : 'Load More'}
-                    </button>
-                  </div>
-                )}
+                <Pagination
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  onPageChange={goToPage}
+                  loading={loading}
+                />
               </>
             )}
 
@@ -166,17 +158,12 @@ function Dashboard({ darkMode, toggleDarkMode, onLogout }) {
                     </div>
                   ))}
                 </div>
-                {hasMore && (
-                  <div className="mt-8 text-center">
-                    <button
-                      onClick={loadMoreBookmarks}
-                      disabled={loading}
-                      className="px-6 py-3 bg-accent text-white rounded-lg hover:bg-accent/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                    >
-                      {loading ? 'Loading...' : 'Load More'}
-                    </button>
-                  </div>
-                )}
+                <Pagination
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  onPageChange={goToPage}
+                  loading={loading}
+                />
               </>
             )}
           </div>

@@ -89,6 +89,54 @@ export async function getBookmarkRecord(bookmarkId) {
 }
 
 /**
+ * Get total count of bookmarks for a user (with filters, before tag filtering)
+ */
+export async function getUserBookmarkCount(userId, options = {}) {
+  try {
+    const {
+      status = null,
+      url = null,
+      start_date = null,
+      end_date = null
+    } = options;
+
+    let query = supabaseAdmin
+      .from('bookmarks')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', userId);
+
+    if (status) {
+      query = query.eq('processing_status', status);
+    }
+
+    if (url) {
+      query = query.eq('url', url);
+    }
+
+    // Add date range filtering
+    if (start_date) {
+      query = query.gte('created_at', start_date);
+    }
+
+    if (end_date) {
+      query = query.lte('created_at', end_date);
+    }
+
+    const { count, error } = await query;
+
+    if (error) {
+      throw error;
+    }
+
+    return count || 0;
+
+  } catch (error) {
+    console.error('Error getting bookmark count from Supabase:', error);
+    throw new Error(`Failed to get bookmark count: ${error.message}`);
+  }
+}
+
+/**
  * Get all bookmark records for a user
  */
 export async function getUserBookmarkRecords(userId, options = {}) {

@@ -10,6 +10,7 @@ import {
   createBookmarkRecord,
   getBookmarkRecord,
   getUserBookmarkRecords,
+  getUserBookmarkCount,
   updateBookmarkRecord,
   deleteBookmarkRecord
 } from '../services/supabase.service.js';
@@ -106,6 +107,14 @@ router.get('/', async (req, res) => {
     // Parse tags if provided (comma-separated)
     const tagArray = tags ? tags.split(',').map(t => t.trim()).filter(t => t) : null;
 
+    // Get total count from Supabase (before pagination and tag filtering)
+    const totalCount = await getUserBookmarkCount(userId, {
+      status,
+      url,
+      start_date,
+      end_date
+    });
+
     // Get bookmarks from Supabase with date filtering
     const bookmarks = await getUserBookmarkRecords(userId, {
       limit: parseInt(limit),
@@ -123,7 +132,8 @@ router.get('/', async (req, res) => {
         pagination: {
           limit: parseInt(limit),
           offset: parseInt(offset),
-          total: 0
+          total: totalCount,
+          totalPages: Math.ceil(totalCount / parseInt(limit))
         }
       });
     }
@@ -161,12 +171,20 @@ router.get('/', async (req, res) => {
       });
     }
 
+    // Note: If tags are filtered, totalCount may not be accurate for filtered results
+    // But it gives a reasonable approximation for pagination
+    const effectiveTotal = tagArray && tagArray.length > 0
+      ? Math.max(filteredBookmarks.length, totalCount) // Use the larger value as estimate
+      : totalCount;
+
     res.json({
       bookmarks: filteredBookmarks,
       pagination: {
         limit: parseInt(limit),
         offset: parseInt(offset),
-        total: filteredBookmarks.length
+        total: effectiveTotal,
+        totalPages: Math.ceil(effectiveTotal / parseInt(limit)),
+        currentPage: Math.floor(parseInt(offset) / parseInt(limit)) + 1
       }
     });
 

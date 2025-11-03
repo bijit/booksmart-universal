@@ -8,9 +8,10 @@ const useBookmarkStore = create((set, get) => ({
   error: null,
 
   // Pagination
-  hasMore: true,
-  currentOffset: 0,
-  pageSize: 100,
+  currentPage: 1,
+  pageSize: 50,
+  totalBookmarks: 0,
+  totalPages: 0,
 
   // Filters
   searchQuery: '',
@@ -142,19 +143,22 @@ const useBookmarkStore = create((set, get) => ({
     return filtered
   },
 
-  // Fetch bookmarks from API (reset pagination)
-  fetchBookmarks: async () => {
+  // Fetch bookmarks from API (page 1 by default)
+  fetchBookmarks: async (page = 1) => {
     const { pageSize, selectedTags, dateRange } = get()
-    set({ loading: true, error: null, currentOffset: 0 })
+    set({ loading: true, error: null, currentPage: page })
 
     try {
       const token = localStorage.getItem('authToken')
+
+      // Calculate offset from page number
+      const offset = (page - 1) * pageSize
 
       // Build query parameters
       const params = new URLSearchParams({
         status: 'completed',
         limit: pageSize,
-        offset: 0
+        offset: offset
       })
 
       // Add tag filtering
@@ -188,70 +192,42 @@ const useBookmarkStore = create((set, get) => ({
 
       const data = await response.json()
       const bookmarks = data.bookmarks || []
+      const pagination = data.pagination || {}
+
       set({
         bookmarks,
         loading: false,
         error: null,
-        currentOffset: bookmarks.length,
-        hasMore: bookmarks.length >= pageSize
+        currentPage: page,
+        totalBookmarks: pagination.total || 0,
+        totalPages: pagination.totalPages || 0
       })
     } catch (error) {
       set({ error: error.message, loading: false })
     }
   },
 
-  // Load more bookmarks (append to existing)
-  loadMoreBookmarks: async () => {
-    const { currentOffset, pageSize, selectedTags, dateRange, bookmarks: existingBookmarks } = get()
-    set({ loading: true, error: null })
+  // Go to specific page
+  goToPage: async (page) => {
+    const state = get()
+    await state.fetchBookmarks(page)
+  },
 
-    try {
-      const token = localStorage.getItem('authToken')
+  // Go to next page
+  nextPage: async () => {
+    const { currentPage, totalPages } = get()
+    if (currentPage < totalPages) {
+      const state = get()
+      await state.fetchBookmarks(currentPage + 1)
+    }
+  },
 
-      // Build query parameters with same filters as initial fetch
-      const params = new URLSearchParams({
-        status: 'completed',
-        limit: pageSize,
-        offset: currentOffset
-      })
-
-      // Add tag filtering
-      if (selectedTags.length > 0) {
-        params.append('tags', selectedTags.join(','))
-      }
-
-      // Add date range filtering
-      if (dateRange.start) {
-        params.append('start_date', dateRange.start.toISOString())
-      }
-      if (dateRange.end) {
-        params.append('end_date', dateRange.end.toISOString())
-      }
-
-      const response = await fetch(
-        `${API_BASE_URL}/bookmarks?${params.toString()}`,
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        }
-      )
-
-      if (!response.ok) {
-        throw new Error('Failed to load more bookmarks')
-      }
-
-      const data = await response.json()
-      const newBookmarks = data.bookmarks || []
-      set({
-        bookmarks: [...existingBookmarks, ...newBookmarks],
-        loading: false,
-        error: null,
-        currentOffset: currentOffset + newBookmarks.length,
-        hasMore: newBookmarks.length >= pageSize
-      })
-    } catch (error) {
-      set({ error: error.message, loading: false })
+  // Go to previous page
+  previousPage: async () => {
+    const { currentPage } = get()
+    if (currentPage > 1) {
+      const state = get()
+      await state.fetchBookmarks(currentPage - 1)
     }
   },
 
