@@ -1,7 +1,8 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 
 function Pagination({ currentPage, totalPages, onPageChange, loading }) {
-  if (totalPages <= 1) return null
+  // Hide pagination if no pages or only 1 page, or if totalPages is 0 (search mode)
+  if (!totalPages || totalPages <= 1) return null
 
   // Calculate page numbers to show (max 7 pages)
   const getPageNumbers = () => {

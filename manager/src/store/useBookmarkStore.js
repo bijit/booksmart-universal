@@ -72,7 +72,17 @@ const useBookmarkStore = create((set, get) => ({
       }
 
       const data = await response.json()
-      set({ bookmarks: data.results || [], loading: false, error: null })
+      const results = data.results || []
+
+      // Reset pagination for search results (search doesn't support pagination)
+      set({
+        bookmarks: results,
+        loading: false,
+        error: null,
+        currentPage: 1,
+        totalPages: 0, // 0 indicates search mode (pagination hidden)
+        totalBookmarks: results.length
+      })
     } catch (error) {
       set({ error: error.message, loading: false })
     }
