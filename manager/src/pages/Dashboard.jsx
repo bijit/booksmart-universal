@@ -12,11 +12,13 @@ function Dashboard({ darkMode, toggleDarkMode, onLogout }) {
     loading,
     error,
     fetchBookmarks,
+    loadMoreBookmarks,
     getFilteredBookmarks,
     viewMode,
     dateRange,
     selectedTags,
-    sortBy
+    sortBy,
+    hasMore
   } = useBookmarkStore()
 
   useEffect(() => {
@@ -78,39 +80,53 @@ function Dashboard({ darkMode, toggleDarkMode, onLogout }) {
 
             {/* Cards View */}
             {!loading && filteredBookmarks.length > 0 && viewMode === 'cards' && (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {filteredBookmarks.map(bookmark => (
-                  <BookmarkCard key={bookmark.id} bookmark={bookmark} />
-                ))}
-              </div>
+              <>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {filteredBookmarks.map(bookmark => (
+                    <BookmarkCard key={bookmark.id} bookmark={bookmark} />
+                  ))}
+                </div>
+                {hasMore && (
+                  <div className="mt-8 text-center">
+                    <button
+                      onClick={loadMoreBookmarks}
+                      disabled={loading}
+                      className="px-6 py-3 bg-accent text-white rounded-lg hover:bg-accent/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      {loading ? 'Loading...' : 'Load More'}
+                    </button>
+                  </div>
+                )}
+              </>
             )}
 
             {/* List View */}
             {!loading && filteredBookmarks.length > 0 && viewMode === 'list' && (
-              <div className="space-y-4">
-                {filteredBookmarks.map(bookmark => (
-                  <BookmarkCard key={bookmark.id} bookmark={bookmark} />
-                ))}
-              </div>
+              <>
+                <div className="space-y-4">
+                  {filteredBookmarks.map(bookmark => (
+                    <BookmarkCard key={bookmark.id} bookmark={bookmark} />
+                  ))}
+                </div>
+                {hasMore && (
+                  <div className="mt-8 text-center">
+                    <button
+                      onClick={loadMoreBookmarks}
+                      disabled={loading}
+                      className="px-6 py-3 bg-accent text-white rounded-lg hover:bg-accent/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      {loading ? 'Loading...' : 'Load More'}
+                    </button>
+                  </div>
+                )}
+              </>
             )}
 
             {/* Timeline View */}
             {!loading && filteredBookmarks.length > 0 && viewMode === 'timeline' && (
-              <div className="space-y-8">
-                {filteredBookmarks.reduce((acc, bookmark) => {
-                  const date = new Date(bookmark.created_at).toLocaleDateString('en-US', {
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric'
-                  })
-
-                  if (!acc[date]) {
-                    acc[date] = []
-                  }
-                  acc[date].push(bookmark)
-                  return acc
-                }, {}) && Object.entries(
-                  filteredBookmarks.reduce((acc, bookmark) => {
+              <>
+                <div className="space-y-8">
+                  {filteredBookmarks.reduce((acc, bookmark) => {
                     const date = new Date(bookmark.created_at).toLocaleDateString('en-US', {
                       year: 'numeric',
                       month: 'long',
@@ -122,21 +138,46 @@ function Dashboard({ darkMode, toggleDarkMode, onLogout }) {
                     }
                     acc[date].push(bookmark)
                     return acc
-                  }, {})
-                ).map(([date, bookmarks]) => (
-                  <div key={date}>
-                    <h2 className="text-xl font-bold mb-4 flex items-center gap-3">
-                      <span className="text-accent dark:text-accent-dark">{date}</span>
-                      <div className="flex-1 h-px bg-light-border dark:bg-dark-border"></div>
-                    </h2>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                      {bookmarks.map(bookmark => (
-                        <BookmarkCard key={bookmark.id} bookmark={bookmark} />
-                      ))}
+                  }, {}) && Object.entries(
+                    filteredBookmarks.reduce((acc, bookmark) => {
+                      const date = new Date(bookmark.created_at).toLocaleDateString('en-US', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric'
+                      })
+
+                      if (!acc[date]) {
+                        acc[date] = []
+                      }
+                      acc[date].push(bookmark)
+                      return acc
+                    }, {})
+                  ).map(([date, bookmarks]) => (
+                    <div key={date}>
+                      <h2 className="text-xl font-bold mb-4 flex items-center gap-3">
+                        <span className="text-accent dark:text-accent-dark">{date}</span>
+                        <div className="flex-1 h-px bg-light-border dark:bg-dark-border"></div>
+                      </h2>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {bookmarks.map(bookmark => (
+                          <BookmarkCard key={bookmark.id} bookmark={bookmark} />
+                        ))}
+                      </div>
                     </div>
+                  ))}
+                </div>
+                {hasMore && (
+                  <div className="mt-8 text-center">
+                    <button
+                      onClick={loadMoreBookmarks}
+                      disabled={loading}
+                      className="px-6 py-3 bg-accent text-white rounded-lg hover:bg-accent/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      {loading ? 'Loading...' : 'Load More'}
+                    </button>
                   </div>
-                ))}
-              </div>
+                )}
+              </>
             )}
           </div>
         </main>

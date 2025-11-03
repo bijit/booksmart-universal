@@ -7,6 +7,11 @@ const useBookmarkStore = create((set, get) => ({
   loading: false,
   error: null,
 
+  // Pagination
+  hasMore: true,
+  currentOffset: 0,
+  pageSize: 100,
+
   // Filters
   searchQuery: '',
   selectedTags: [],
@@ -136,18 +141,22 @@ const useBookmarkStore = create((set, get) => ({
     return filtered
   },
 
-  // Fetch bookmarks from API
+  // Fetch bookmarks from API (reset pagination)
   fetchBookmarks: async () => {
-    set({ loading: true, error: null })
+    const { pageSize } = get()
+    set({ loading: true, error: null, currentOffset: 0 })
 
     try {
       const token = localStorage.getItem('authToken')
       // Only fetch completed bookmarks by default (hide pending/failed/processing)
-      const response = await fetch(`${API_BASE_URL}/bookmarks?status=completed`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
+      const response = await fetch(
+        `${API_BASE_URL}/bookmarks?status=completed&limit=${pageSize}&offset=0`,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
         }
-      })
+      )
 
       if (!response.ok) {
         // Try to get the actual error message from the response
@@ -157,7 +166,48 @@ const useBookmarkStore = create((set, get) => ({
       }
 
       const data = await response.json()
-      set({ bookmarks: data.bookmarks || [], loading: false, error: null })
+      const bookmarks = data.bookmarks || []
+      set({
+        bookmarks,
+        loading: false,
+        error: null,
+        currentOffset: bookmarks.length,
+        hasMore: bookmarks.length >= pageSize
+      })
+    } catch (error) {
+      set({ error: error.message, loading: false })
+    }
+  },
+
+  // Load more bookmarks (append to existing)
+  loadMoreBookmarks: async () => {
+    const { currentOffset, pageSize, bookmarks: existingBookmarks } = get()
+    set({ loading: true, error: null })
+
+    try {
+      const token = localStorage.getItem('authToken')
+      const response = await fetch(
+        `${API_BASE_URL}/bookmarks?status=completed&limit=${pageSize}&offset=${currentOffset}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        }
+      )
+
+      if (!response.ok) {
+        throw new Error('Failed to load more bookmarks')
+      }
+
+      const data = await response.json()
+      const newBookmarks = data.bookmarks || []
+      set({
+        bookmarks: [...existingBookmarks, ...newBookmarks],
+        loading: false,
+        error: null,
+        currentOffset: currentOffset + newBookmarks.length,
+        hasMore: newBookmarks.length >= pageSize
+      })
     } catch (error) {
       set({ error: error.message, loading: false })
     }

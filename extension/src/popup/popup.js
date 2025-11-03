@@ -224,7 +224,7 @@ async function loadRecentBookmarks() {
     const authData = await chrome.storage.local.get(['auth_token']);
 
     // Only fetch completed bookmarks (hide pending/failed/processing)
-    const response = await fetch(`${API_BASE_URL}/bookmarks?limit=10&status=completed`, {
+    const response = await fetch(`${API_BASE_URL}/bookmarks?limit=100&status=completed`, {
       headers: {
         'Authorization': `Bearer ${authData.auth_token}`
       }
@@ -263,7 +263,7 @@ async function handleSearch(query) {
       },
       body: JSON.stringify({
         query,
-        limit: 10,
+        limit: 100,
         searchType: 'hybrid'
       })
     });
