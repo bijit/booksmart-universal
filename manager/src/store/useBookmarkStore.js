@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { API_BASE_URL } from '../config'
+import { isAuthError, handleAuthError } from '../utils/auth'
 
 const useBookmarkStore = create((set, get) => ({
   // Bookmarks data
@@ -84,6 +85,11 @@ const useBookmarkStore = create((set, get) => ({
         totalBookmarks: results.length
       })
     } catch (error) {
+      // Check if this is an authentication error
+      if (isAuthError(error)) {
+        handleAuthError()
+        return
+      }
       set({ error: error.message, loading: false })
     }
   },
@@ -213,6 +219,11 @@ const useBookmarkStore = create((set, get) => ({
         totalPages: pagination.totalPages || 0
       })
     } catch (error) {
+      // Check if this is an authentication error
+      if (isAuthError(error)) {
+        handleAuthError()
+        return
+      }
       set({ error: error.message, loading: false })
     }
   },
@@ -264,6 +275,11 @@ const useBookmarkStore = create((set, get) => ({
         bookmarks: state.bookmarks.filter(b => b.id !== bookmarkId)
       }))
     } catch (error) {
+      // Check if this is an authentication error
+      if (isAuthError(error)) {
+        handleAuthError()
+        return
+      }
       set({ error: error.message })
       throw error
     }

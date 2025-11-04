@@ -54,6 +54,27 @@ async function checkAuth() {
   }
 }
 
+// Check if an error is an authentication error
+function isAuthError(response, error) {
+  if (response && (response.status === 401 || response.status === 403)) {
+    return true;
+  }
+  if (error) {
+    const message = error.message?.toLowerCase() || '';
+    return message.includes('invalid') ||
+           message.includes('expired') ||
+           message.includes('token') ||
+           message.includes('unauthorized');
+  }
+  return false;
+}
+
+// Handle authentication error by logging out
+async function handleAuthError() {
+  console.log('Authentication error detected, logging out...');
+  await handleLogout();
+}
+
 // Set up event listeners
 function setupEventListeners() {
   // Login form submission
@@ -234,10 +255,20 @@ async function loadRecentBookmarks() {
       const data = await response.json();
       displayBookmarks(data.bookmarks || []);
     } else {
+      // Check if this is an authentication error
+      if (isAuthError(response)) {
+        await handleAuthError();
+        return;
+      }
       showError('Failed to load bookmarks');
     }
   } catch (error) {
     console.error('Error loading bookmarks:', error);
+    // Check if this is an authentication error
+    if (isAuthError(null, error)) {
+      await handleAuthError();
+      return;
+    }
     showError('Network error');
   }
 }
@@ -272,10 +303,20 @@ async function handleSearch(query) {
       const data = await response.json();
       displayBookmarks(data.results || []);
     } else {
+      // Check if this is an authentication error
+      if (isAuthError(response)) {
+        await handleAuthError();
+        return;
+      }
       showError('Search failed');
     }
   } catch (error) {
     console.error('Search error:', error);
+    // Check if this is an authentication error
+    if (isAuthError(null, error)) {
+      await handleAuthError();
+      return;
+    }
     showError('Network error');
   }
 }
