@@ -14,16 +14,12 @@ function App() {
   })
 
   const [isAuthenticated, setIsAuthenticated] = useState(() => {
-    return !!localStorage.getItem('authToken')
-  })
-
-  // Check for token in URL (from extension) and auto-login
-  useEffect(() => {
+    // Check for token in URL first (from extension SSO)
     const urlParams = new URLSearchParams(window.location.search)
     const tokenFromUrl = urlParams.get('token')
 
     if (tokenFromUrl) {
-      // Always store fresh token from URL (even if there's an old one)
+      // Store token immediately (synchronously during init)
       localStorage.setItem('authToken', tokenFromUrl)
 
       // Try to extract email from JWT token payload
@@ -31,7 +27,6 @@ function App() {
         const payload = JSON.parse(atob(tokenFromUrl.split('.')[1]))
         if (payload.email) {
           localStorage.setItem('userEmail', payload.email)
-          // Use email username as userName if not already set
           if (!localStorage.getItem('userName')) {
             localStorage.setItem('userName', payload.email.split('@')[0])
           }
@@ -40,13 +35,15 @@ function App() {
         console.error('Failed to parse token:', e)
       }
 
-      setIsAuthenticated(true)
+      // Clean up URL
+      window.history.replaceState({}, document.title, window.location.pathname)
 
-      // Clean up URL by removing token parameter
-      const newUrl = window.location.pathname
-      window.history.replaceState({}, document.title, newUrl)
+      return true // User is authenticated
     }
-  }, [])
+
+    // Otherwise check localStorage
+    return !!localStorage.getItem('authToken')
+  })
 
   // Apply dark mode class to document
   useEffect(() => {
