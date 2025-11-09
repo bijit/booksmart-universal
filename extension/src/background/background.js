@@ -39,6 +39,59 @@ chrome.bookmarks.onRemoved.addListener(async (id, removeInfo) => {
   }
 });
 
+// Extract content from active tab
+async function extractContentFromActiveTab() {
+  try {
+    // Get the active tab
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+
+    if (!tab || !tab.id) {
+      console.log('[BookSmart] No active tab found');
+      return null;
+    }
+
+    console.log(`[BookSmart] Extracting content from tab: ${tab.title}`);
+
+    // First, inject Readability.js library
+    await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      files: ['lib/Readability.js']
+    });
+
+    // Then inject and execute the content extraction function
+    const results = await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      files: ['content-extractor.js']
+    });
+
+    // Execute the extraction function
+    const extractionResults = await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      func: function() {
+        // This runs in page context where extractPageContent is now defined
+        if (typeof extractPageContent === 'function') {
+          return extractPageContent();
+        } else {
+          return { success: false, error: 'extractPageContent not defined' };
+        }
+      }
+    });
+
+    if (extractionResults && extractionResults[0] && extractionResults[0].result) {
+      const result = extractionResults[0].result;
+      console.log('[BookSmart] Content extraction result:', result);
+      return result;
+    }
+
+    console.log('[BookSmart] No extraction results');
+    return null;
+
+  } catch (error) {
+    console.error('[BookSmart] Error extracting content from tab:', error);
+    return null;
+  }
+}
+
 // Handle new bookmark
 async function handleNewBookmark(bookmark) {
   try {
@@ -50,6 +103,28 @@ async function handleNewBookmark(bookmark) {
       return;
     }
 
+    // Try to extract content from the active tab
+    const extracted = await extractContentFromActiveTab();
+
+    // Prepare bookmark data
+    const bookmarkData = {
+      url: bookmark.url,
+      title: bookmark.title || null
+    };
+
+    // If extraction succeeded, include the content
+    if (extracted && extracted.success) {
+      bookmarkData.extractedContent = extracted.content;
+      bookmarkData.extractedTitle = extracted.title;
+      bookmarkData.extractedExcerpt = extracted.excerpt;
+      bookmarkData.extractedMethod = extracted.method;
+      bookmarkData.extractedLength = extracted.length;
+
+      console.log(`[BookSmart] Including extracted content (${extracted.length} chars) using ${extracted.method} method`);
+    } else {
+      console.log('[BookSmart] No extracted content, backend will use Jina');
+    }
+
     // Send bookmark to backend
     const response = await fetch(`${API_BASE_URL}/bookmarks`, {
       method: 'POST',
@@ -57,10 +132,7 @@ async function handleNewBookmark(bookmark) {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${authData.auth_token}`
       },
-      body: JSON.stringify({
-        url: bookmark.url,
-        title: bookmark.title || null
-      })
+      body: JSON.stringify(bookmarkData)
     });
 
     if (response.ok) {

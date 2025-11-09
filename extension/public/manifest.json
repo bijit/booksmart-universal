@@ -11,7 +11,9 @@
   "permissions": [
     "bookmarks",
     "storage",
-    "notifications"
+    "notifications",
+    "scripting",
+    "activeTab"
   ],
   "host_permissions": [
     "http://localhost:3000/*",

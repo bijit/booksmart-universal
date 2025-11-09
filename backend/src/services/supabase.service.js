@@ -44,6 +44,7 @@ export async function createBookmarkRecord(userId, bookmarkData) {
         qdrant_point_id: bookmarkData.qdrant_point_id,
         processing_status: bookmarkData.processing_status || 'completed',
         extraction_method: bookmarkData.extraction_method || 'jina',
+        extracted_content: bookmarkData.extracted_content || null,
         error_message: bookmarkData.error_message || null,
         retry_count: bookmarkData.retry_count || 0
       })

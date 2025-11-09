@@ -82,7 +82,7 @@ async function processMetadataOnly(id, url, title, user_id) {
  * @returns {Promise<boolean>} True if successful, false if failed
  */
 async function processBookmark(bookmark) {
-  const { id, url, title, user_id, retry_count } = bookmark;
+  const { id, url, title, user_id, retry_count, extracted_content, extraction_method } = bookmark;
 
   console.log(`\n[Worker] Processing bookmark ${id}: ${url}`);
 
@@ -92,9 +92,20 @@ async function processBookmark(bookmark) {
       processing_status: 'processing'
     });
 
-    // Step 2: Extract content with Jina
-    console.log(`[Worker] Step 1/4: Extracting content...`);
-    const extracted = await extractContent(url);
+    // Step 2: Get content - use extracted content from extension if available, otherwise use Jina
+    let extracted;
+    const hasValidExtractedContent = extracted_content && extracted_content.length > 500;
+
+    if (hasValidExtractedContent) {
+      console.log(`[Worker] Step 1/4: Using locally extracted content (${extracted_content.length} chars via ${extraction_method})`);
+      extracted = {
+        content: extracted_content,
+        favicon: null // Extension doesn't provide favicon
+      };
+    } else {
+      console.log(`[Worker] Step 1/4: No local content, extracting with Jina...`);
+      extracted = await extractContent(url);
+    }
 
     // Step 3: Process with Gemini (summarize + embed)
     console.log(`[Worker] Step 2/4: Generating AI summary and embeddings...`);
@@ -118,7 +129,7 @@ async function processBookmark(bookmark) {
       title: aiResult.title,
       qdrant_point_id: qdrantPointId,
       processing_status: 'completed',
-      extraction_method: 'jina',
+      extraction_method: hasValidExtractedContent ? extraction_method : 'jina',
       error_message: null
     });
 

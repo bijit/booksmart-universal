@@ -30,7 +30,16 @@ router.use(requireAuth);
  */
 router.post('/', async (req, res) => {
   try {
-    const { url, title, tags } = req.body;
+    const {
+      url,
+      title,
+      tags,
+      extractedContent,
+      extractedTitle,
+      extractedExcerpt,
+      extractedMethod,
+      extractedLength
+    } = req.body;
     const userId = req.user.id;
 
     // Validate input
@@ -51,13 +60,24 @@ router.post('/', async (req, res) => {
       });
     }
 
+    // Check if we have valid extracted content from the extension
+    const hasExtractedContent = extractedContent && extractedContent.length > 500;
+
+    // Log extraction info
+    if (hasExtractedContent) {
+      console.log(`[Bookmark] Received extracted content (${extractedLength} chars) via ${extractedMethod}`);
+    } else {
+      console.log('[Bookmark] No extracted content, worker will use Jina fallback');
+    }
+
     // Create bookmark record in Supabase with "pending" status
     // The bookmark will be processed by background worker
     const bookmark = await createBookmarkRecord(userId, {
       url,
-      title: title || null,
+      title: extractedTitle || title || null,
       processing_status: 'pending',
-      extraction_method: null,
+      extraction_method: hasExtractedContent ? extractedMethod : null,
+      extracted_content: hasExtractedContent ? extractedContent : null,
       qdrant_point_id: null,
       error_message: null,
       retry_count: 0
