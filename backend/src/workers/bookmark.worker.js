@@ -127,6 +127,28 @@ async function processBookmark(bookmark) {
   } catch (error) {
     console.error(`[Worker] ❌ Error processing bookmark ${id}:`, error.message);
 
+    // Check if this is a permanent HTTP error (404, 403, 410)
+    const is404 = error.message && error.message.includes('404');
+    const is403 = error.message && error.message.includes('403');
+    const is410 = error.message && error.message.includes('410');
+
+    if (is404 || is403 || is410) {
+      let errorMsg = 'Page not accessible';
+      if (is404) errorMsg = 'Page not found (404) - URL may be deleted or expired';
+      if (is403) errorMsg = 'Access forbidden (403) - Page may require authentication';
+      if (is410) errorMsg = 'Page gone (410) - Content permanently deleted';
+
+      console.log(`[Worker] 🗑️  ${errorMsg} for ${id}, marking as failed (won't retry)`);
+
+      // Mark as permanently failed - no point retrying
+      await updateBookmarkRecord(id, {
+        processing_status: 'failed',
+        error_message: errorMsg
+      });
+
+      return false; // Don't retry
+    }
+
     // Check if this is a quota error
     if (isQuotaError(error)) {
       console.log(`[Worker] 🚫 Quota exceeded! Keeping bookmark ${id} in pending state for retry tomorrow`);
@@ -145,7 +167,7 @@ async function processBookmark(bookmark) {
       throw new Error('QUOTA_EXHAUSTED');
     }
 
-    // Determine if we should retry (for non-quota errors)
+    // Determine if we should retry (for non-quota, non-404 errors)
     const shouldRetry = retry_count < MAX_RETRIES;
     const newRetryCount = retry_count + 1;
 
