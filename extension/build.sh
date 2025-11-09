@@ -7,6 +7,7 @@ echo "Building BookSmart Extension..."
 # Clean dist folder
 rm -rf dist/*
 mkdir -p dist/icons
+mkdir -p dist/lib
 
 # Copy manifest
 cp public/manifest.json dist/
@@ -21,6 +22,10 @@ cp src/config.js dist/
 cp src/background/background.js dist/
 # Fix the config.js import path (from ../config.js to ./config.js)
 sed -i "s|'../config.js'|'./config.js'|g" dist/background.js
+
+# Copy content extraction files
+cp src/content-extractor.js dist/
+cp src/lib/Readability.js dist/lib/
 
 # Copy popup files
 cp src/popup/popup.html dist/
