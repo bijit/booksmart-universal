@@ -28,18 +28,18 @@ function Header({ darkMode, toggleDarkMode, onLogout, onOpenImport }) {
 
   return (
     <header className="sticky top-0 z-50 bg-light-card dark:bg-dark-card border-b border-light-border dark:border-dark-border">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16">
+      <div className="w-full mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex items-center justify-between gap-2 sm:gap-4 h-16">
           {/* Logo */}
-          <div className="flex items-center gap-2">
-            <div className="text-2xl font-bold">
+          <div className="flex items-center flex-shrink-0">
+            <div className="text-xl sm:text-2xl font-bold whitespace-nowrap">
               <span className="text-accent dark:text-accent-dark">Book</span>
               <span>Smart</span>
             </div>
           </div>
 
           {/* Search Bar */}
-          <div className="flex-1 max-w-2xl mx-8">
+          <div className="flex-1 max-w-2xl min-w-0 mx-2 sm:mx-4 lg:mx-8">
             <div className={`relative transition-all duration-200 ${searchFocused ? 'transform scale-105' : ''}`}>
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-light-text-secondary dark:text-dark-text-secondary w-5 h-5" />
               <input
@@ -49,7 +49,7 @@ function Header({ darkMode, toggleDarkMode, onLogout, onOpenImport }) {
                 onChange={(e) => setLocalSearchQuery(e.target.value)}
                 onFocus={() => setSearchFocused(true)}
                 onBlur={() => setSearchFocused(false)}
-                className="input pl-10 pr-10"
+                className="input pl-10 pr-10 w-full"
               />
               {localSearchQuery && (
                 <button
@@ -64,7 +64,7 @@ function Header({ darkMode, toggleDarkMode, onLogout, onOpenImport }) {
           </div>
 
           {/* Actions */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
             {/* View Mode Toggle */}
             <div className="hidden md:flex items-center gap-1 bg-light-bg dark:bg-dark-bg rounded-lg p-1">
               <button

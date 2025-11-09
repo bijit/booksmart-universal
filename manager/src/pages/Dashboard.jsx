@@ -53,7 +53,7 @@ function Dashboard({ darkMode, toggleDarkMode, onLogout }) {
 
         {/* Main Content */}
         <main className="flex-1 overflow-y-auto">
-          <div className="max-w-7xl mx-auto p-6">
+          <div className="w-full max-w-7xl mx-auto px-4 py-4 sm:px-6 sm:py-6 lg:px-8 lg:py-8">
             {/* Loading State */}
             {loading && filteredBookmarks.length === 0 && (
               <div className="flex items-center justify-center py-20">
@@ -83,7 +83,7 @@ function Dashboard({ darkMode, toggleDarkMode, onLogout }) {
             {/* Cards View */}
             {!loading && filteredBookmarks.length > 0 && viewMode === 'cards' && (
               <>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
                   {filteredBookmarks.map(bookmark => (
                     <BookmarkCard key={bookmark.id} bookmark={bookmark} />
                   ))}
@@ -100,7 +100,7 @@ function Dashboard({ darkMode, toggleDarkMode, onLogout }) {
             {/* List View */}
             {!loading && filteredBookmarks.length > 0 && viewMode === 'list' && (
               <>
-                <div className="space-y-4">
+                <div className="space-y-3 sm:space-y-4">
                   {filteredBookmarks.map(bookmark => (
                     <BookmarkCard key={bookmark.id} bookmark={bookmark} />
                   ))}
@@ -146,11 +146,11 @@ function Dashboard({ darkMode, toggleDarkMode, onLogout }) {
                     }, {})
                   ).map(([date, bookmarks]) => (
                     <div key={date}>
-                      <h2 className="text-xl font-bold mb-4 flex items-center gap-3">
-                        <span className="text-accent dark:text-accent-dark">{date}</span>
-                        <div className="flex-1 h-px bg-light-border dark:bg-dark-border"></div>
+                      <h2 className="text-lg sm:text-xl font-bold mb-4 flex items-center gap-2 sm:gap-3">
+                        <span className="text-accent dark:text-accent-dark whitespace-nowrap">{date}</span>
+                        <div className="flex-1 h-px bg-light-border dark:bg-dark-border min-w-0"></div>
                       </h2>
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
                         {bookmarks.map(bookmark => (
                           <BookmarkCard key={bookmark.id} bookmark={bookmark} />
                         ))}
