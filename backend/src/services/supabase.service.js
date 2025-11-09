@@ -7,6 +7,30 @@
 import { supabaseAdmin } from '../config/supabase.js';
 
 /**
+ * Check if a bookmark with the same URL already exists for a user
+ */
+export async function checkBookmarkExists(userId, url) {
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('bookmarks')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('url', url)
+      .maybeSingle();
+
+    if (error) {
+      throw error;
+    }
+
+    return !!data; // Returns true if bookmark exists, false otherwise
+
+  } catch (error) {
+    console.error('Error checking bookmark existence in Supabase:', error);
+    throw new Error(`Failed to check bookmark existence: ${error.message}`);
+  }
+}
+
+/**
  * Create a bookmark record in Supabase
  */
 export async function createBookmarkRecord(userId, bookmarkData) {

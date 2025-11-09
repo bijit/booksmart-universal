@@ -6,7 +6,11 @@
 
 import { Router } from 'express';
 import { requireAuth } from '../middleware/auth.js';
-import { createBookmarkRecord } from '../services/supabase.service.js';
+import {
+  createBookmarkRecord,
+  checkBookmarkExists,
+  getUserBookmarkCount
+} from '../services/supabase.service.js';
 import {
   createImportJob,
   getImportJob,
@@ -60,16 +64,50 @@ router.post('/batch', async (req, res) => {
       }
     }
 
+    // Check user's current bookmark count
+    const currentCount = await getUserBookmarkCount(userId);
+    const MAX_BOOKMARKS_PER_USER = 5000;
+
+    // Check if user has already hit the limit
+    if (currentCount >= MAX_BOOKMARKS_PER_USER) {
+      return res.status(400).json({
+        error: 'Limit Exceeded',
+        message: `You have reached the maximum limit of ${MAX_BOOKMARKS_PER_USER} bookmarks. Please delete some bookmarks before importing more.`,
+        currentCount,
+        limit: MAX_BOOKMARKS_PER_USER
+      });
+    }
+
+    // Calculate how many new bookmarks can be added
+    const remainingSlots = MAX_BOOKMARKS_PER_USER - currentCount;
+    const bookmarksToImport = bookmarks.slice(0, remainingSlots);
+    const willBeSkippedDueToLimit = bookmarks.length - bookmarksToImport.length;
+
+    if (willBeSkippedDueToLimit > 0) {
+      console.log(`[Import] User ${userId} can only import ${remainingSlots} of ${bookmarks.length} bookmarks (limit: ${MAX_BOOKMARKS_PER_USER})`);
+    }
+
     // Create import job
-    const jobId = createImportJob(userId, bookmarks.length);
+    const jobId = createImportJob(userId, bookmarksToImport.length);
 
     // Create bookmark records in Supabase with "pending" status
     // The existing worker will pick these up automatically
     let successCount = 0;
     let failCount = 0;
+    let duplicateCount = 0;
 
-    for (const bookmark of bookmarks) {
+    for (const bookmark of bookmarksToImport) {
       try {
+        // Check if bookmark already exists (duplicate detection)
+        const exists = await checkBookmarkExists(userId, bookmark.url);
+
+        if (exists) {
+          console.log(`[Import] Skipping duplicate bookmark: ${bookmark.url}`);
+          duplicateCount++;
+          continue; // Skip this bookmark
+        }
+
+        // Create new bookmark record
         await createBookmarkRecord(userId, {
           url: bookmark.url,
           title: bookmark.title || null,
@@ -87,7 +125,7 @@ router.post('/batch', async (req, res) => {
 
       // Update job progress
       updateImportJobProgress(jobId, {
-        processedBookmarks: successCount + failCount,
+        processedBookmarks: successCount + failCount + duplicateCount,
         successfulBookmarks: successCount,
         failedBookmarks: failCount
       });
@@ -103,7 +141,11 @@ router.post('/batch', async (req, res) => {
       jobId,
       totalBookmarks: bookmarks.length,
       createdBookmarks: successCount,
-      failedBookmarks: failCount
+      skippedDuplicates: duplicateCount,
+      skippedDueToLimit: willBeSkippedDueToLimit,
+      failedBookmarks: failCount,
+      currentBookmarkCount: currentCount + successCount,
+      bookmarkLimit: MAX_BOOKMARKS_PER_USER
     });
 
   } catch (error) {
