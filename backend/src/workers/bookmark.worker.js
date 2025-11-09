@@ -13,7 +13,8 @@ import { processContent, summarizeFromMetadata, generateEmbedding } from '../ser
 import { createBookmark } from '../services/qdrant.service.js';
 import {
   getUserBookmarkRecords,
-  updateBookmarkRecord
+  updateBookmarkRecord,
+  deleteBookmarkRecord
 } from '../services/supabase.service.js';
 import { isQuotaError } from '../utils/errors.js';
 
@@ -138,13 +139,10 @@ async function processBookmark(bookmark) {
       if (is403) errorMsg = 'Access forbidden (403) - Page may require authentication';
       if (is410) errorMsg = 'Page gone (410) - Content permanently deleted';
 
-      console.log(`[Worker] 🗑️  ${errorMsg} for ${id}, marking as failed (won't retry)`);
+      console.log(`[Worker] 🗑️  ${errorMsg} for ${id}, deleting bookmark`);
 
-      // Mark as permanently failed - no point retrying
-      await updateBookmarkRecord(id, {
-        processing_status: 'failed',
-        error_message: errorMsg
-      });
+      // Delete the bookmark entirely - no point keeping dead links
+      await deleteBookmarkRecord(id);
 
       return false; // Don't retry
     }
