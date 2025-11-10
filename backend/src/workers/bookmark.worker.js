@@ -26,7 +26,7 @@ const QUOTA_BACKOFF_MS = 60 * 60 * 1000; // Back off for 1 hour when quota is hi
 
 // Parallel processing configuration (set ENABLE_PARALLEL_PROCESSING = false to use sequential)
 const ENABLE_PARALLEL_PROCESSING = true; // Toggle between parallel and sequential processing
-const CONCURRENCY = 10; // Process 10 bookmarks at a time in parallel (only used if parallel enabled)
+const CONCURRENCY = 5; // Process 5 bookmarks at a time in parallel (reduced from 10 to avoid rate limits)
 
 let isProcessing = false;
 let workerRunning = false;
