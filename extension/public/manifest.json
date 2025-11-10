@@ -16,8 +16,7 @@
     "activeTab"
   ],
   "host_permissions": [
-    "http://localhost:3000/*",
-    "https://booksmart-backend-production-fe49.up.railway.app/*"
+    "<all_urls>"
   ],
   "background": {
     "service_worker": "background.js",
