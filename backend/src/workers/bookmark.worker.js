@@ -21,8 +21,12 @@ import { isQuotaError } from '../utils/errors.js';
 // Worker configuration
 const POLL_INTERVAL_MS = 5000; // Check for new bookmarks every 5 seconds
 const MAX_RETRIES = 3;
-const BATCH_SIZE = 5; // Process up to 5 bookmarks concurrently
+const BATCH_SIZE = 50; // Fetch up to 50 bookmarks per poll
 const QUOTA_BACKOFF_MS = 60 * 60 * 1000; // Back off for 1 hour when quota is hit
+
+// Parallel processing configuration (set ENABLE_PARALLEL_PROCESSING = false to use sequential)
+const ENABLE_PARALLEL_PROCESSING = true; // Toggle between parallel and sequential processing
+const CONCURRENCY = 10; // Process 10 bookmarks at a time in parallel (only used if parallel enabled)
 
 let isProcessing = false;
 let workerRunning = false;
@@ -222,6 +226,93 @@ async function processBookmark(bookmark) {
 }
 
 /**
+ * Process bookmarks in parallel with concurrency control
+ *
+ * @param {Array} bookmarks - Array of bookmark objects to process
+ * @returns {Object} Results with success and failure counts
+ */
+async function processBookmarksInParallel(bookmarks) {
+  let successful = 0;
+  let failed = 0;
+  let quotaHit = false;
+
+  // Process bookmarks in batches of CONCURRENCY
+  for (let i = 0; i < bookmarks.length; i += CONCURRENCY) {
+    if (quotaHit) break; // Stop if quota was hit in previous batch
+
+    const batch = bookmarks.slice(i, i + CONCURRENCY);
+    const batchNumber = Math.floor(i / CONCURRENCY) + 1;
+    const totalBatches = Math.ceil(bookmarks.length / CONCURRENCY);
+
+    console.log(`[Worker] 🚀 Processing batch ${batchNumber}/${totalBatches} (${batch.length} bookmarks in parallel)`);
+
+    // Process all bookmarks in this batch concurrently
+    const results = await Promise.allSettled(
+      batch.map(bookmark => processBookmark(bookmark))
+    );
+
+    // Analyze results
+    for (let j = 0; j < results.length; j++) {
+      const result = results[j];
+      const bookmark = batch[j];
+
+      if (result.status === 'fulfilled') {
+        if (result.value === true) {
+          successful++;
+        } else {
+          failed++;
+        }
+      } else if (result.status === 'rejected') {
+        // Check if it was a quota error
+        if (result.reason?.message === 'QUOTA_EXHAUSTED') {
+          console.log(`[Worker] 🚫 Quota exhausted in batch ${batchNumber}, stopping processing`);
+          quotaHit = true;
+          failed++;
+          break; // Stop processing this batch
+        } else {
+          console.error(`[Worker] ❌ Unexpected error for ${bookmark.id}:`, result.reason);
+          failed++;
+        }
+      }
+    }
+  }
+
+  return { successful, failed, quotaHit };
+}
+
+/**
+ * Process bookmarks sequentially (original method)
+ *
+ * @param {Array} bookmarks - Array of bookmark objects to process
+ * @returns {Object} Results with success and failure counts
+ */
+async function processBookmarksSequentially(bookmarks) {
+  let successful = 0;
+  let failed = 0;
+  let quotaHit = false;
+
+  for (const bookmark of bookmarks) {
+    try {
+      const result = await processBookmark(bookmark);
+      if (result) {
+        successful++;
+      } else {
+        failed++;
+      }
+    } catch (error) {
+      if (error.message === 'QUOTA_EXHAUSTED') {
+        console.log(`[Worker] 🚫 Stopping sequential processing due to quota exhaustion`);
+        quotaHit = true;
+        break; // Stop processing more bookmarks
+      }
+      failed++;
+    }
+  }
+
+  return { successful, failed, quotaHit };
+}
+
+/**
  * Poll for pending bookmarks and process them
  */
 async function pollAndProcess() {
@@ -261,29 +352,19 @@ async function pollAndProcess() {
     }
 
     if (pendingBookmarks && pendingBookmarks.length > 0) {
-      console.log(`\n[Worker] Found ${pendingBookmarks.length} pending bookmark(s)`);
+      const mode = ENABLE_PARALLEL_PROCESSING ? 'parallel' : 'sequential';
+      console.log(`\n[Worker] Found ${pendingBookmarks.length} pending bookmark(s) - Processing in ${mode} mode`);
 
-      // Process bookmarks sequentially to stop immediately on quota error
-      let successful = 0;
-      let failed = 0;
+      let results;
 
-      for (const bookmark of pendingBookmarks) {
-        try {
-          const result = await processBookmark(bookmark);
-          if (result) {
-            successful++;
-          } else {
-            failed++;
-          }
-        } catch (error) {
-          if (error.message === 'QUOTA_EXHAUSTED') {
-            console.log(`[Worker] 🚫 Stopping batch processing due to quota exhaustion`);
-            break; // Stop processing more bookmarks
-          }
-          failed++;
-        }
+      // Choose processing mode based on configuration
+      if (ENABLE_PARALLEL_PROCESSING) {
+        results = await processBookmarksInParallel(pendingBookmarks);
+      } else {
+        results = await processBookmarksSequentially(pendingBookmarks);
       }
 
+      const { successful, failed } = results;
       console.log(`[Worker] Batch complete: ${successful} successful, ${failed} failed/pending`);
     }
 
@@ -309,6 +390,10 @@ export function startWorker() {
   console.log(`📊 Poll interval: ${POLL_INTERVAL_MS / 1000}s`);
   console.log(`🔄 Max retries: ${MAX_RETRIES}`);
   console.log(`📦 Batch size: ${BATCH_SIZE}`);
+  console.log(`⚡ Processing mode: ${ENABLE_PARALLEL_PROCESSING ? 'PARALLEL' : 'SEQUENTIAL'}`);
+  if (ENABLE_PARALLEL_PROCESSING) {
+    console.log(`🚀 Concurrency: ${CONCURRENCY} bookmarks at a time`);
+  }
   console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`);
 
   workerRunning = true;
