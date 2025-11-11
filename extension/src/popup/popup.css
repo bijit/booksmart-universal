@@ -189,6 +189,13 @@ input::placeholder {
 
 .header-buttons {
   display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.header-left-buttons {
+  display: flex;
   gap: 8px;
 }
 
@@ -223,6 +230,24 @@ input::placeholder {
 .btn-import:hover {
   color: #047857;
   background: #D1FAE5;
+}
+
+.btn-logout-top {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  color: #DC2626;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-logout-top:hover {
+  color: #B91C1C;
+  background: #FEE2E2;
 }
 
 .open-manager-link svg, .btn-import svg {

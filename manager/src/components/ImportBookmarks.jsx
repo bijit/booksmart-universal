@@ -144,11 +144,14 @@ function ImportBookmarks({ onClose, onImportComplete }) {
         {success ? (
           <div className="text-center py-8">
             <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
-            <p className="text-lg font-medium mb-2">Import Complete!</p>
-            <p className="text-light-text-secondary dark:text-dark-text-secondary text-sm">
-              Your bookmarks are being processed by AI.
+            <p className="text-lg font-medium mb-2">Bookmarks Uploaded!</p>
+            <p className="text-light-text-secondary dark:text-dark-text-secondary text-sm mb-3">
+              AI processing started: {progress?.total || 0} bookmarks queued
+            </p>
+            <p className="text-light-text-secondary dark:text-dark-text-secondary text-xs">
+              Processing time: ~5-10 minutes
               <br />
-              Check back in a few minutes.
+              Your bookmarks will appear as they're processed.
             </p>
           </div>
         ) : importing ? (

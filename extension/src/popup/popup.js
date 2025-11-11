@@ -20,7 +20,7 @@ const importProgressState = document.getElementById('importProgressState');
 const openManagerBtn = document.getElementById('openManagerBtn');
 const importBtn = document.getElementById('importBtn');
 const importFromEmptyBtn = document.getElementById('importFromEmptyBtn');
-const logoutBtn = document.getElementById('logoutBtn');
+const logoutBtn = document.getElementById('logoutBtnTop');
 
 // API Configuration is now loaded from config.js
 // API_BASE_URL is available globally
@@ -606,7 +606,7 @@ async function pollImportProgress(jobId, totalBookmarks) {
           hideImportProgress();
 
           // Show success message
-          alert(`Import complete!\n\n${status.successfulBookmarks} bookmarks imported successfully.\n${status.failedBookmarks} failed.\n\nBookmarks are now being processed by AI. Check back in a few minutes.`);
+          alert(`Bookmarks Uploaded!\n\nAI processing started: ${status.successfulBookmarks} bookmarks queued\n${status.failedBookmarks} failed\n\nProcessing time: ~5-10 minutes\nYour bookmarks will appear as they're processed.`);
 
           // Reload bookmarks
           loadRecentBookmarks();
