@@ -50,7 +50,8 @@ app.use(helmet({
   contentSecurityPolicy: false, // Disable CSP for Vite's inline scripts
 })); // Security headers
 app.use(cors()); // Enable CORS
-app.use(express.json()); // Parse JSON bodies
+app.use(express.json({ limit: '10mb' })); // Parse JSON bodies (increased limit for large bookmark imports)
+app.use(express.urlencoded({ limit: '10mb', extended: true })); // Parse URL-encoded bodies
 app.use(morgan('dev')); // HTTP request logging
 
 // Mount API routes (before static files)
