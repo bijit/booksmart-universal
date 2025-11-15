@@ -174,16 +174,18 @@ async function processBookmark(bookmark) {
   } catch (error) {
     console.error(`[Worker] ❌ Error processing bookmark ${id}:`, error.message);
 
-    // Check if this is a permanent HTTP error (404, 403, 410)
+    // Check if this is a permanent HTTP error (404, 403, 410, 400)
     const is404 = error.message && error.message.includes('404');
     const is403 = error.message && error.message.includes('403');
     const is410 = error.message && error.message.includes('410');
+    const is400 = error.message && error.message.includes('400'); // Jina "Bad Request"
 
-    if (is404 || is403 || is410) {
+    if (is404 || is403 || is410 || is400) {
       let errorMsg = 'Page not accessible';
       if (is404) errorMsg = 'Page not found (404) - URL may be deleted or expired';
       if (is403) errorMsg = 'Access forbidden (403) - Page may require authentication';
       if (is410) errorMsg = 'Page gone (410) - Content permanently deleted';
+      if (is400) errorMsg = 'Bad request (400) - Invalid URL or content extraction failed';
 
       console.log(`[Worker] 🗑️  ${errorMsg} for ${id}, deleting bookmark`);
 
