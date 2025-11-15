@@ -489,6 +489,54 @@ function showRegisterError(message) {
 // Import functionality
 async function handleImport() {
   try {
+    const authData = await chrome.storage.local.get(['auth_token']);
+
+    // First, check if user has existing bookmarks
+    const countResponse = await fetch(`${API_BASE_URL}/bookmarks?limit=1`, {
+      headers: {
+        'Authorization': `Bearer ${authData.auth_token}`
+      }
+    });
+
+    if (!countResponse.ok) {
+      throw new Error('Failed to check existing bookmarks');
+    }
+
+    const countData = await countResponse.json();
+    const existingCount = countData.pagination?.total || 0;
+
+    // If user has existing bookmarks, ask if they want to delete them first
+    if (existingCount > 0) {
+      const deleteConfirmed = confirm(
+        `You have ${existingCount} existing bookmark${existingCount > 1 ? 's' : ''} in BookSmart.\n\n` +
+        `Do you want to DELETE ALL existing bookmarks and re-import from Chrome?\n\n` +
+        `⚠️ WARNING: This cannot be undone!\n\n` +
+        `Click OK to delete and re-import, or Cancel to add Chrome bookmarks to your existing collection.`
+      );
+
+      if (deleteConfirmed) {
+        // Delete all existing bookmarks
+        showImportProgress();
+        updateImportProgress(0, existingCount, 0);
+        const progressText = document.getElementById('importProgressText');
+        progressText.textContent = 'Deleting existing bookmarks...';
+
+        const deleteResponse = await fetch(`${API_BASE_URL}/bookmarks/all`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${authData.auth_token}`
+          }
+        });
+
+        if (!deleteResponse.ok) {
+          throw new Error('Failed to delete existing bookmarks');
+        }
+
+        const deleteData = await deleteResponse.json();
+        console.log(`Deleted ${deleteData.deletedCount} existing bookmarks`);
+      }
+    }
+
     // Get all Chrome bookmarks
     const bookmarksTree = await chrome.bookmarks.getTree();
 
@@ -497,14 +545,20 @@ async function handleImport() {
 
     if (bookmarks.length === 0) {
       alert('No bookmarks found to import');
+      hideImportProgress();
       return;
     }
 
-    // Confirm with user
-    const confirmed = confirm(`Import ${bookmarks.length} Chrome bookmarks to BookSmart?\n\nThis may take several minutes. You can close this popup and the import will continue in the background.`);
+    // Confirm import (if we didn't already ask about deletion)
+    if (existingCount === 0) {
+      const confirmed = confirm(
+        `Import ${bookmarks.length} Chrome bookmarks to BookSmart?\n\n` +
+        `This may take several minutes. You can close this popup and the import will continue in the background.`
+      );
 
-    if (!confirmed) {
-      return;
+      if (!confirmed) {
+        return;
+      }
     }
 
     // Show import progress

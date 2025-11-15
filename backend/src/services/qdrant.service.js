@@ -474,3 +474,38 @@ export async function getBookmarkChunks(bookmarkId) {
     throw new Error(`Failed to get bookmark chunks: ${error.message}`);
   }
 }
+
+/**
+ * Delete all points (bookmarks and chunks) for a user
+ * Used for re-import scenarios where user wants to start fresh
+ *
+ * @param {string} userId - User ID
+ * @returns {Promise<number>} Number of points deleted
+ */
+export async function deleteAllUserPoints(userId) {
+  try {
+    console.log(`[Qdrant] Deleting all points for user ${userId}...`);
+
+    // Delete all points for this user using filter
+    // This handles both legacy bookmarks and chunked bookmarks
+    const result = await qdrantClient.delete(COLLECTION_NAME, {
+      wait: true,
+      filter: {
+        must: [
+          {
+            key: 'user_id',
+            match: { value: userId }
+          }
+        ]
+      }
+    });
+
+    console.log(`[Qdrant] Deleted all points for user ${userId}`);
+
+    return result;
+
+  } catch (error) {
+    console.error('Error deleting all user points from Qdrant:', error);
+    throw new Error(`Failed to delete all user points: ${error.message}`);
+  }
+}

@@ -376,3 +376,36 @@ export async function updateImportJob(jobId, updates) {
     throw new Error(`Failed to update import job: ${error.message}`);
   }
 }
+
+/**
+ * Delete all bookmark records for a user
+ * Used for re-import scenarios where user wants to start fresh
+ *
+ * @param {string} userId - User ID
+ * @returns {Promise<number>} Number of bookmarks deleted
+ */
+export async function deleteAllUserBookmarks(userId) {
+  try {
+    console.log(`[Supabase] Deleting all bookmarks for user ${userId}...`);
+
+    // Delete all bookmark records for this user
+    const { data, error } = await supabaseAdmin
+      .from('bookmarks')
+      .delete()
+      .eq('user_id', userId)
+      .select();
+
+    if (error) {
+      throw error;
+    }
+
+    const deletedCount = data?.length || 0;
+    console.log(`[Supabase] Deleted ${deletedCount} bookmark records`);
+
+    return deletedCount;
+
+  } catch (error) {
+    console.error('Error deleting all user bookmarks from Supabase:', error);
+    throw new Error(`Failed to delete all user bookmarks: ${error.message}`);
+  }
+}

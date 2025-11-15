@@ -12,11 +12,13 @@ import {
   getUserBookmarkRecords,
   getUserBookmarkCount,
   updateBookmarkRecord,
-  deleteBookmarkRecord
+  deleteBookmarkRecord,
+  deleteAllUserBookmarks
 } from '../services/supabase.service.js';
 import {
   getBookmarkById,
-  deleteBookmark as deleteQdrantBookmark
+  deleteBookmark as deleteQdrantBookmark,
+  deleteAllUserPoints
 } from '../services/qdrant.service.js';
 
 const router = Router();
@@ -336,6 +338,50 @@ router.put('/:id', async (req, res) => {
     return res.status(500).json({
       error: 'Internal Server Error',
       message: 'Failed to update bookmark'
+    });
+  }
+});
+
+/**
+ * DELETE /api/bookmarks/all
+ * Delete ALL bookmarks for authenticated user
+ * Used for re-import scenarios - requires confirmation from client
+ * NOTE: This route must come BEFORE the /:id route to avoid path collision
+ */
+router.delete('/all', async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    console.log(`[Bookmarks] Deleting ALL bookmarks for user ${userId}...`);
+
+    // Get count before deletion for logging
+    const countBefore = await getUserBookmarkCount(userId);
+    console.log(`[Bookmarks] User has ${countBefore} bookmarks to delete`);
+
+    // Delete from Qdrant first (all user points)
+    try {
+      await deleteAllUserPoints(userId);
+      console.log(`[Bookmarks] Deleted all Qdrant points for user ${userId}`);
+    } catch (error) {
+      console.error('Error deleting from Qdrant:', error);
+      // Continue - we still want to delete from Supabase
+    }
+
+    // Delete from Supabase
+    const deletedCount = await deleteAllUserBookmarks(userId);
+
+    console.log(`[Bookmarks] Successfully deleted ${deletedCount} bookmarks for user ${userId}`);
+
+    res.json({
+      message: 'All bookmarks deleted successfully',
+      deletedCount: deletedCount
+    });
+
+  } catch (error) {
+    console.error('Delete all bookmarks error:', error);
+    return res.status(500).json({
+      error: 'Internal Server Error',
+      message: 'Failed to delete all bookmarks'
     });
   }
 });
