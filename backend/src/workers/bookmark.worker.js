@@ -9,8 +9,8 @@
  */
 
 import { extractContent } from '../services/jina.service.js';
-import { processContent, summarizeFromMetadata, generateEmbedding } from '../services/gemini.service.js';
-import { createBookmark } from '../services/qdrant.service.js';
+import { processContent, processContentWithChunking, summarizeFromMetadata, generateEmbedding } from '../services/gemini.service.js';
+import { createBookmark, createBookmarkChunks } from '../services/qdrant.service.js';
 import {
   getUserBookmarkRecords,
   updateBookmarkRecord,
@@ -26,7 +26,10 @@ const QUOTA_BACKOFF_MS = 60 * 60 * 1000; // Back off for 1 hour when quota is hi
 
 // Parallel processing configuration (set ENABLE_PARALLEL_PROCESSING = false to use sequential)
 const ENABLE_PARALLEL_PROCESSING = true; // Toggle between parallel and sequential processing
-const CONCURRENCY = 5; // Process 5 bookmarks at a time in parallel (reduced from 10 to avoid rate limits)
+const CONCURRENCY = 15; // Process 15 bookmarks at a time in parallel (paid tier allows higher concurrency)
+
+// Chunking configuration (set to true to use improved chunked embedding)
+const ENABLE_CHUNKING = true; // Enable chunked embedding for better search quality
 
 let isProcessing = false;
 let workerRunning = false;
@@ -113,25 +116,53 @@ async function processBookmark(bookmark) {
 
     // Step 3: Process with Gemini (summarize + embed)
     console.log(`[Worker] Step 2/4: Generating AI summary and embeddings...`);
-    const aiResult = await processContent(extracted.content, url);
+    let aiResult;
+    let qdrantPointIds;
 
-    // Step 4: Store in Qdrant
-    console.log(`[Worker] Step 3/4: Storing in vector database...`);
-    const qdrantPointId = await createBookmark(user_id, {
-      url: url,
-      title: aiResult.title,
-      description: aiResult.description,
-      content: extracted.content,
-      embedding: aiResult.embedding,
-      tags: aiResult.tags || [], // AI-generated tags
-      favicon_url: extracted.favicon || null
-    });
+    if (ENABLE_CHUNKING) {
+      // Use new chunked processing for better search quality
+      console.log(`[Worker] Using CHUNKED processing mode`);
+      aiResult = await processContentWithChunking(extracted.content, url, title);
+
+      // Step 4: Store chunks in Qdrant
+      console.log(`[Worker] Step 3/4: Storing ${aiResult.chunks.length} chunks in vector database...`);
+      qdrantPointIds = await createBookmarkChunks(user_id, {
+        bookmark_id: id, // Use Supabase bookmark ID as parent reference
+        url: url,
+        title: aiResult.title,
+        description: aiResult.description,
+        content: extracted.content,
+        tags: aiResult.tags || [],
+        chunks: aiResult.chunks,
+        favicon_url: extracted.favicon || null
+      });
+
+      console.log(`[Worker] Created ${qdrantPointIds.length} chunk points in Qdrant`);
+    } else {
+      // Use legacy single-embedding approach
+      console.log(`[Worker] Using LEGACY processing mode`);
+      aiResult = await processContent(extracted.content, url);
+
+      // Step 4: Store in Qdrant (legacy single point)
+      console.log(`[Worker] Step 3/4: Storing in vector database...`);
+      const qdrantPointId = await createBookmark(user_id, {
+        url: url,
+        title: aiResult.title,
+        description: aiResult.description,
+        content: extracted.content,
+        embedding: aiResult.embedding,
+        tags: aiResult.tags || [],
+        favicon_url: extracted.favicon || null
+      });
+
+      qdrantPointIds = [qdrantPointId];
+    }
 
     // Step 5: Update Supabase with completion
     console.log(`[Worker] Step 4/4: Updating database...`);
     await updateBookmarkRecord(id, {
       title: aiResult.title,
-      qdrant_point_id: qdrantPointId,
+      qdrant_point_id: qdrantPointIds[0], // Store first chunk ID for legacy compatibility
       processing_status: 'completed',
       extraction_method: hasValidExtractedContent ? extraction_method : 'jina',
       error_message: null
@@ -394,6 +425,7 @@ export function startWorker() {
   if (ENABLE_PARALLEL_PROCESSING) {
     console.log(`🚀 Concurrency: ${CONCURRENCY} bookmarks at a time`);
   }
+  console.log(`🧩 Chunking: ${ENABLE_CHUNKING ? 'ENABLED (improved search quality)' : 'DISABLED (legacy mode)'}`);
   console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`);
 
   workerRunning = true;

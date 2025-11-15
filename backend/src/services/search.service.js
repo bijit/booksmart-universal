@@ -5,12 +5,103 @@
  * and hybrid search combining vector similarity with text matching
  */
 
-import { generateEmbedding } from './gemini.service.js';
-import { searchBookmarks as searchQdrant } from './qdrant.service.js';
+import { generateEmbedding, rerankResults } from './gemini.service.js';
+import { searchBookmarks as searchQdrant, searchChunks } from './qdrant.service.js';
 import { createSearchHistory } from './supabase.service.js';
+import { scoreBM25, enhancedTextMatch } from '../utils/text-matching.js';
+
+// Configuration: Enable chunked search (set to false to use legacy non-chunked search)
+const ENABLE_CHUNKED_SEARCH = true;
+
+// Configuration: Enable LLM-based reranking for top results (higher quality but slower)
+const ENABLE_RERANKING = true;
 
 /**
- * Perform semantic search on bookmarks
+ * Aggregate chunks by parent bookmark and select best score
+ *
+ * @param {Array} chunks - Array of chunk search results
+ * @param {number} limit - Number of bookmarks to return
+ * @returns {Array} Aggregated bookmarks with best scores
+ */
+function aggregateChunksByBookmark(chunks, limit = 10) {
+  // Group chunks by bookmark_id
+  const bookmarkMap = new Map();
+
+  for (const chunk of chunks) {
+    const bookmarkId = chunk.bookmark_id;
+
+    if (!bookmarkMap.has(bookmarkId)) {
+      // First chunk for this bookmark
+      bookmarkMap.set(bookmarkId, {
+        bookmark_id: bookmarkId,
+        url: chunk.url,
+        title: chunk.title,
+        description: chunk.description,
+        content: chunk.content,
+        tags: chunk.tags,
+        favicon_url: chunk.favicon_url,
+        created_at: chunk.created_at,
+        updated_at: chunk.updated_at,
+        // Keep track of best matching chunk
+        best_chunk: {
+          score: chunk.score,
+          chunk_index: chunk.chunk_index,
+          chunk_text: chunk.chunk_text
+        },
+        // Keep track of all chunks for this bookmark
+        matching_chunks: [{
+          chunk_index: chunk.chunk_index,
+          score: chunk.score,
+          chunk_text: chunk.chunk_text.substring(0, 200) + '...' // Preview only
+        }]
+      });
+    } else {
+      // Additional chunk for existing bookmark
+      const bookmark = bookmarkMap.get(bookmarkId);
+
+      // Update best score if this chunk is better
+      if (chunk.score > bookmark.best_chunk.score) {
+        bookmark.best_chunk = {
+          score: chunk.score,
+          chunk_index: chunk.chunk_index,
+          chunk_text: chunk.chunk_text
+        };
+      }
+
+      // Add to matching chunks list
+      bookmark.matching_chunks.push({
+        chunk_index: chunk.chunk_index,
+        score: chunk.score,
+        chunk_text: chunk.chunk_text.substring(0, 200) + '...'
+      });
+    }
+  }
+
+  // Convert map to array and sort by best score
+  const bookmarks = Array.from(bookmarkMap.values())
+    .sort((a, b) => b.best_chunk.score - a.best_chunk.score)
+    .slice(0, limit)
+    .map(bookmark => ({
+      id: bookmark.bookmark_id,
+      url: bookmark.url,
+      title: bookmark.title,
+      description: bookmark.description,
+      content: bookmark.content,
+      tags: bookmark.tags,
+      favicon_url: bookmark.favicon_url,
+      created_at: bookmark.created_at,
+      updated_at: bookmark.updated_at,
+      score: bookmark.best_chunk.score,
+      chunk_index: bookmark.best_chunk.chunk_index,
+      matching_chunks_count: bookmark.matching_chunks.length,
+      matching_chunks: bookmark.matching_chunks.sort((a, b) => b.score - a.score).slice(0, 3) // Top 3 chunks
+    }));
+
+  return bookmarks;
+}
+
+/**
+ * Perform semantic search on bookmarks (with chunking support)
  *
  * @param {string} userId - User ID performing the search
  * @param {string} query - Natural language search query
@@ -22,27 +113,47 @@ export async function semanticSearch(userId, query, options = {}) {
     const {
       limit = 10,
       tags = null,
-      scoreThreshold = 0.35  // Balanced threshold for good recall without noise
+      scoreThreshold = 0.3  // Lower threshold for chunked search (better recall)
     } = options;
 
     console.log(`[Search] Semantic search: "${query}" for user ${userId}`);
+    console.log(`[Search] Mode: ${ENABLE_CHUNKED_SEARCH ? 'CHUNKED' : 'LEGACY'}`);
 
     // Step 1: Generate embedding for the search query
     console.log('[Search] Generating query embedding...');
     const queryEmbedding = await generateEmbedding(query);
     console.log(`[Search] Query embedding generated: ${queryEmbedding.length}D`);
 
-    // Step 2: Search Qdrant with the query embedding
-    console.log(`[Search] Searching Qdrant (limit: ${limit}, threshold: ${scoreThreshold})...`);
-    const results = await searchQdrant(userId, queryEmbedding, {
-      limit,
-      tags,
-      scoreThreshold
-    });
+    let results;
 
-    console.log(`[Search] Found ${results.length} results`);
+    if (ENABLE_CHUNKED_SEARCH) {
+      // Step 2a: Search chunks (get more chunks to allow aggregation)
+      console.log(`[Search] Searching chunks (limit: ${limit * 5}, threshold: ${scoreThreshold})...`);
+      const chunkResults = await searchChunks(userId, queryEmbedding, {
+        limit: limit * 5, // Fetch more chunks to aggregate into top bookmarks
+        tags,
+        scoreThreshold
+      });
 
-    // Step 3: Record search in history (fire and forget)
+      console.log(`[Search] Found ${chunkResults.length} matching chunks`);
+
+      // Step 3a: Aggregate chunks by parent bookmark
+      results = aggregateChunksByBookmark(chunkResults, limit);
+
+      console.log(`[Search] Aggregated into ${results.length} unique bookmarks`);
+    } else {
+      // Step 2b: Legacy search (non-chunked)
+      console.log(`[Search] Searching Qdrant (limit: ${limit}, threshold: ${scoreThreshold})...`);
+      results = await searchQdrant(userId, queryEmbedding, {
+        limit,
+        tags,
+        scoreThreshold
+      });
+
+      console.log(`[Search] Found ${results.length} results`);
+    }
+
+    // Step 4: Record search in history (fire and forget)
     createSearchHistory(userId, {
       query,
       filters: { tags, scoreThreshold },
@@ -80,46 +191,52 @@ export async function hybridSearch(userId, query, options = {}) {
 
     // Get semantic results with higher limit for re-ranking
     const semanticResults = await semanticSearch(userId, query, {
-      limit: limit * 2,  // Get more results for better re-ranking
+      limit: limit * 3,  // Get more results for better re-ranking with BM25
       tags,
       scoreThreshold
     });
 
-    // For now, we'll use semantic results only
-    // In a production system, you'd combine with text search from Supabase
-    // and implement a scoring algorithm
+    if (semanticResults.length === 0) {
+      console.log('[Search] No semantic results found');
+      return [];
+    }
 
-    // Simple text matching bonus: boost results where query terms appear in title
-    const queryTerms = query.toLowerCase().split(/\s+/);
+    // Apply BM25 scoring to all results
+    console.log(`[Search] Applying BM25 scoring to ${semanticResults.length} results...`);
+    const bm25Results = scoreBM25(query, semanticResults);
 
-    const scoredResults = semanticResults.map(result => {
-      let score = result.score; // Start with semantic score (0-1)
+    // Normalize BM25 scores to 0-1 range for combination
+    const maxBM25 = Math.max(...bm25Results.map(r => r.bm25_score || 0), 0.01);
 
-      // Add text matching bonus
-      const title = (result.title || '').toLowerCase();
-      const description = (result.description || '').toLowerCase();
+    const scoredResults = bm25Results.map(result => {
+      const semanticScore = result.score; // Vector similarity score (0-1)
+      const bm25Score = (result.bm25_score || 0) / maxBM25; // Normalized BM25 score (0-1)
 
-      let textMatchScore = 0;
-      for (const term of queryTerms) {
-        if (title.includes(term)) textMatchScore += 0.3;
-        if (description.includes(term)) textMatchScore += 0.1;
-      }
+      // Enhanced text matching with stemming
+      const textMatchScore = enhancedTextMatch(query, result.title, result.description);
 
-      // Weighted combination: 60% semantic, 40% text
-      const hybridScore = (score * 0.6) + (Math.min(textMatchScore, 1.0) * 0.4);
+      // Weighted combination: 50% semantic, 30% BM25, 20% enhanced text match
+      const hybridScore = (semanticScore * 0.5) + (bm25Score * 0.3) + (textMatchScore * 0.2);
 
       return {
         ...result,
-        semantic_score: score,
+        semantic_score: semanticScore,
+        bm25_score: result.bm25_score,
         text_match_score: textMatchScore,
         hybrid_score: hybridScore
       };
     });
 
     // Sort by hybrid score and limit
-    const rankedResults = scoredResults
+    let rankedResults = scoredResults
       .sort((a, b) => b.hybrid_score - a.hybrid_score)
       .slice(0, limit);
+
+    // Apply LLM-based reranking if enabled (for premium quality)
+    if (ENABLE_RERANKING && rankedResults.length > 1) {
+      console.log(`[Search] Applying LLM-based reranking to top ${rankedResults.length} results...`);
+      rankedResults = await rerankResults(query, rankedResults);
+    }
 
     console.log(`[Search] Hybrid search completed: ${rankedResults.length} results`);
 

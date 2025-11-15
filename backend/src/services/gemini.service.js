@@ -249,6 +249,186 @@ Respond in JSON format:
 }
 
 /**
+ * Generate embeddings for multiple text chunks in batch
+ * This is more efficient than calling generateEmbedding multiple times
+ *
+ * @param {Array<string>} texts - Array of text chunks to embed
+ * @returns {Promise<Array<number[]>>} Array of 768-dimensional embedding vectors
+ */
+export async function generateBatchEmbeddings(texts) {
+  try {
+    if (!Array.isArray(texts) || texts.length === 0) {
+      throw new Error('texts must be a non-empty array');
+    }
+
+    console.log(`[Embeddings] Generating vectors for ${texts.length} chunks in batch...`);
+
+    const model = genAI.getGenerativeModel({ model: 'text-embedding-004' });
+
+    // Process all chunks in parallel for maximum speed
+    const embeddings = await Promise.all(
+      texts.map(async (text) => {
+        const truncatedText = text.substring(0, 10000);
+        const result = await model.embedContent(truncatedText);
+
+        if (!result.embedding || !result.embedding.values || !Array.isArray(result.embedding.values)) {
+          throw new Error('Invalid embedding response from Google API');
+        }
+
+        return result.embedding.values;
+      })
+    );
+
+    // Validate all vectors
+    embeddings.forEach((vector, index) => {
+      if (vector.length !== 768) {
+        throw new Error(`Expected 768-dimensional vector for chunk ${index}, got ${vector.length}`);
+      }
+    });
+
+    console.log(`[Embeddings] Successfully generated ${embeddings.length} vectors (768D each)`);
+
+    return embeddings;
+
+  } catch (error) {
+    console.error('[Embeddings] Error generating batch embeddings:', error.message);
+    throw new Error(`Batch embedding generation failed: ${error.message}`);
+  }
+}
+
+/**
+ * Process content with chunking: summarize AND generate embeddings for chunks
+ * This is the new main function used by the worker for better search quality
+ *
+ * @param {string} content - The extracted content
+ * @param {string} url - The source URL
+ * @param {string} title - The bookmark title (optional)
+ * @returns {Promise<Object>} Summary and chunk embeddings
+ */
+export async function processContentWithChunking(content, url, title = '') {
+  try {
+    console.log(`[Gemini] Processing content with chunking for: ${url}`);
+
+    // Import chunking utilities
+    const { createSmartChunks, createChunkContext } = await import('../utils/text-chunking.js');
+
+    // Run summarization in parallel with chunk creation
+    const [summary] = await Promise.all([
+      summarizeContent(content, url)
+    ]);
+
+    // Create smart chunks (paragraph-aware)
+    const chunks = createSmartChunks(content, 2000, 200);
+
+    console.log(`[Gemini] Created ${chunks.length} chunks for embedding`);
+
+    // Create context-aware text for each chunk
+    const chunkTexts = chunks.map(chunk =>
+      createChunkContext(title || summary.title, chunk.text, chunk.index, chunk.total_chunks)
+    );
+
+    // Generate embeddings for all chunks in batch
+    const embeddings = await generateBatchEmbeddings(chunkTexts);
+
+    // Combine chunks with their embeddings
+    const chunksWithEmbeddings = chunks.map((chunk, index) => ({
+      ...chunk,
+      embedding: embeddings[index]
+    }));
+
+    return {
+      title: summary.title,
+      description: summary.description,
+      tags: summary.tags,
+      chunks: chunksWithEmbeddings  // Array of chunks with embeddings
+    };
+
+  } catch (error) {
+    console.error('[Gemini] Error processing content with chunking:', error.message);
+    throw error;
+  }
+}
+
+/**
+ * Rerank search results using LLM-based relevance scoring
+ * This is more accurate than pure vector similarity for the top results
+ *
+ * @param {string} query - User's search query
+ * @param {Array<Object>} results - Top search results to rerank (typically 10-20)
+ * @returns {Promise<Array>} Reranked results with relevance scores
+ */
+export async function rerankResults(query, results) {
+  try {
+    if (!results || results.length === 0) {
+      return results;
+    }
+
+    if (results.length === 1) {
+      // No need to rerank a single result
+      return results.map(r => ({ ...r, rerank_score: 1.0 }));
+    }
+
+    console.log(`[Gemini] Reranking ${results.length} results for query: "${query}"`);
+
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+
+    // Prepare results for reranking (use titles and descriptions)
+    const resultsForReranking = results.map((r, idx) => ({
+      index: idx,
+      title: r.title || 'Untitled',
+      description: (r.description || '').substring(0, 300) // Limit description length
+    }));
+
+    const prompt = `You are a search relevance expert. Given a search query and a list of bookmarks, score each bookmark's relevance to the query on a scale of 0-10.
+
+Query: "${query}"
+
+Bookmarks:
+${resultsForReranking.map((r, i) => `${i + 1}. ${r.title}\n   ${r.description}`).join('\n\n')}
+
+Respond with ONLY a JSON array of relevance scores (0-10) in the same order as the bookmarks. Higher scores mean more relevant.
+Example: [8, 5, 9, 3, 7]`;
+
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    const text = response.text();
+
+    // Parse JSON array from response
+    const jsonMatch = text.match(/\[[\d,\s]+\]/);
+    if (!jsonMatch) {
+      console.error('[Gemini] Failed to parse reranking scores, using original order');
+      return results.map(r => ({ ...r, rerank_score: r.score }));
+    }
+
+    const scores = JSON.parse(jsonMatch[0]);
+
+    // Validate scores array length
+    if (scores.length !== results.length) {
+      console.error(`[Gemini] Score count mismatch (${scores.length} vs ${results.length}), using original order`);
+      return results.map(r => ({ ...r, rerank_score: r.score }));
+    }
+
+    // Attach rerank scores to results
+    const rerankedResults = results.map((result, idx) => ({
+      ...result,
+      rerank_score: scores[idx] / 10.0 // Normalize to 0-1
+    }));
+
+    // Sort by rerank score
+    rerankedResults.sort((a, b) => b.rerank_score - a.rerank_score);
+
+    console.log(`[Gemini] Reranking complete. Top result: "${rerankedResults[0].title}" (score: ${rerankedResults[0].rerank_score})`);
+
+    return rerankedResults;
+
+  } catch (error) {
+    console.error('[Gemini] Error reranking results:', error.message);
+    // Return original results on error
+    return results.map(r => ({ ...r, rerank_score: r.score }));
+  }
+}
+
+/**
  * Test Gemini service
  */
 export async function testGeminiService() {
