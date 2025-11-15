@@ -26,7 +26,7 @@ const QUOTA_BACKOFF_MS = 60 * 60 * 1000; // Back off for 1 hour when quota is hi
 
 // Parallel processing configuration (set ENABLE_PARALLEL_PROCESSING = false to use sequential)
 const ENABLE_PARALLEL_PROCESSING = true; // Toggle between parallel and sequential processing
-const CONCURRENCY = 15; // Process 15 bookmarks at a time in parallel (paid tier allows higher concurrency)
+const CONCURRENCY = 3; // Process 3 bookmarks at a time in parallel (reduced to avoid quota limits during bulk imports)
 
 // Chunking configuration (set to true to use improved chunked embedding)
 const ENABLE_CHUNKING = true; // Enable chunked embedding for better search quality
