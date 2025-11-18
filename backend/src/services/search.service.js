@@ -14,7 +14,8 @@ import { scoreBM25, enhancedTextMatch } from '../utils/text-matching.js';
 const ENABLE_CHUNKED_SEARCH = true;
 
 // Configuration: Enable LLM-based reranking for top results (higher quality but slower)
-const ENABLE_RERANKING = true;
+// Set to false for faster search (trades quality for speed)
+const ENABLE_RERANKING = false;
 
 /**
  * Aggregate chunks by parent bookmark and select best score
