@@ -112,7 +112,20 @@ async function setupQdrant() {
       field_name: 'created_at',
       field_schema: 'datetime',
     });
-    console.log('   ✅ Index on created_at created\n');
+    console.log('   ✅ Index on created_at created');
+
+    // Indexes for chunking support
+    await client.createPayloadIndex(collectionName, {
+      field_name: 'is_chunk',
+      field_schema: 'bool',
+    });
+    console.log('   ✅ Index on is_chunk created');
+
+    await client.createPayloadIndex(collectionName, {
+      field_name: 'bookmark_id',
+      field_schema: 'keyword',
+    });
+    console.log('   ✅ Index on bookmark_id created\n');
 
     // Verify setup
     console.log('🔍 Verifying collection setup...');
