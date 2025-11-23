@@ -61,7 +61,7 @@ async function processMetadataOnly(id, url, title, user_id) {
       content: `Metadata-only bookmark. URL: ${url}`, // Minimal content
       embedding: embedding,
       tags: summary.tags || [],
-      favicon_url: null
+      favicon_url: getFaviconUrl(url)
     });
 
     // Step 4: Update Supabase with completion
@@ -79,6 +79,24 @@ async function processMetadataOnly(id, url, title, user_id) {
   } catch (error) {
     console.error(`[Worker] ❌ Metadata-only processing failed for ${id}:`, error.message);
     throw error;
+  }
+}
+
+/**
+ * Generate favicon URL from page URL using Google's favicon service
+ * Same API that the Chrome extension uses for displaying favicons
+ *
+ * @param {string} url - The page URL
+ * @returns {string} Favicon URL
+ */
+function getFaviconUrl(url) {
+  try {
+    const urlObj = new URL(url);
+    const domain = urlObj.hostname;
+    return `https://www.google.com/s2/favicons?domain=${domain}&sz=32`;
+  } catch (error) {
+    console.warn(`[Worker] Failed to generate favicon URL for ${url}:`, error.message);
+    return null;
   }
 }
 
@@ -107,11 +125,15 @@ async function processBookmark(bookmark) {
       console.log(`[Worker] Step 1/4: Using locally extracted content (${extracted_content.length} chars via ${extraction_method})`);
       extracted = {
         content: extracted_content,
-        favicon: null // Extension doesn't provide favicon
+        favicon: getFaviconUrl(url) // Generate favicon URL using Google's service
       };
     } else {
       console.log(`[Worker] Step 1/4: No local content, extracting with Jina...`);
       extracted = await extractContent(url);
+      // If Jina didn't provide favicon, generate one
+      if (!extracted.favicon) {
+        extracted.favicon = getFaviconUrl(url);
+      }
     }
 
     // Step 3: Process with Gemini (summarize + embed)
