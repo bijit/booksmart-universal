@@ -25,7 +25,7 @@ function Sidebar() {
   }, {})
 
   return (
-    <aside className="w-64 bg-light-card dark:bg-dark-card border-r border-light-border dark:border-dark-border p-6 overflow-y-auto">
+    <aside className="w-64 h-full bg-light-card dark:bg-dark-card border-r border-light-border dark:border-dark-border p-6 overflow-y-auto">
       {/* Sort */}
       <div className="mb-6">
         <div className="flex items-center gap-2 mb-3">

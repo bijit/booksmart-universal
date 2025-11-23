@@ -8,7 +8,7 @@
 import { generateEmbedding, rerankResults } from './gemini.service.js';
 import { searchBookmarks as searchQdrant, searchChunks } from './qdrant.service.js';
 import { createSearchHistory } from './supabase.service.js';
-import { scoreBM25, enhancedTextMatch } from '../utils/text-matching.js';
+// import { scoreBM25, enhancedTextMatch } from '../utils/text-matching.js'; // Disabled for semantic-only search
 
 // Configuration: Enable chunked search (set to false to use legacy non-chunked search)
 const ENABLE_CHUNKED_SEARCH = true;
@@ -202,33 +202,25 @@ export async function hybridSearch(userId, query, options = {}) {
       return [];
     }
 
-    // Apply BM25 scoring to all results
-    console.log(`[Search] Applying BM25 scoring to ${semanticResults.length} results...`);
-    const bm25Results = scoreBM25(query, semanticResults);
+    // Use semantic scores only (BM25/text matching disabled for better quality)
+    console.log(`[Search] Using semantic-only ranking for ${semanticResults.length} results...`);
 
-    // Normalize BM25 scores to 0-1 range for combination
-    const maxBM25 = Math.max(...bm25Results.map(r => r.bm25_score || 0), 0.01);
-
-    const scoredResults = bm25Results.map(result => {
+    const scoredResults = semanticResults.map(result => {
       const semanticScore = result.score; // Vector similarity score (0-1)
-      const bm25Score = (result.bm25_score || 0) / maxBM25; // Normalized BM25 score (0-1)
 
-      // Enhanced text matching with stemming
-      const textMatchScore = enhancedTextMatch(query, result.title, result.description);
-
-      // Weighted combination: 50% semantic, 30% BM25, 20% enhanced text match
-      const hybridScore = (semanticScore * 0.5) + (bm25Score * 0.3) + (textMatchScore * 0.2);
+      // Use semantic score as hybrid score (100% semantic, 0% BM25, 0% text match)
+      const hybridScore = semanticScore;
 
       return {
         ...result,
         semantic_score: semanticScore,
-        bm25_score: result.bm25_score,
-        text_match_score: textMatchScore,
+        bm25_score: 0, // Disabled
+        text_match_score: 0, // Disabled
         hybrid_score: hybridScore
       };
     });
 
-    // Sort by hybrid score and limit
+    // Sort by semantic score and limit (already sorted, but ensure correct order)
     let rankedResults = scoredResults
       .sort((a, b) => b.hybrid_score - a.hybrid_score)
       .slice(0, limit);
