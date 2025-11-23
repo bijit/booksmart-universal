@@ -25,6 +25,19 @@ function BookmarkCard({ bookmark }) {
     toggleTag(tag)
   }
 
+  // Generate favicon URL from bookmark URL (same as extension logic)
+  const getFaviconUrl = (url) => {
+    try {
+      const urlObj = new URL(url)
+      const domain = urlObj.hostname
+      return `https://www.google.com/s2/favicons?domain=${domain}&sz=32`
+    } catch (error) {
+      return null
+    }
+  }
+
+  const faviconUrl = bookmark.favicon_url || getFaviconUrl(bookmark.url)
+
   return (
     <div className={`card group ${isDeleting ? 'opacity-50 pointer-events-none' : ''}`}>
       <div className="p-5">
@@ -32,9 +45,9 @@ function BookmarkCard({ bookmark }) {
         <div className="flex items-start justify-between gap-3 mb-3">
           <div className="flex items-start gap-2 flex-1 min-w-0">
             {/* Favicon */}
-            {bookmark.favicon_url ? (
+            {faviconUrl ? (
               <img
-                src={bookmark.favicon_url}
+                src={faviconUrl}
                 alt=""
                 className="w-5 h-5 mt-1 flex-shrink-0 rounded"
                 onError={(e) => {
