@@ -30,9 +30,26 @@ function BookmarkCard({ bookmark }) {
       <div className="p-5">
         {/* Header */}
         <div className="flex items-start justify-between gap-3 mb-3">
-          <h3 className="text-lg font-semibold line-clamp-2 flex-1">
-            {bookmark.title || 'Untitled'}
-          </h3>
+          <div className="flex items-start gap-2 flex-1 min-w-0">
+            {/* Favicon */}
+            {bookmark.favicon_url ? (
+              <img
+                src={bookmark.favicon_url}
+                alt=""
+                className="w-5 h-5 mt-1 flex-shrink-0 rounded"
+                onError={(e) => {
+                  e.target.style.display = 'none'
+                }}
+              />
+            ) : (
+              <div className="w-5 h-5 mt-1 flex-shrink-0 bg-light-border dark:bg-dark-border rounded flex items-center justify-center text-xs text-light-text-secondary dark:text-dark-text-secondary">
+                <ExternalLink className="w-3 h-3" />
+              </div>
+            )}
+            <h3 className="text-lg font-semibold line-clamp-2 flex-1 min-w-0">
+              {bookmark.title || 'Untitled'}
+            </h3>
+          </div>
           <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
             <a
               href={bookmark.url}
