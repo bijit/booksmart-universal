@@ -137,9 +137,23 @@ router.get('/', async (req, res) => {
       end_date
     });
 
+    // If limit=0, just return the count (used for badge polling)
+    const parsedLimit = parseInt(limit) || 50;
+    if (parsedLimit === 0 || limit === '0') {
+      return res.json({
+        bookmarks: [],
+        pagination: {
+          limit: 0,
+          offset: parseInt(offset),
+          total: totalCount,
+          totalPages: 0
+        }
+      });
+    }
+
     // Get bookmarks from Supabase with date filtering
     const bookmarks = await getUserBookmarkRecords(userId, {
-      limit: parseInt(limit),
+      limit: parsedLimit,
       offset: parseInt(offset),
       status,
       url,
@@ -152,10 +166,10 @@ router.get('/', async (req, res) => {
       return res.json({
         bookmarks: [],
         pagination: {
-          limit: parseInt(limit),
+          limit: parsedLimit,
           offset: parseInt(offset),
           total: totalCount,
-          totalPages: Math.ceil(totalCount / parseInt(limit))
+          totalPages: Math.ceil(totalCount / parsedLimit)
         }
       });
     }
@@ -202,11 +216,11 @@ router.get('/', async (req, res) => {
     res.json({
       bookmarks: filteredBookmarks,
       pagination: {
-        limit: parseInt(limit),
+        limit: parsedLimit,
         offset: parseInt(offset),
         total: effectiveTotal,
-        totalPages: Math.ceil(effectiveTotal / parseInt(limit)),
-        currentPage: Math.floor(parseInt(offset) / parseInt(limit)) + 1
+        totalPages: Math.ceil(effectiveTotal / parsedLimit),
+        currentPage: Math.floor(parseInt(offset) / parsedLimit) + 1
       }
     });
 
