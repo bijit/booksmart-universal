@@ -1,0 +1,17 @@
+{
+  "name": "booksmart-extension",
+  "version": "1.0.0",
+  "description": "Chrome extension for BookSmart bookmark management",
+  "main": "background.js",
+  "scripts": {
+    "build": "bash build.sh"
+  },
+  "keywords": [
+    "chrome",
+    "extension",
+    "bookmarks",
+    "ai"
+  ],
+  "author": "",
+  "license": "ISC"
+}

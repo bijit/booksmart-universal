@@ -10,23 +10,26 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-// Load .env.local if not already loaded
-if (!process.env.QDRANT_URL) {
-  config({ path: resolve(__dirname, '../../../.env.local') });
-}
+// Note: Environment variables are loaded in index.js
+const qdrantUrl = process.env.QDRANT_URL || '';
+const qdrantApiKey = process.env.QDRANT_API_KEY || '';
 
-// Validate environment variables
-if (!process.env.QDRANT_URL || !process.env.QDRANT_API_KEY) {
-  throw new Error('Missing Qdrant environment variables');
-}
+// Create Qdrant client safely
+export let qdrantClient;
 
-// Create Qdrant client
-export const qdrantClient = new QdrantClient({
-  url: process.env.QDRANT_URL,
-  apiKey: process.env.QDRANT_API_KEY,
-});
+if (qdrantUrl && qdrantApiKey) {
+  try {
+    qdrantClient = new QdrantClient({
+      url: qdrantUrl,
+      apiKey: qdrantApiKey,
+    });
+    console.log('✅ Qdrant client initialized');
+  } catch (err) {
+    console.error('❌ Qdrant client failed:', err.message);
+  }
+} else {
+  console.warn('⚠️ QDRANT_URL or QDRANT_API_KEY not found');
+}
 
 // Collection name
 export const COLLECTION_NAME = 'bookmarks';
-
-console.log('✅ Qdrant client initialized');

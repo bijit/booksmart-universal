@@ -1,11 +1,13 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>BookSmart</title>
   <link rel="stylesheet" href="popup.css">
 </head>
+
 <body>
   <div class="container">
     <!-- Login Screen (shown when not authenticated) -->
@@ -13,8 +15,10 @@
       <div class="login-content">
         <div class="logo">
           <svg width="48" height="48" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M19 21H5C3.89543 21 3 20.1046 3 19V5C3 3.89543 3.89543 3 5 3H19C20.1046 3 21 3.89543 21 5V19C21 20.1046 20.1046 21 19 21Z" stroke="#3B82F6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            <path d="M7 7H17M7 12H17M7 17H13" stroke="#3B82F6" stroke-width="2" stroke-linecap="round"/>
+            <path
+              d="M19 21H5C3.89543 21 3 20.1046 3 19V5C3 3.89543 3.89543 3 5 3H19C20.1046 3 21 3.89543 21 5V19C21 20.1046 20.1046 21 19 21Z"
+              stroke="#3B82F6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+            <path d="M7 7H17M7 12H17M7 17H13" stroke="#3B82F6" stroke-width="2" stroke-linecap="round" />
           </svg>
         </div>
         <h1>BookSmart</h1>
@@ -38,8 +42,10 @@
       <div class="login-content">
         <div class="logo">
           <svg width="48" height="48" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M19 21H5C3.89543 21 3 20.1046 3 19V5C3 3.89543 3.89543 3 5 3H19C20.1046 3 21 3.89543 21 5V19C21 20.1046 20.1046 21 19 21Z" stroke="#3B82F6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            <path d="M7 7H17M7 12H17M7 17H13" stroke="#3B82F6" stroke-width="2" stroke-linecap="round"/>
+            <path
+              d="M19 21H5C3.89543 21 3 20.1046 3 19V5C3 3.89543 3.89543 3 5 3H19C20.1046 3 21 3.89543 21 5V19C21 20.1046 20.1046 21 19 21Z"
+              stroke="#3B82F6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+            <path d="M7 7H17M7 12H17M7 17H13" stroke="#3B82F6" stroke-width="2" stroke-linecap="round" />
           </svg>
         </div>
         <h1>Create Account</h1>
@@ -47,7 +53,8 @@
 
         <form id="registerForm" class="login-form">
           <input type="email" id="registerEmail" placeholder="Email" required autocomplete="email">
-          <input type="password" id="registerPassword" placeholder="Password (min 8 characters)" required autocomplete="new-password" minlength="8">
+          <input type="password" id="registerPassword" placeholder="Password (min 8 characters)" required
+            autocomplete="new-password" minlength="8">
           <button type="submit" class="btn btn-primary">Create Account</button>
           <div id="registerError" class="error-message hidden"></div>
         </form>
@@ -66,80 +73,165 @@
           <div class="header-left-buttons">
             <button id="openManagerBtn" class="open-manager-link" title="Open full manager">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M10 6H6C4.89543 6 4 6.89543 4 8V18C4 19.1046 4.89543 20 6 20H16C17.1046 20 18 19.1046 18 18V14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                <path d="M14 4H20M20 4V10M20 4L10 14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M10 6H6C4.89543 6 4 6.89543 4 8V18C4 19.1046 4.89543 20 6 20H16C17.1046 20 18 19.1046 18 18V14"
+                  stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                <path d="M14 4H20M20 4V10M20 4L10 14" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                  stroke-linejoin="round" />
               </svg>
               Manager
             </button>
             <button id="importBtn" class="btn-import" title="Import Chrome Bookmarks">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M21 15V19C21 20.1046 20.1046 21 19 21H5C3.89543 21 3 20.1046 3 19V15" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                <path d="M17 8L12 3M12 3L7 8M12 3V15" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M21 15V19C21 20.1046 20.1046 21 19 21H5C3.89543 21 3 20.1046 3 19V15" stroke="currentColor"
+                  stroke-width="2" stroke-linecap="round" />
+                <path d="M17 8L12 3M12 3L7 8M12 3V15" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                  stroke-linejoin="round" />
               </svg>
               Import
             </button>
           </div>
           <button id="logoutBtnTop" class="btn-logout-top" title="Logout">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M9 21H5C3.89543 21 3 20.1046 3 19V5C3 3.89543 3.89543 3 5 3H9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-              <path d="M16 17L21 12M21 12L16 7M21 12H9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M9 21H5C3.89543 21 3 20.1046 3 19V5C3 3.89543 3.89543 3 5 3H9" stroke="currentColor"
+                stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+              <path d="M16 17L21 12M21 12L16 7M21 12H9" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                stroke-linejoin="round" />
             </svg>
           </button>
         </div>
         <div class="search-container">
-          <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <circle cx="11" cy="11" r="8" stroke="#6B7280" stroke-width="2"/>
-            <path d="M21 21L16.65 16.65" stroke="#6B7280" stroke-width="2" stroke-linecap="round"/>
+          <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none"
+            xmlns="http://www.w3.org/2000/svg">
+            <circle cx="11" cy="11" r="8" stroke="#6B7280" stroke-width="2" />
+            <path d="M21 21L16.65 16.65" stroke="#6B7280" stroke-width="2" stroke-linecap="round" />
           </svg>
-          <input type="text" id="searchInput" placeholder="Search bookmarks..." autocomplete="off">
+          <input type="text" id="searchInput" placeholder="Search your library..." autocomplete="off">
           <button id="clearSearchBtn" class="clear-search-btn hidden" title="Clear search">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M18 6L6 18M6 6L18 18" stroke="#6B7280" stroke-width="2" stroke-linecap="round"/>
+              <path d="M18 6L6 18M6 6L18 18" stroke="#6B7280" stroke-width="2" stroke-linecap="round" />
             </svg>
           </button>
         </div>
+        <div id="tagFilterContainer" class="tag-filter-container hidden">
+          <div class="tag-filter-label">Filter by Tag:</div>
+          <div id="tagFilterList" class="tag-filter-list"></div>
+        </div>
       </div>
 
-      <!-- Bookmarks List -->
-      <div class="bookmarks-container">
-        <div id="bookmarksList" class="bookmarks-list">
-          <!-- Bookmarks will be inserted here dynamically -->
-        </div>
-
-        <!-- Loading State -->
-        <div id="loadingState" class="state-message hidden">
-          <div class="spinner"></div>
-          <p>Loading bookmarks...</p>
-        </div>
-
-        <!-- Empty State -->
-        <div id="emptyState" class="state-message hidden">
-          <svg width="64" height="64" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M19 21H5C3.89543 21 3 20.1046 3 19V5C3.89543 3.89543 3.89543 3 5 3H19C20.1046 3 21 3.89543 21 5V19C21 20.1046 20.1046 21 19 21Z" stroke="#D1D5DB" stroke-width="2"/>
-            <path d="M12 8V16M8 12H16" stroke="#D1D5DB" stroke-width="2" stroke-linecap="round"/>
-          </svg>
-          <p>No bookmarks yet</p>
-          <p class="hint">Click the star in your address bar to save a bookmark</p>
-          <button id="importFromEmptyBtn" class="btn btn-primary" style="margin-top: 16px;">
-            Import Chrome Bookmarks
-          </button>
-        </div>
-
-        <!-- Import Progress State -->
-        <div id="importProgressState" class="state-message hidden">
-          <div class="spinner"></div>
-          <p id="importProgressText">Importing bookmarks...</p>
-          <div class="import-progress-bar">
-            <div id="importProgressFill" class="import-progress-fill"></div>
+      <div class="main-scroll-area">
+        <!-- Current Page Section -->
+        <div id="currentPageSection" class="current-page-section">
+          <div class="section-title">Current Page</div>
+          <div id="currentPageCard" class="current-page-card">
+            <div class="current-page-info">
+              <img id="currentPageFavicon" src="" alt="" class="current-page-favicon"
+                onerror="this.style.display='none'">
+              <div class="current-page-text">
+                <div id="currentPageTitle" class="current-page-title">Loading...</div>
+                <div id="currentPageUrl" class="current-page-url">...</div>
+              </div>
+            </div>
+            <div id="currentPageActions" class="current-page-actions">
+              <button id="savePageBtn" class="btn btn-primary btn-sm">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                  stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path>
+                </svg>
+                Save to BookSmart
+              </button>
+            </div>
           </div>
-          <p id="importProgressDetails" class="hint">0 / 0 (0%)</p>
+
+          <!-- Related Content & Suggestions (shown after checking current page) -->
+          <div id="relatedContent" class="related-content hidden">
+            <div id="discoveryTagsContainer" class="suggested-tags-container hidden">
+              <div class="related-title">✨ AI Discovery (New Tags):</div>
+              <div id="discoveryTagsList" class="suggested-tags-list"></div>
+            </div>
+            <div id="suggestedTagsContainer" class="suggested-tags-container hidden">
+              <div class="related-title">📚 Library Consistency:</div>
+              <div id="suggestedTagsList" class="suggested-tags-list"></div>
+            </div>
+            <div class="related-title">From your library:</div>
+            <div id="relatedList" class="related-list"></div>
+          </div>
         </div>
+
+        <!-- Local AI Help Section -->
+        <div id="localAiHelp" class="local-ai-help hidden">
+          <div class="help-header">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"></circle>
+              <path d="M12 16v-4"></path>
+              <path d="M12 8h.01"></path>
+            </svg>
+            Boost speed with Local AI
+          </div>
+          <p>Enable Chrome's built-in <b>Gemini Nano</b> for instant analysis:</p>
+          <ol>
+            <li>Go to <code>chrome://flags</code></li>
+            <li>Enable <b>Enables optimization guide on device model</b></li>
+            <li>Set <b>Prompt API Helper</b> to Enabled</li>
+            <li>Restart Chrome</li>
+          </ol>
+        </div>
+
+        <!-- AI Overview Section (Search Results Only) -->
+        <div id="aiOverviewSection" class="ai-overview-section hidden">
+          <div class="ai-overview-header">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path
+                d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z">
+              </path>
+            </svg>
+            AI Overview
+          </div>
+          <div id="aiAnswer" class="ai-answer"></div>
+        </div>
+
+        <!-- Bookmarks List -->
+        <div class="bookmarks-container">
+          <div id="resultsTitle" class="section-title hidden">Search Results</div>
+          <div id="bookmarksList" class="bookmarks-list">
+            <!-- Bookmarks will be inserted here dynamically -->
+          </div>
+
+          <!-- Loading State -->
+          <div id="loadingState" class="state-message hidden">
+            <div class="spinner"></div>
+            <p>Loading bookmarks...</p>
+          </div>
+
+          <!-- Empty State -->
+          <div id="emptyState" class="state-message hidden">
+            <svg width="64" height="64" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path
+                d="M19 21H5C3.89543 21 3 20.1046 3 19V5C3.89543 3.89543 3.89543 3 5 3H19C20.1046 3 21 3.89543 21 5V19C21 20.1046 20.1046 21 19 21Z"
+                stroke="#D1D5DB" stroke-width="2" />
+              <path d="M12 8V16M8 12H16" stroke="#D1D5DB" stroke-width="2" stroke-linecap="round" />
+            </svg>
+            <p>No bookmarks yet</p>
+            <p class="hint">Click the star in your address bar to save a bookmark</p>
+            <button id="importFromEmptyBtn" class="btn btn-primary" style="margin-top: 16px;">
+              Import Chrome Bookmarks
+            </button>
+          </div>
+
+          <!-- Import Progress State -->
+          <div id="importProgressState" class="state-message hidden">
+            <div class="spinner"></div>
+            <p id="importProgressText">Importing bookmarks...</p>
+            <div class="import-progress-bar">
+              <div id="importProgressFill" class="import-progress-fill"></div>
+            </div>
+            <p id="importProgressDetails" class="hint">0 / 0 (0%)</p>
+          </div>
+        </div>
+
       </div>
-
     </div>
-  </div>
 
-  <script src="config.js"></script>
-  <script src="popup.js"></script>
+    <script type="module" src="popup.js"></script>
 </body>
+
 </html>

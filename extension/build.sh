@@ -8,6 +8,7 @@ echo "Building BookSmart Extension..."
 rm -rf dist/*
 mkdir -p dist/icons
 mkdir -p dist/lib
+mkdir -p dist/utils
 
 # Copy manifest
 cp public/manifest.json dist/
@@ -18,10 +19,13 @@ cp src/icons/*.png dist/icons/
 # Copy config
 cp src/config.js dist/
 
-# Copy background script and fix import path
+# Copy utilities
+cp src/utils/*.js dist/utils/
+
+# Copy background script
 cp src/background/background.js dist/
-# Fix the config.js import path (from ../config.js to ./config.js)
-sed -i "s|'../config.js'|'./config.js'|g" dist/background.js
+# Fix imports in background.js (from ../ to ./)
+sed -i '' "s|'../|'./|g" dist/background.js
 
 # Copy content extraction files
 cp src/content-extractor.js dist/
@@ -31,6 +35,8 @@ cp src/lib/Readability.js dist/lib/
 cp src/popup/popup.html dist/
 cp src/popup/popup.css dist/
 cp src/popup/popup.js dist/
+# Fix imports in popup.js (from ../ to ./)
+sed -i '' "s|'../|'./|g" dist/popup.js
 
 echo "Build complete!"
 echo ""

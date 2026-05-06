@@ -7,6 +7,97 @@
 import { qdrantClient, COLLECTION_NAME } from '../config/qdrant.js';
 import { v4 as uuidv4 } from 'uuid';
 
+const DESIRED_DIMENSION = 3072; // Gemini high-resolution embeddings
+
+/**
+ * Create a new bookmark point in Qdrant
+ */
+export async function initializeCollection() {
+  try {
+    const collections = await qdrantClient.getCollections();
+    const collection = collections.collections.find(c => c.name === COLLECTION_NAME);
+
+    const DESIRED_DIMENSION = 3072; // Gemini high-resolution embeddings
+
+    if (collection) {
+      // Check current configuration
+      const info = await qdrantClient.getCollection(COLLECTION_NAME);
+      const currentSize = info.config.params.vectors.size;
+
+      if (currentSize !== DESIRED_DIMENSION) {
+        console.log(`[Qdrant] Dimension mismatch detected (Current: ${currentSize}, Desired: ${DESIRED_DIMENSION}). Recreating collection...`);
+        await qdrantClient.deleteCollection(COLLECTION_NAME);
+        await createNewCollection(DESIRED_DIMENSION);
+      } else {
+        console.log(`[Qdrant] Collection ${COLLECTION_NAME} is correctly configured at ${DESIRED_DIMENSION} dimensions`);
+        
+        // Even if collection exists, ensure indexes are there
+        await ensurePayloadIndexes();
+      }
+    } else {
+      console.log(`[Qdrant] Collection ${COLLECTION_NAME} does not exist. Creating...`);
+      await createNewCollection(DESIRED_DIMENSION);
+    }
+  } catch (error) {
+    console.error('[Qdrant] Error initializing collection:', error);
+  }
+}
+
+/**
+ * Ensure required payload indexes exist
+ */
+async function ensurePayloadIndexes() {
+  try {
+    console.log('[Qdrant] Checking payload indexes...');
+    
+    // We can just call createPayloadIndex; Qdrant handles it gracefully if it already exists
+    // but better to be safe
+    await qdrantClient.createPayloadIndex(COLLECTION_NAME, {
+      field_name: 'user_id',
+      field_schema: 'keyword',
+      wait: true
+    });
+
+    await qdrantClient.createPayloadIndex(COLLECTION_NAME, {
+      field_name: 'bookmark_id',
+      field_schema: 'keyword',
+      wait: true
+    });
+
+    console.log('[Qdrant] Payload indexes verified/created');
+  } catch (error) {
+    console.warn('[Qdrant] Warning: Could not ensure payload indexes:', error.message);
+  }
+}
+
+async function createNewCollection(size) {
+  await qdrantClient.createCollection(COLLECTION_NAME, {
+    vectors: {
+      size: size,
+      distance: 'Cosine'
+    }
+  });
+  
+  console.log(`[Qdrant] Collection ${COLLECTION_NAME} created with ${size} dimensions`);
+
+  // Create payload indexes for efficient filtering
+  console.log('[Qdrant] Creating payload indexes...');
+  
+  await qdrantClient.createPayloadIndex(COLLECTION_NAME, {
+    field_name: 'user_id',
+    field_schema: 'keyword',
+    wait: true
+  });
+
+  await qdrantClient.createPayloadIndex(COLLECTION_NAME, {
+    field_name: 'bookmark_id',
+    field_schema: 'keyword',
+    wait: true
+  });
+
+  console.log('[Qdrant] Payload indexes created successfully');
+}
+
 /**
  * Create a new bookmark point in Qdrant
  */
@@ -113,6 +204,8 @@ export async function searchBookmarks(userId, queryEmbedding, options = {}) {
       limit = 10,
       offset = 0,
       tags = null,
+      startDate = null,
+      endDate = null,
       scoreThreshold = 0.5
     } = options;
 
@@ -131,6 +224,18 @@ export async function searchBookmarks(userId, queryEmbedding, options = {}) {
       filter.must.push({
         key: 'tags',
         match: { any: tags }
+      });
+    }
+
+    // Add date range filter if provided
+    if (startDate || endDate) {
+      const range = {};
+      if (startDate) range.gte = startDate instanceof Date ? startDate.toISOString() : startDate;
+      if (endDate) range.lte = endDate instanceof Date ? endDate.toISOString() : endDate;
+      
+      filter.must.push({
+        key: 'created_at',
+        range: range
       });
     }
 
@@ -341,6 +446,8 @@ export async function searchChunks(userId, queryEmbedding, options = {}) {
       limit = 50, // Fetch more chunks to allow aggregation
       offset = 0,
       tags = null,
+      startDate = null,
+      endDate = null,
       scoreThreshold = 0.3
     } = options;
 
@@ -350,10 +457,6 @@ export async function searchChunks(userId, queryEmbedding, options = {}) {
         {
           key: 'user_id',
           match: { value: userId }
-        },
-        {
-          key: 'is_chunk',
-          match: { value: true }
         }
       ]
     };
@@ -363,6 +466,18 @@ export async function searchChunks(userId, queryEmbedding, options = {}) {
       filter.must.push({
         key: 'tags',
         match: { any: tags }
+      });
+    }
+
+    // Add date range filter if provided
+    if (startDate || endDate) {
+      const range = {};
+      if (startDate) range.gte = startDate instanceof Date ? startDate.toISOString() : startDate;
+      if (endDate) range.lte = endDate instanceof Date ? endDate.toISOString() : endDate;
+      
+      filter.must.push({
+        key: 'created_at',
+        range: range
       });
     }
 

@@ -1,4 +1,6 @@
-import { X, Tag, Calendar, SortAsc } from 'lucide-react'
+import { useState } from 'react'
+import { X, Tag, SortAsc, Search, Check } from 'lucide-react'
+import TimelineSlider from './TimelineSlider'
 import useBookmarkStore from '../store/useBookmarkStore'
 
 function Sidebar() {
@@ -6,6 +8,7 @@ function Sidebar() {
     bookmarks,
     selectedTags,
     toggleTag,
+    setSelectedTags,
     clearTags,
     sortBy,
     setSortBy,
@@ -13,10 +16,22 @@ function Sidebar() {
     setDateRange,
     clearDateRange
   } = useBookmarkStore()
+  
+  const [tagSearch, setTagSearch] = useState('')
 
-  // Get all unique tags from bookmarks
   const allTags = [...new Set(bookmarks.flatMap(b => b.tags || []))]
     .sort((a, b) => a.localeCompare(b))
+
+  const searchTerms = tagSearch.split(',').map(s => s.trim().toLowerCase()).filter(s => s !== '')
+  const filteredTags = allTags.filter(tag => {
+    if (searchTerms.length === 0) return true
+    return searchTerms.some(term => tag.toLowerCase().includes(term))
+  })
+
+  const handleSelectAllFiltered = () => {
+    const newSelectedTags = [...new Set([...selectedTags, ...filteredTags])]
+    setSelectedTags(newSelectedTags)
+  }
 
   // Count bookmarks per tag
   const tagCounts = allTags.reduce((acc, tag) => {
@@ -59,13 +74,51 @@ function Sidebar() {
             </button>
           )}
         </div>
+
+        {allTags.length > 5 && (
+          <div className="mb-3">
+            <div className="relative mb-2">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3 h-3 text-light-text-secondary dark:text-dark-text-secondary" />
+              <input
+                type="text"
+                placeholder="Search tags (e.g. ai, web)..."
+                value={tagSearch}
+                onChange={(e) => setTagSearch(e.target.value)}
+                className="w-full pl-8 pr-3 py-1.5 text-xs bg-light-bg dark:bg-dark-bg border border-light-border dark:border-dark-border rounded-md focus:outline-none focus:ring-1 focus:ring-accent"
+              />
+              {tagSearch && (
+                <button 
+                  onClick={() => setTagSearch('')}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-light-text-secondary hover:text-accent"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              )}
+            </div>
+            
+            {tagSearch && filteredTags.length > 0 && (
+              <button
+                onClick={handleSelectAllFiltered}
+                className="w-full flex items-center justify-center gap-1.5 py-1 px-2 text-[10px] font-medium uppercase tracking-wider text-accent border border-accent/20 rounded hover:bg-accent/5 transition-colors"
+              >
+                <Check className="w-3 h-3" />
+                Select All Matching
+              </button>
+            )}
+          </div>
+        )}
+
         {allTags.length === 0 ? (
           <p className="text-xs text-light-text-secondary dark:text-dark-text-secondary">
             No tags yet
           </p>
+        ) : filteredTags.length === 0 ? (
+          <p className="text-xs text-light-text-secondary dark:text-dark-text-secondary py-2 italic text-center">
+            No matching tags
+          </p>
         ) : (
           <div className="space-y-1 max-h-64 overflow-y-auto">
-            {allTags.map(tag => (
+            {filteredTags.map(tag => (
               <button
                 key={tag}
                 onClick={() => toggleTag(tag)}
@@ -87,39 +140,13 @@ function Sidebar() {
         )}
       </div>
 
-      {/* Date Range */}
-      <div className="mb-6">
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2">
-            <Calendar className="w-4 h-4 text-light-text-secondary dark:text-dark-text-secondary" />
-            <h3 className="font-medium text-sm">Date Range</h3>
-          </div>
-          {(dateRange.start || dateRange.end) && (
-            <button
-              onClick={clearDateRange}
-              className="text-xs text-accent dark:text-accent-dark hover:underline"
-            >
-              Clear
-            </button>
-          )}
-        </div>
-        <div className="space-y-2">
-          <input
-            type="date"
-            value={dateRange.start ? dateRange.start.toISOString().split('T')[0] : ''}
-            onChange={(e) => setDateRange(e.target.value ? new Date(e.target.value) : null, dateRange.end)}
-            className="input text-sm"
-            placeholder="Start date"
-          />
-          <input
-            type="date"
-            value={dateRange.end ? dateRange.end.toISOString().split('T')[0] : ''}
-            onChange={(e) => setDateRange(dateRange.start, e.target.value ? new Date(e.target.value) : null)}
-            className="input text-sm"
-            placeholder="End date"
-          />
-        </div>
-      </div>
+      {/* Timeline Slider */}
+      <TimelineSlider
+        bookmarks={bookmarks}
+        dateRange={dateRange}
+        setDateRange={setDateRange}
+        clearDateRange={clearDateRange}
+      />
 
       {/* Stats */}
       <div className="pt-6 border-t border-light-border dark:border-dark-border">

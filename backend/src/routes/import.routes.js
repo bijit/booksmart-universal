@@ -71,50 +71,45 @@ router.post('/batch', async (req, res) => {
     // Create import job (no limit - import all bookmarks)
     const jobId = createImportJob(userId, bookmarks.length);
 
-    // Create bookmark records in Supabase with "pending" status
-    // The existing worker will pick these up automatically
-    let successCount = 0;
-    let failCount = 0;
+    // Optimized approach: Fetch all existing URLs once
+    const existingUrls = await import('../services/supabase.service.js').then(s => s.getAllUserBookmarkUrls(userId));
+    
+    const toCreate = [];
     let duplicateCount = 0;
 
     for (const bookmark of bookmarks) {
-      try {
-        // Check if bookmark already exists (duplicate detection)
-        const exists = await checkBookmarkExists(userId, bookmark.url);
-
-        if (exists) {
-          console.log(`[Import] Skipping duplicate bookmark: ${bookmark.url}`);
-          duplicateCount++;
-          continue; // Skip this bookmark
-        }
-
-        // Create new bookmark record
-        await createBookmarkRecord(userId, {
+      if (existingUrls.has(bookmark.url)) {
+        duplicateCount++;
+      } else {
+        toCreate.push({
           url: bookmark.url,
           title: bookmark.title || null,
-          processing_status: 'pending',
-          extraction_method: null,
-          qdrant_point_id: null,
-          error_message: null,
-          retry_count: 0
+          processing_status: 'pending'
         });
-        successCount++;
-      } catch (error) {
-        console.error(`Failed to create bookmark record for ${bookmark.url}:`, error);
-        failCount++;
       }
+    }
 
-      // Update job progress
-      updateImportJobProgress(jobId, {
-        processedBookmarks: successCount + failCount + duplicateCount,
-        successfulBookmarks: successCount,
-        failedBookmarks: failCount
-      });
+    // Batch create new records
+    let successCount = 0;
+    let failCount = 0;
+
+    if (toCreate.length > 0) {
+      try {
+        const { createBookmarkRecordsBatch } = await import('../services/supabase.service.js');
+        const created = await createBookmarkRecordsBatch(userId, toCreate);
+        successCount = created.length;
+      } catch (error) {
+        console.error('[Import] Batch creation failed:', error);
+        failCount = toCreate.length;
+      }
     }
 
     // Mark job as completed
     updateImportJobProgress(jobId, {
-      status: 'completed'
+      status: 'completed',
+      processedBookmarks: bookmarks.length,
+      successfulBookmarks: successCount,
+      failedBookmarks: failCount
     });
 
     res.status(201).json({

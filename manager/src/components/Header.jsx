@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Search, Moon, Sun, LogOut, Grid, List, Clock, Upload, X } from 'lucide-react'
+import { Search, Moon, Sun, LogOut, Grid, List, Clock, Layers, Upload, X } from 'lucide-react'
 import useBookmarkStore from '../store/useBookmarkStore'
 
 function Header({ darkMode, toggleDarkMode, onLogout, onOpenImport }) {
@@ -99,6 +99,17 @@ function Header({ darkMode, toggleDarkMode, onLogout, onOpenImport }) {
                 title="Timeline View"
               >
                 <Clock className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => setViewMode('grouped')}
+                className={`p-2 rounded transition-colors ${
+                  viewMode === 'grouped'
+                    ? 'bg-accent text-white'
+                    : 'hover:bg-light-card dark:hover:bg-dark-card'
+                }`}
+                title="Grouped by Tag"
+              >
+                <Layers className="w-4 h-4" />
               </button>
             </div>
 

@@ -1,45 +1,14 @@
-/**
- * BookSmart Backend API Server
- *
- * Main entry point for the Express application
- */
-
+console.log('--- SERVER STARTUP INITIATED ---');
+import './config/env.js';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
-import { config } from 'dotenv';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import authRoutes from './routes/auth.routes.js';
-import bookmarksRoutes from './routes/bookmarks.routes.js';
-import searchRoutes from './routes/search.routes.js';
-import preferencesRoutes from './routes/preferences.routes.js';
-import importRoutes from './routes/import.routes.js';
-import debugRoutes from './routes/debug.routes.js';
-import { startWorker } from './workers/bookmark.worker.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-
-// Load environment variables
-config({ path: resolve(__dirname, '../../.env.local') });
-
-// Validate required environment variables
-const requiredEnvVars = [
-  'SUPABASE_URL',
-  'SUPABASE_ANON_KEY',
-  'QDRANT_URL',
-  'QDRANT_API_KEY',
-  'GOOGLE_AI_API_KEY'
-];
-
-const missingEnvVars = requiredEnvVars.filter(envVar => !process.env[envVar]);
-if (missingEnvVars.length > 0) {
-  console.error('❌ Missing required environment variables:');
-  missingEnvVars.forEach(envVar => console.error(`   - ${envVar}`));
-  process.exit(1);
-}
 
 // Create Express app
 const app = express();
@@ -47,22 +16,33 @@ const PORT = process.env.PORT || 3000;
 
 // Middleware
 app.use(helmet({
-  contentSecurityPolicy: false, // Disable CSP for Vite's inline scripts
-})); // Security headers
-app.use(cors()); // Enable CORS
-app.use(express.json({ limit: '10mb' })); // Parse JSON bodies (increased limit for large bookmark imports)
-app.use(express.urlencoded({ limit: '10mb', extended: true })); // Parse URL-encoded bodies
-app.use(morgan('dev')); // HTTP request logging
+  contentSecurityPolicy: false,
+})); 
+app.use(cors()); 
+app.use(express.json({ limit: '10mb' })); 
+app.use(express.urlencoded({ limit: '10mb', extended: true })); 
+app.use(morgan('dev')); 
 
-// Mount API routes (before static files)
-app.use('/api/auth', authRoutes);
-app.use('/api/bookmarks', bookmarksRoutes);
-app.use('/api/search', searchRoutes);
-app.use('/api/preferences', preferencesRoutes);
-app.use('/api/import', importRoutes);
-app.use('/api/debug', debugRoutes);
+// Helper for lazy loading routes
+const lazyRoute = (modulePath) => async (req, res, next) => {
+  try {
+    const module = await import(modulePath);
+    const router = module.default;
+    router(req, res, next);
+  } catch (error) {
+    next(error);
+  }
+};
 
-// Health check endpoint
+// Mount API routes with dynamic imports to prevent startup blocking
+app.use('/api/auth', lazyRoute('./routes/auth.routes.js'));
+app.use('/api/bookmarks', lazyRoute('./routes/bookmarks.routes.js'));
+app.use('/api/search', lazyRoute('./routes/search.routes.js'));
+app.use('/api/preferences', lazyRoute('./routes/preferences.routes.js'));
+app.use('/api/import', lazyRoute('./routes/import.routes.js'));
+app.use('/api/debug', lazyRoute('./routes/debug.routes.js'));
+
+// Health check endpoint (Directly in index.js for maximum reliability)
 app.get('/api/health', (req, res) => {
   res.json({
     status: 'ok',
@@ -72,13 +52,12 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// Serve static files from backend/public (built React app)
+// Serve static files from backend/public
 const managerPath = resolve(__dirname, '../public');
 app.use(express.static(managerPath));
 
-// Serve index.html for all non-API routes (React Router support)
+// Serve index.html for all non-API routes
 app.get('*', (req, res) => {
-  // Don't serve index.html for API routes
   if (req.path.startsWith('/api')) {
     return res.status(404).json({
       error: 'Not Found',
@@ -86,14 +65,12 @@ app.get('*', (req, res) => {
       timestamp: new Date().toISOString()
     });
   }
-
-  // Serve React app
   res.sendFile(resolve(managerPath, 'index.html'));
 });
 
 // Error handler
 app.use((err, req, res, next) => {
-  console.error('Error:', err);
+  console.error('CRITICAL SERVER ERROR:', err);
   res.status(err.status || 500).json({
     error: err.message || 'Internal Server Error',
     timestamp: new Date().toISOString()
@@ -106,12 +83,25 @@ app.listen(PORT, () => {
   console.log('🚀 BookSmart API Server');
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
   console.log(`📡 Server running on: http://localhost:${PORT}`);
-  console.log(`🏥 Health check: http://localhost:${PORT}/api/health`);
-  console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
 
-  // Start background worker
-  startWorker();
+  // Initialize services asynchronously AFTER port is bound
+  (async () => {
+    try {
+      console.log('[Init] Port bound. Starting background services...');
+      
+      const { initializeCollection } = await import('./services/qdrant.service.js');
+      const { startWorker } = await import('./workers/bookmark.worker.js');
+      
+      console.log('[Init] Initializing Qdrant collection...');
+      await initializeCollection();
+      
+      console.log('[Init] Starting background worker...');
+      startWorker();
+    } catch (err) {
+      console.error('❌ Critical Error during deferred initialization:', err.message);
+    }
+  })();
 });
 
 export default app;

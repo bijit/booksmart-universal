@@ -5,17 +5,21 @@
  * and hybrid search combining vector similarity with text matching
  */
 
-import { generateEmbedding, rerankResults } from './gemini.service.js';
+import { 
+  generateEmbedding, 
+  rerankResults, 
+  generateSearchAnswer 
+} from './gemini.service.js';
 import { searchBookmarks as searchQdrant, searchChunks } from './qdrant.service.js';
 import { createSearchHistory } from './supabase.service.js';
-// import { scoreBM25, enhancedTextMatch } from '../utils/text-matching.js'; // Disabled for semantic-only search
+import { scoreBM25, enhancedTextMatch } from '../utils/text-matching.js';
 
 // Configuration: Enable chunked search (set to false to use legacy non-chunked search)
 const ENABLE_CHUNKED_SEARCH = true;
 
 // Configuration: Enable LLM-based reranking for top results (higher quality but slower)
 // Set to false for faster search (trades quality for speed)
-const ENABLE_RERANKING = false;
+const ENABLE_RERANKING = true;
 
 /**
  * Aggregate chunks by parent bookmark and select best score
@@ -29,10 +33,12 @@ function aggregateChunksByBookmark(chunks, limit = 10) {
   const bookmarkMap = new Map();
 
   for (const chunk of chunks) {
-    const bookmarkId = chunk.bookmark_id;
+    // For chunks, bookmark_id is the reference to Supabase. 
+    // For legacy bookmarks, they might just have the 'id'.
+    const bookmarkId = chunk.bookmark_id || chunk.id;
 
     if (!bookmarkMap.has(bookmarkId)) {
-      // First chunk for this bookmark
+      // First time seeing this bookmark
       bookmarkMap.set(bookmarkId, {
         bookmark_id: bookmarkId,
         url: chunk.url,
@@ -43,17 +49,17 @@ function aggregateChunksByBookmark(chunks, limit = 10) {
         favicon_url: chunk.favicon_url,
         created_at: chunk.created_at,
         updated_at: chunk.updated_at,
-        // Keep track of best matching chunk
+        // Keep track of best matching chunk (or the bookmark itself if legacy)
         best_chunk: {
           score: chunk.score,
-          chunk_index: chunk.chunk_index,
-          chunk_text: chunk.chunk_text
+          chunk_index: chunk.chunk_index || 0,
+          chunk_text: chunk.chunk_text || chunk.content?.substring(0, 500) || ''
         },
         // Keep track of all chunks for this bookmark
         matching_chunks: [{
-          chunk_index: chunk.chunk_index,
+          chunk_index: chunk.chunk_index || 0,
           score: chunk.score,
-          chunk_text: chunk.chunk_text.substring(0, 200) + '...' // Preview only
+          chunk_text: (chunk.chunk_text || chunk.content || '').substring(0, 200) + '...'
         }]
       });
     } else {
@@ -114,58 +120,74 @@ export async function semanticSearch(userId, query, options = {}) {
     const {
       limit = 10,
       tags = null,
-      scoreThreshold = 0.5  // Higher threshold to filter out weak/irrelevant matches
+      startDate = null,
+      endDate = null,
+      scoreThreshold = 0.3  // More forgiving threshold to show relevant matches
     } = options;
 
-    console.log(`[Search] Semantic search: "${query}" for user ${userId}`);
+    console.log(`[Search] Semantic search for: "${query}" (${query.length} chars)`);
     console.log(`[Search] Mode: ${ENABLE_CHUNKED_SEARCH ? 'CHUNKED' : 'LEGACY'}`);
 
     // Step 1: Generate embedding for the search query
-    console.log('[Search] Generating query embedding...');
-    const queryEmbedding = await generateEmbedding(query);
-    console.log(`[Search] Query embedding generated: ${queryEmbedding.length}D`);
+    console.log('[Search] Requesting query embedding from Gemini...');
+    let queryEmbedding;
+    try {
+      queryEmbedding = await generateEmbedding(query);
+      console.log(`[Search] Query embedding generated successfully: ${queryEmbedding.length}D`);
+    } catch (embedError) {
+      console.error('[Search] FAILED to generate query embedding:', embedError.message);
+      throw embedError;
+    }
 
     let results;
 
     if (ENABLE_CHUNKED_SEARCH) {
       // Step 2a: Search chunks (get more chunks to allow aggregation)
-      console.log(`[Search] Searching chunks (limit: ${limit * 5}, threshold: ${scoreThreshold})...`);
-      const chunkResults = await searchChunks(userId, queryEmbedding, {
-        limit: limit * 5, // Fetch more chunks to aggregate into top bookmarks
-        tags,
-        scoreThreshold
-      });
-
-      console.log(`[Search] Found ${chunkResults.length} matching chunks`);
-
-      // Step 3a: Aggregate chunks by parent bookmark
-      results = aggregateChunksByBookmark(chunkResults, limit);
-
-      console.log(`[Search] Aggregated into ${results.length} unique bookmarks`);
+      console.log(`[Search] Searching chunks in Qdrant (limit: ${limit * 5}, threshold: ${scoreThreshold})...`);
+      try {
+        const chunkResults = await searchChunks(userId, queryEmbedding, {
+          limit: limit * 5, // Fetch more chunks to aggregate into top bookmarks
+          tags,
+          startDate,
+          endDate,
+          scoreThreshold
+        });
+        console.log(`[Search] Qdrant returned ${chunkResults.length} matching chunks`);
+        results = aggregateChunksByBookmark(chunkResults, limit);
+      } catch (qdrantError) {
+        console.error('[Search] Qdrant search FAILED:', qdrantError.message);
+        throw qdrantError;
+      }
     } else {
       // Step 2b: Legacy search (non-chunked)
-      console.log(`[Search] Searching Qdrant (limit: ${limit}, threshold: ${scoreThreshold})...`);
-      results = await searchQdrant(userId, queryEmbedding, {
-        limit,
-        tags,
-        scoreThreshold
-      });
-
-      console.log(`[Search] Found ${results.length} results`);
+      console.log(`[Search] Searching legacy bookmarks in Qdrant...`);
+      try {
+        results = await searchQdrant(userId, queryEmbedding, {
+          limit,
+          tags,
+          startDate,
+          endDate,
+          scoreThreshold
+        });
+        console.log(`[Search] Qdrant returned ${results.length} results`);
+      } catch (qdrantError) {
+        console.error('[Search] Legacy Qdrant search FAILED:', qdrantError.message);
+        throw qdrantError;
+      }
     }
 
     // Step 4: Record search in history (fire and forget)
     createSearchHistory(userId, {
       query,
-      filters: { tags, scoreThreshold },
+      filters: { tags, startDate, endDate, scoreThreshold },
       result_count: results.length
     }).catch(err => console.error('[Search] Failed to save search history:', err));
 
     return results;
 
   } catch (error) {
-    console.error('[Search] Semantic search failed:', error);
-    throw new Error(`Search failed: ${error.message}`);
+    console.error('[Search] CRITICAL: Semantic search pipeline failed:', error.message);
+    throw error;
   }
 }
 
@@ -185,37 +207,33 @@ export async function hybridSearch(userId, query, options = {}) {
     const {
       limit = 10,
       tags = null,
-      scoreThreshold = 0.5  // Higher threshold to filter out irrelevant results
+      startDate = null,
+      endDate = null,
+      scoreThreshold = 0.3,
+      generateAnswer = true // New flag for RAG
     } = options;
 
-    console.log(`[Search] Hybrid search: "${query}" for user ${userId}`);
+    const semanticResults = await semanticSearch(userId, query, { limit: limit * 2, tags, startDate, endDate, scoreThreshold });
+    const resultsWithBM25 = scoreBM25(query, semanticResults);
 
-    // Get semantic results with higher limit for re-ranking
-    const semanticResults = await semanticSearch(userId, query, {
-      limit: limit * 3,  // Get more results for better re-ranking with BM25
-      tags,
-      scoreThreshold
-    });
-
-    if (semanticResults.length === 0) {
-      console.log('[Search] No semantic results found');
-      return [];
-    }
-
-    // Use semantic scores only (BM25/text matching disabled for better quality)
-    console.log(`[Search] Using semantic-only ranking for ${semanticResults.length} results...`);
-
-    const scoredResults = semanticResults.map(result => {
+    const scoredResults = resultsWithBM25.map(result => {
       const semanticScore = result.score; // Vector similarity score (0-1)
+      const bm25Score = result.bm25_score || 0;
+      const textMatchScore = enhancedTextMatch(query, result.title, result.description);
 
-      // Use semantic score as hybrid score (100% semantic, 0% BM25, 0% text match)
-      const hybridScore = semanticScore;
+      // HYBRID FORMULA:
+      // - 70% Semantic (Vector)
+      // - 20% BM25 (Frequency)
+      // - 10% Exact Match (Boolean/Stemmed)
+      // We also normalize BM25 which can be > 1
+      const normalizedBM25 = Math.min(bm25Score / 5, 1.0);
+      const hybridScore = (semanticScore * 0.7) + (normalizedBM25 * 0.2) + (textMatchScore * 0.1);
 
       return {
         ...result,
         semantic_score: semanticScore,
-        bm25_score: 0, // Disabled
-        text_match_score: 0, // Disabled
+        bm25_score: bm25Score,
+        text_match_score: textMatchScore,
         hybrid_score: hybridScore
       };
     });
@@ -231,9 +249,22 @@ export async function hybridSearch(userId, query, options = {}) {
       rankedResults = await rerankResults(query, rankedResults);
     }
 
-    console.log(`[Search] Hybrid search completed: ${rankedResults.length} results`);
+    // Step 5: RAG Answer Generation (New)
+    let answer = null;
+    if (generateAnswer && rankedResults.length > 0 && query.length > 5) {
+      try {
+        answer = await generateSearchAnswer(query, rankedResults);
+      } catch (error) {
+        console.error('[Search] RAG generation failed:', error);
+      }
+    }
 
-    return rankedResults;
+    console.log(`[Search] Hybrid search completed: ${rankedResults.length} results${answer ? ' (Answer generated)' : ''}`);
+
+    return {
+      results: rankedResults,
+      answer: answer
+    };
 
   } catch (error) {
     console.error('[Search] Hybrid search failed:', error);

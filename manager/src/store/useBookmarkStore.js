@@ -7,6 +7,7 @@ const useBookmarkStore = create((set, get) => ({
   bookmarks: [],
   loading: false,
   error: null,
+  aiAnswer: null,
 
   // Pagination
   currentPage: 1,
@@ -49,9 +50,10 @@ const useBookmarkStore = create((set, get) => ({
 
   // Perform semantic search using the API
   performSearch: async (query) => {
-    set({ loading: true, error: null })
+    set({ loading: true, error: null, aiAnswer: null })
 
     try {
+      const { selectedTags, dateRange } = get()
       const token = localStorage.getItem('authToken')
       const response = await fetch(`${API_BASE_URL}/search`, {
         method: 'POST',
@@ -61,8 +63,11 @@ const useBookmarkStore = create((set, get) => ({
         },
         body: JSON.stringify({
           query,
-          limit: 50,
-          threshold: 0.3
+          limit: 20,
+          scoreThreshold: 0.3,
+          tags: selectedTags.length > 0 ? selectedTags : null,
+          startDate: dateRange.start ? dateRange.start.toISOString() : null,
+          endDate: dateRange.end ? dateRange.end.toISOString() : null
         })
       })
 
@@ -74,10 +79,12 @@ const useBookmarkStore = create((set, get) => ({
 
       const data = await response.json()
       const results = data.results || []
+      const aiAnswer = data.answer || null
 
       // Reset pagination for search results (search doesn't support pagination)
       set({
         bookmarks: results,
+        aiAnswer: aiAnswer,
         loading: false,
         error: null,
         currentPage: 1,
@@ -101,30 +108,74 @@ const useBookmarkStore = create((set, get) => ({
       ? state.selectedTags.filter(t => t !== tag)
       : [...state.selectedTags, tag]
     set({ selectedTags })
-    // Refetch with new filter
-    await state.fetchBookmarks()
+    
+    // Refetch with new filter (respect search if active)
+    if (state.searchQuery.trim()) {
+      await state.performSearch(state.searchQuery)
+    } else {
+      await state.fetchBookmarks()
+    }
+  },
+
+  setSelectedTags: async (tags) => {
+    const state = get()
+    set({ selectedTags: tags })
+    
+    // Refetch with new filter (respect search if active)
+    if (state.searchQuery.trim()) {
+      await state.performSearch(state.searchQuery)
+    } else {
+      await state.fetchBookmarks()
+    }
+  },
+
+  setSelectedTags: async (tags) => {
+    const state = get()
+    set({ selectedTags: tags })
+    
+    // Refetch with new filter (respect search if active)
+    if (state.searchQuery.trim()) {
+      await state.performSearch(state.searchQuery)
+    } else {
+      await state.fetchBookmarks()
+    }
   },
 
   clearTags: async () => {
     set({ selectedTags: [] })
-    // Refetch without tag filter
+    
+    // Refetch without tag filter (respect search if active)
     const state = get()
-    await state.fetchBookmarks()
+    if (state.searchQuery.trim()) {
+      await state.performSearch(state.searchQuery)
+    } else {
+      await state.fetchBookmarks()
+    }
   },
 
   // Date range
   setDateRange: async (start, end) => {
     set({ dateRange: { start, end } })
-    // Refetch with new filter
+    
+    // Refetch with new filter (respect search if active)
     const state = get()
-    await state.fetchBookmarks()
+    if (state.searchQuery.trim()) {
+      await state.performSearch(state.searchQuery)
+    } else {
+      await state.fetchBookmarks()
+    }
   },
 
   clearDateRange: async () => {
     set({ dateRange: { start: null, end: null } })
-    // Refetch without date filter
+    
+    // Refetch without date filter (respect search if active)
     const state = get()
-    await state.fetchBookmarks()
+    if (state.searchQuery.trim()) {
+      await state.performSearch(state.searchQuery)
+    } else {
+      await state.fetchBookmarks()
+    }
   },
 
   // Sort
@@ -135,26 +186,26 @@ const useBookmarkStore = create((set, get) => ({
 
   // Get filtered bookmarks
   getFilteredBookmarks: () => {
-    const { bookmarks, sortBy } = get()
+    const { bookmarks, sortBy, searchQuery } = get()
 
     let filtered = [...bookmarks]
 
-    // Note: Search query, tags, and date filtering are handled by the API
-    // This function only handles client-side sorting
-
-    // Sort
-    filtered.sort((a, b) => {
-      switch (sortBy) {
-        case 'date_added':
-          return new Date(b.created_at) - new Date(a.created_at)
-        case 'title':
-          return (a.title || '').localeCompare(b.title || '')
-        case 'date_published':
-          return new Date(b.published_date || 0) - new Date(a.published_date || 0)
-        default:
-          return 0
-      }
-    })
+    // If we are in search mode, the API has already sorted by relevance score.
+    // We should only apply client-side sorting if we are NOT searching.
+    if (!searchQuery) {
+      filtered.sort((a, b) => {
+        switch (sortBy) {
+          case 'date_added':
+            return new Date(b.created_at) - new Date(a.created_at)
+          case 'title':
+            return (a.title || '').localeCompare(b.title || '')
+          case 'date_published':
+            return new Date(b.published_date || 0) - new Date(a.published_date || 0)
+          default:
+            return 0
+        }
+      })
+    }
 
     return filtered
   },
@@ -281,6 +332,84 @@ const useBookmarkStore = create((set, get) => ({
         return
       }
       set({ error: error.message })
+      throw error
+    }
+  },
+
+  // Update bookmark
+  updateBookmark: async (bookmarkId, updates) => {
+    try {
+      const token = localStorage.getItem('authToken')
+      const response = await fetch(
+        `${API_BASE_URL}/bookmarks/${bookmarkId}`,
+        {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify(updates)
+        }
+      )
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null)
+        throw new Error(errorData?.message || 'Failed to update bookmark')
+      }
+
+      const { bookmark } = await response.json()
+
+      // Update in state
+      set((state) => ({
+        bookmarks: state.bookmarks.map(b => b.id === bookmarkId ? { ...b, ...bookmark } : b)
+      }))
+
+      return bookmark
+    } catch (error) {
+      // Check if this is an authentication error
+      if (isAuthError(error)) {
+        handleAuthError()
+        return
+      }
+      set({ error: error.message })
+      throw error
+    }
+  },
+
+  // Generate deep summary
+  generateSummary: async (bookmarkId) => {
+    try {
+      const token = localStorage.getItem('authToken')
+      const response = await fetch(
+        `${API_BASE_URL}/bookmarks/${bookmarkId}/summarize`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        }
+      )
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null)
+        throw new Error(errorData?.message || 'Failed to generate summary')
+      }
+
+      const { summary } = await response.json()
+
+      // Update the bookmark in state with its new summary
+      set((state) => ({
+        bookmarks: state.bookmarks.map(b =>
+          b.id === bookmarkId ? { ...b, detailed_summary: summary } : b
+        )
+      }))
+
+      return summary
+    } catch (error) {
+      if (isAuthError(error)) {
+        handleAuthError()
+        return
+      }
       throw error
     }
   }

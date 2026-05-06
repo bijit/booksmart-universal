@@ -19,6 +19,15 @@ export function isQuotaError(error) {
 
   // Check error message for quota-related keywords
   const errorMessage = (error?.message || '').toLowerCase();
+
+  // Only treat as a pause-worthy quota error if it's from our AI services
+  const isAIServiceError = errorMessage.includes('google') || 
+                           errorMessage.includes('gemini') || 
+                           errorMessage.includes('embedding') ||
+                           errorMessage.includes('ai');
+
+  if (!isAIServiceError) return false;
+
   const quotaKeywords = [
     'quota exceeded',
     'too many requests',

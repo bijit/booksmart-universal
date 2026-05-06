@@ -401,6 +401,98 @@ router.delete('/all', async (req, res) => {
 });
 
 /**
+ * POST /api/bookmarks/:id/summarize
+ * Generate a deep summary for a bookmark
+ */
+router.post('/:id/summarize', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.id;
+
+    // 1. Get bookmark from Supabase
+    const bookmark = await getBookmarkRecord(id);
+
+    if (!bookmark) {
+      return res.status(404).json({
+        error: 'Not Found',
+        message: 'Bookmark not found'
+      });
+    }
+
+    // 2. Check ownership
+    if (bookmark.user_id !== userId) {
+      return res.status(403).json({
+        error: 'Forbidden',
+        message: 'You do not have access to this bookmark'
+      });
+    }
+
+    // 3. Check if we already have a detailed summary
+    if (bookmark.detailed_summary && !req.query.refresh) {
+      return res.json({
+        message: 'Returning cached summary',
+        summary: bookmark.detailed_summary
+      });
+    }
+
+    // 4. Get full content from Qdrant (since Supabase only stores metadata or truncated content)
+    let content = bookmark.extracted_content;
+    if (!content && bookmark.qdrant_point_id) {
+      const qdrantData = await getBookmarkById(bookmark.qdrant_point_id);
+      content = qdrantData?.content;
+    }
+
+    if (!content || content.length < 200) {
+      return res.status(400).json({
+        error: 'Bad Request',
+        message: 'Bookmark does not have enough content for a deep summary'
+      });
+    }
+
+    // 5. Generate deep summary using Gemini
+    const { generateDeepSummary, suggestTags } = await import('../services/gemini.service.js');
+    const summary = await generateDeepSummary(content, bookmark.title);
+
+    // 6. Save back to Supabase
+    await updateBookmarkRecord(id, {
+      detailed_summary: summary
+    });
+
+    res.status(200).json({
+      message: 'Deep summary generated successfully',
+      summary
+    });
+  } catch (error) {
+    console.error('Error generating deep summary:', error);
+    res.status(500).json({
+      error: 'Internal Server Error',
+      message: error.message
+    });
+  }
+});
+
+/**
+ * POST /api/bookmarks/analyze
+ * Real-time analysis for tag suggestions (Pre-save)
+ */
+router.post('/analyze', requireAuth, async (req, res) => {
+  try {
+    const { title, content } = req.body;
+    
+    if (!title) {
+      return res.status(400).json({ error: 'Title is required' });
+    }
+
+    const tags = await suggestTags(title, content);
+    
+    res.json({ tags });
+  } catch (error) {
+    console.error('Error analyzing page:', error);
+    res.status(500).json({ error: 'Failed to analyze page' });
+  }
+});
+
+/**
  * DELETE /api/bookmarks/:id
  * Delete a bookmark (removes from both Supabase and Qdrant)
  */

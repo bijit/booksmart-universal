@@ -2,10 +2,12 @@ import { useEffect, useState } from 'react'
 import Header from '../components/Header'
 import Sidebar from '../components/Sidebar'
 import BookmarkCard from '../components/BookmarkCard'
+import TagCloudView from '../components/TagCloudView'
 import EmptyState from '../components/EmptyState'
 import ImportBookmarks from '../components/ImportBookmarks'
 import Pagination from '../components/Pagination'
 import useBookmarkStore from '../store/useBookmarkStore'
+import { Sparkles } from 'lucide-react'
 
 function Dashboard({ darkMode, toggleDarkMode, onLogout }) {
   const [showImport, setShowImport] = useState(false)
@@ -16,6 +18,8 @@ function Dashboard({ darkMode, toggleDarkMode, onLogout }) {
     goToPage,
     getFilteredBookmarks,
     viewMode,
+    searchQuery,
+    aiAnswer,
     dateRange,
     selectedTags,
     sortBy,
@@ -54,7 +58,68 @@ function Dashboard({ darkMode, toggleDarkMode, onLogout }) {
         {/* Main Content */}
         <main className="flex-1 overflow-y-auto">
           <div className="w-full max-w-7xl mx-auto px-4 py-4 sm:px-6 sm:py-6 lg:px-8 lg:py-8">
-            {/* Loading State */}
+            
+            {/* Search Header */}
+            {searchQuery && (
+              <div className="mb-6 flex items-baseline justify-between">
+                <h2 className="text-2xl font-bold flex items-center gap-2">
+                  <span>Results for</span>
+                  <span className="text-accent dark:text-accent-dark italic">"{searchQuery}"</span>
+                </h2>
+                {!loading && (
+                  <span className="text-sm text-light-text-secondary dark:text-dark-text-secondary font-medium">
+                    {filteredBookmarks.length} matches
+                  </span>
+                )}
+              </div>
+            )}
+            {/* AI Overview (RAG) Section */}
+            {searchQuery && (loading || aiAnswer) && (
+              <div className="mb-8 p-6 bg-gradient-to-br from-accent/10 to-accent-dark/10 dark:from-accent/20 dark:to-accent-dark/20 rounded-2xl border border-accent/20 dark:border-accent-dark/20 shadow-lg shadow-accent/5 overflow-hidden relative">
+                {/* Decorative background element */}
+                <div className="absolute -top-10 -right-10 w-40 h-40 bg-accent/10 rounded-full blur-3xl"></div>
+                
+                <div className="relative z-10">
+                  <div className="flex items-center gap-2 mb-4">
+                    <div className="p-1.5 bg-accent text-white rounded-lg">
+                      <Sparkles className={`w-5 h-5 ${loading ? 'animate-pulse' : ''}`} />
+                    </div>
+                    <h3 className="text-lg font-bold">AI Overview</h3>
+                  </div>
+
+                  {loading ? (
+                    <div className="space-y-3">
+                      <div className="h-4 bg-accent/10 rounded w-3/4 animate-pulse"></div>
+                      <div className="h-4 bg-accent/10 rounded w-full animate-pulse delay-75"></div>
+                      <div className="h-4 bg-accent/10 rounded w-2/3 animate-pulse delay-150"></div>
+                    </div>
+                  ) : aiAnswer ? (
+                    <div className="animate-in fade-in slide-in-from-bottom-2 duration-500">
+                      <div className="text-light-text dark:text-dark-text leading-relaxed mb-6 prose dark:prose-invert max-w-none">
+                        {aiAnswer.answer}
+                      </div>
+                      
+                      {aiAnswer.sources && aiAnswer.sources.length > 0 && (
+                        <div className="flex flex-wrap gap-2 pt-4 border-t border-accent/10">
+                          <span className="text-xs font-bold uppercase tracking-wider text-light-text-secondary dark:text-dark-text-secondary w-full mb-1">Sources</span>
+                          {aiAnswer.sources.map((source) => (
+                            <div 
+                              key={source.index}
+                              className="flex items-center gap-2 px-2.5 py-1 bg-white dark:bg-dark-card border border-accent/20 rounded-full text-xs font-medium text-light-text hover:border-accent transition-colors"
+                            >
+                              <span className="flex items-center justify-center w-4 h-4 bg-accent text-white rounded-full text-[10px]">{source.index}</span>
+                              <span className="truncate max-w-[150px]">{source.title}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+            )}
+
+            {/* Loading State for Bookmarks */}
             {loading && filteredBookmarks.length === 0 && (
               <div className="flex items-center justify-center py-20">
                 <div className="text-center">
@@ -165,6 +230,11 @@ function Dashboard({ darkMode, toggleDarkMode, onLogout }) {
                   loading={loading}
                 />
               </>
+            )}
+
+            {/* Grouped by Tag View */}
+            {!loading && filteredBookmarks.length > 0 && viewMode === 'grouped' && (
+              <TagCloudView bookmarks={filteredBookmarks} />
             )}
           </div>
         </main>

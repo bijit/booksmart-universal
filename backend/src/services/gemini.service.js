@@ -12,18 +12,21 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-// Load .env.local if not already loaded
-if (!process.env.GOOGLE_AI_API_KEY) {
-  config({ path: resolve(__dirname, '../../../.env.local') });
-}
+// Note: Environment variables are loaded in index.js
 
-// Validate API key
-if (!process.env.GOOGLE_AI_API_KEY) {
-  throw new Error('Missing GOOGLE_AI_API_KEY environment variable');
-}
+// Initialize Gemini API safely
+export let genAI;
 
-// Initialize Gemini API
-const genAI = new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY);
+if (process.env.GOOGLE_AI_API_KEY) {
+  try {
+    genAI = new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY);
+    console.log('✅ Gemini AI initialized');
+  } catch (err) {
+    console.error('❌ Gemini AI failed to initialize:', err.message);
+  }
+} else {
+  console.warn('⚠️ GOOGLE_AI_API_KEY not found');
+}
 
 /**
  * Generate a concise title and description from content using Gemini
@@ -114,36 +117,39 @@ Respond in JSON format:
  */
 export async function generateEmbedding(text) {
   try {
-    console.log(`[Embeddings] Generating vector for ${text.length} chars...`);
-
-    // Use text-embedding-004 model (768 dimensions)
-    const model = genAI.getGenerativeModel({ model: 'text-embedding-004' });
-
-    // Truncate text if too long
-    const truncatedText = text.substring(0, 10000);
-
-    const result = await model.embedContent(truncatedText);
-    const embedding = result.embedding;
-
-    if (!embedding || !embedding.values || !Array.isArray(embedding.values)) {
-      throw new Error('Invalid embedding response from Google API');
+    if (!genAI) {
+      throw new Error('Gemini AI is not initialized. Check your GOOGLE_AI_API_KEY.');
     }
 
-    const vector = embedding.values;
+    // Using the stable and available gemini-embedding-001 model
+    const model = genAI.getGenerativeModel({ model: 'models/gemini-embedding-001' });
 
-    // Validate vector dimensions (should be 768 for text-embedding-004)
-    if (vector.length !== 768) {
-      throw new Error(`Expected 768-dimensional vector, got ${vector.length}`);
+    const result = await model.embedContent({
+      content: { parts: [{ text: text.substring(0, 10000) }] },
+      taskType: 'RETRIEVAL_QUERY',
+      outputDimensionality: 3072
+    });
+
+    if (!result.embedding || !result.embedding.values) {
+      throw new Error('Invalid embedding response from Gemini');
     }
 
+    const vector = result.embedding.values;
     console.log(`[Embeddings] Successfully generated ${vector.length}D vector`);
-
     return vector;
 
   } catch (error) {
     console.error('[Embeddings] Error generating embedding:', error.message);
     throw new Error(`Embedding generation failed: ${error.message}`);
   }
+}
+
+// Helper to ensure database compatibility
+function padTo3072(values) {
+  if (values.length === 3072) return values;
+  const padded = new Array(3072).fill(0);
+  for (let i = 0; i < Math.min(values.length, 3072); i++) padded[i] = values[i];
+  return padded;
 }
 
 /**
@@ -257,37 +263,31 @@ Respond in JSON format:
  */
 export async function generateBatchEmbeddings(texts) {
   try {
-    if (!Array.isArray(texts) || texts.length === 0) {
-      throw new Error('texts must be a non-empty array');
+    if (!genAI) {
+      throw new Error('Gemini AI is not initialized. Check your GOOGLE_AI_API_KEY.');
     }
 
-    console.log(`[Embeddings] Generating vectors for ${texts.length} chunks in batch...`);
-
-    const model = genAI.getGenerativeModel({ model: 'text-embedding-004' });
+    const model = genAI.getGenerativeModel({ model: 'models/gemini-embedding-001' });
 
     // Process all chunks in parallel for maximum speed
     const embeddings = await Promise.all(
       texts.map(async (text) => {
         const truncatedText = text.substring(0, 10000);
-        const result = await model.embedContent(truncatedText);
+        const result = await model.embedContent({
+          content: { parts: [{ text: truncatedText }] },
+          taskType: 'RETRIEVAL_DOCUMENT',
+          outputDimensionality: 3072
+        });
 
         if (!result.embedding || !result.embedding.values || !Array.isArray(result.embedding.values)) {
-          throw new Error('Invalid embedding response from Google API');
+          throw new Error('Invalid batch embedding response from Gemini');
         }
 
         return result.embedding.values;
       })
     );
 
-    // Validate all vectors
-    embeddings.forEach((vector, index) => {
-      if (vector.length !== 768) {
-        throw new Error(`Expected 768-dimensional vector for chunk ${index}, got ${vector.length}`);
-      }
-    });
-
-    console.log(`[Embeddings] Successfully generated ${embeddings.length} vectors (768D each)`);
-
+    console.log(`[Embeddings] Successfully generated ${embeddings.length} vectors`);
     return embeddings;
 
   } catch (error) {
@@ -425,6 +425,174 @@ Example: [8, 5, 9, 3, 7]`;
     console.error('[Gemini] Error reranking results:', error.message);
     // Return original results on error
     return results.map(r => ({ ...r, rerank_score: r.score }));
+  }
+}
+
+/**
+ * Generate a RAG-based answer from search results
+ * 
+ * @param {string} query - The user's search query
+ * @param {Array} results - The top search results with text content
+ * @returns {Promise<Object>} The generated answer and citations
+ */
+export async function generateSearchAnswer(query, results) {
+  try {
+    if (!results || results.length === 0) return null;
+
+    console.log(`[Gemini] Generating RAG answer for query: "${query}" using ${results.length} sources`);
+
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+
+    // Prepare context from results
+    // We use the first few matches to keep context clean
+    const sources = results.slice(0, 5).map((r, i) => ({
+      id: r.id,
+      index: i + 1,
+      title: r.title || 'Untitled Source',
+      content: r.text || r.description || ''
+    }));
+
+    const context = sources.map(s => `[Source ${s.index}]: ${s.title}\n${s.content}`).join('\n\n');
+
+    const prompt = `You are a helpful assistant for "BookSmart", an AI-powered bookmark manager.
+Your task is to provide a concise "AI Overview" answer to the user's query based ONLY on the provided bookmark snippets.
+
+Query: "${query}"
+
+Context from user's bookmarks:
+${context}
+
+Instructions:
+1. Provide a clear, direct answer in 2-4 sentences if possible.
+2. If the bookmarks don't contain enough information to answer the query, say so politely.
+3. Use markdown for formatting (bolding key terms).
+4. CITATIONS ARE MANDATORY: Use [1], [2], etc. to cite information from the specific sources.
+5. Keep the tone professional but helpful.
+
+Respond with a JSON object:
+{
+  "answer": "The generated text with [1] citations...",
+  "sources": [
+    {"index": 1, "id": "uuid", "title": "Source Title"},
+    ...
+  ]
+}`;
+
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    const text = response.text();
+
+    // Parse JSON response
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      // Fallback if AI didn't return clean JSON
+      return {
+        answer: text,
+        sources: sources.map(s => ({ index: s.index, id: s.id, title: s.title }))
+      };
+    }
+
+    const parsed = JSON.parse(jsonMatch[0]);
+    return {
+      answer: parsed.answer,
+      sources: parsed.sources || sources.map(s => ({ index: s.index, id: s.id, title: s.title }))
+    };
+
+  } catch (error) {
+    console.error('[Gemini] Error generating search answer:', error.message);
+    return null;
+  }
+}
+
+/**
+ * Suggest tags for a new page based on title and snippet
+ * 
+ * @param {string} title - Page title
+ * @param {string} content - Snippet of page content
+ * @returns {Promise<Array>} List of suggested tags
+ */
+export async function suggestTags(title, content = '') {
+  try {
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+    
+    const prompt = `You are a professional librarian for "BookSmart". 
+Suggest 3-5 concise, professional tags for this page.
+
+Title: ${title}
+Context: ${content.substring(0, 500)}
+
+Respond with ONLY a JSON array of strings.
+Example: ["Technology", "AI", "Research"]`;
+
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    const text = response.text();
+
+    const jsonMatch = text.match(/\[[\s\S]*\]/);
+    if (!jsonMatch) return ["General"];
+
+    return JSON.parse(jsonMatch[0]);
+  } catch (error) {
+    console.error('[Gemini] Error suggesting tags:', error.message);
+    return ["General"];
+  }
+}
+
+/**
+ * Generate a deep, structured summary for a long-form article or paper
+ * 
+ * @param {string} content - The full extracted content
+ * @param {string} title - The original title
+ * @returns {Promise<Object>} Structured summary object
+ */
+export async function generateDeepSummary(content, title) {
+  try {
+    console.log(`[Gemini] Generating deep summary for: "${title}" (${content.length} chars)`);
+
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+
+    // Truncate to a reasonable limit for summarization (e.g., 30,000 characters)
+    const truncatedContent = content.substring(0, 30000);
+
+    const prompt = `You are an expert content analyzer. Provide a deep, structured summary of the following content.
+    
+    Original Title: ${title}
+    
+    Content:
+    ${truncatedContent}
+    
+    Format your response as a JSON object with the following structure:
+    {
+      "tldr": "A 1-2 sentence high-level summary of the core message.",
+      "key_takeaways": [
+        "A list of 3-5 specific, actionable, or insightful points learned from the content.",
+        "Each point should be a complete sentence."
+      ],
+      "analysis": "A brief (2-3 sentence) analysis of the content's significance, target audience, or unique perspective.",
+      "reading_time_minutes": 5,
+      "category": "The most appropriate category (e.g. Technology, Business, Science, Health, etc.)"
+    }
+    
+    Ensure the tone is professional yet accessible. Do not include any text outside the JSON block.`;
+
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    const text = response.text();
+
+    // Parse JSON response
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      throw new Error('Failed to parse Gemini deep summary response as JSON');
+    }
+
+    const summary = JSON.parse(jsonMatch[0]);
+    console.log(`[Gemini] Deep summary generated successfully for: "${title}"`);
+
+    return summary;
+
+  } catch (error) {
+    console.error('[Gemini] Error generating deep summary:', error.message);
+    throw new Error(`Deep summarization failed: ${error.message}`);
   }
 }
 

@@ -1,6 +1,10 @@
 // BookSmart Popup Script
 // This script handles the popup UI logic
 
+import '../config.js';
+import { auth, bookmarks, search, importJobs } from '../utils/api.js';
+import { getAuthData, saveAuthData, clearAuthData, STORAGE_KEYS } from '../utils/storage.js';
+
 // DOM Elements
 const loginScreen = document.getElementById('loginScreen');
 const registerScreen = document.getElementById('registerScreen');
@@ -21,85 +25,63 @@ const openManagerBtn = document.getElementById('openManagerBtn');
 const importBtn = document.getElementById('importBtn');
 const importFromEmptyBtn = document.getElementById('importFromEmptyBtn');
 const logoutBtn = document.getElementById('logoutBtnTop');
+const resultsTitle = document.getElementById('resultsTitle');
+const aiOverviewSection = document.getElementById('aiOverviewSection');
+const aiAnswer = document.getElementById('aiAnswer');
+const currentPageSection = document.getElementById('currentPageSection');
+const currentPageTitle = document.getElementById('currentPageTitle');
+const currentPageUrl = document.getElementById('currentPageUrl');
+const currentPageFavicon = document.getElementById('currentPageFavicon');
+const savePageBtn = document.getElementById('savePageBtn');
+const relatedList = document.getElementById('relatedList');
+const suggestedTagsContainer = document.getElementById('suggestedTagsContainer');
+const suggestedTagsList = document.getElementById('suggestedTagsList');
+const discoveryTagsContainer = document.getElementById('discoveryTagsContainer');
+const discoveryTagsList = document.getElementById('discoveryTagsList');
+const localAiHelp = document.getElementById('localAiHelp');
+const localAiHelpToggle = document.getElementById('localAiHelpToggle');
+const localAiHelpContent = document.getElementById('localAiHelpContent');
+const tagFilterContainer = document.getElementById('tagFilterContainer');
+const tagFilterList = document.getElementById('tagFilterList');
 
-// API Configuration is now loaded from config.js
-// API_BASE_URL is available globally
+let selectedFilterTags = [];
 
 // Initialize popup
 document.addEventListener('DOMContentLoaded', async () => {
   console.log('BookSmart popup loaded');
 
-  // Check authentication status
-  const isAuthenticated = await checkAuth();
+  const authData = await getAuthData();
+  const authenticated = !!(authData[STORAGE_KEYS.AUTH_TOKEN] && authData[STORAGE_KEYS.USER]);
 
-  if (isAuthenticated) {
+  if (authenticated) {
     showMainScreen();
+    initializeCurrentPageContext();
     loadRecentBookmarks();
   } else {
     showLoginScreen();
   }
 
-  // Set up event listeners
   setupEventListeners();
 });
 
-// Check if user is authenticated
-async function checkAuth() {
-  try {
-    const authData = await chrome.storage.local.get(['auth_token', 'user']);
-    return !!(authData.auth_token && authData.user);
-  } catch (error) {
-    console.error('Error checking auth:', error);
-    return false;
-  }
-}
-
-// Check if an error is an authentication error
-function isAuthError(response, error) {
-  if (response && (response.status === 401 || response.status === 403)) {
-    return true;
-  }
-  if (error) {
-    const message = error.message?.toLowerCase() || '';
-    return message.includes('invalid') ||
-           message.includes('expired') ||
-           message.includes('token') ||
-           message.includes('unauthorized');
-  }
-  return false;
-}
-
-// Handle authentication error by logging out
-async function handleAuthError() {
-  console.log('Authentication error detected, logging out...');
-  await handleLogout();
-}
-
 // Set up event listeners
 function setupEventListeners() {
-  // Login form submission
   loginForm.addEventListener('submit', handleLogin);
-
-  // Register form submission
   registerForm.addEventListener('submit', handleRegister);
 
-  // Register link - show register screen
   registerLink.addEventListener('click', (e) => {
     e.preventDefault();
     showRegisterScreen();
   });
 
-  // Back to login link
   backToLoginLink.addEventListener('click', (e) => {
     e.preventDefault();
     showLoginScreen();
   });
 
-  // Search input
   let searchTimeout;
   searchInput.addEventListener('input', (e) => {
     const value = e.target.value;
-    // Show/hide clear button
     if (value) {
       clearSearchBtn.classList.remove('hidden');
     } else {
@@ -109,244 +91,252 @@ function setupEventListeners() {
     clearTimeout(searchTimeout);
     searchTimeout = setTimeout(() => {
       handleSearch(value);
-    }, 300); // Debounce 300ms
+    }, 300);
   });
 
-  // Clear search button
   clearSearchBtn.addEventListener('click', () => {
     searchInput.value = '';
     clearSearchBtn.classList.add('hidden');
-    loadRecentBookmarks(); // Reload all bookmarks
+    selectedFilterTags = [];
+    renderTagFilterRow([]); // Reset pills
+    loadRecentBookmarks();
   });
 
-  // Open Manager button
-  openManagerBtn.addEventListener('click', () => {
-    openManager();
-  });
-
-  // Import buttons
+  openManagerBtn.addEventListener('click', () => openManager());
   importBtn.addEventListener('click', handleImport);
   importFromEmptyBtn.addEventListener('click', handleImport);
-
-  // Logout button
   logoutBtn.addEventListener('click', handleLogout);
+  savePageBtn.addEventListener('click', handleSaveCurrentPage);
+
+  localAiHelpToggle.addEventListener('click', () => {
+    const isOpen = !localAiHelpContent.classList.contains('hidden');
+    localAiHelpContent.classList.toggle('hidden', isOpen);
+    localAiHelpToggle.classList.toggle('open', !isOpen);
+  });
 }
 
-// Handle login form submission
+// Authentication Handlers
 async function handleLogin(e) {
   e.preventDefault();
-
   const email = document.getElementById('email').value;
   const password = document.getElementById('password').value;
-
-  // Hide any previous errors
   loginError.classList.add('hidden');
 
   try {
-    const response = await fetch(`${API_BASE_URL}/auth/login`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ email, password })
-    });
-
-    const data = await response.json();
-
-    if (response.ok) {
-      // Store auth data
-      await chrome.storage.local.set({
-        auth_token: data.session.access_token,
-        refresh_token: data.session.refresh_token,
-        user: data.user,
-        token_expires_at: data.session.expires_at
-      });
-
-      // Show main screen
-      showMainScreen();
-      loadRecentBookmarks();
-    } else {
-      // Show error
-      showError(data.error || 'Login failed. Please try again.');
-    }
+    const data = await auth.login(email, password);
+    await saveAuthData(data);
+    showMainScreen();
+    loadRecentBookmarks();
   } catch (error) {
     console.error('Login error:', error);
-    showError('Network error. Please check your connection.');
+    showError(error.message || 'Login failed. Please try again.');
   }
 }
 
-// Handle register form submission
 async function handleRegister(e) {
   e.preventDefault();
-
   const email = document.getElementById('registerEmail').value;
   const password = document.getElementById('registerPassword').value;
-
-  // Auto-generate name from email (e.g., "john@example.com" -> "john")
   const name = email.split('@')[0];
-
-  // Hide any previous errors
   registerError.classList.add('hidden');
 
   try {
-    const response = await fetch(`${API_BASE_URL}/auth/register`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ name, email, password })
-    });
-
-    const data = await response.json();
-
-    if (response.ok) {
-      // Auto-login after successful registration
-      await chrome.storage.local.set({
-        auth_token: data.session.access_token,
-        refresh_token: data.session.refresh_token,
-        user: data.user,
-        token_expires_at: data.session.expires_at
-      });
-
-      // Show main screen
-      showMainScreen();
-      loadRecentBookmarks();
-    } else {
-      // Show error
-      showRegisterError(data.message || 'Registration failed. Please try again.');
-    }
+    const data = await auth.register(name, email, password);
+    await saveAuthData(data);
+    showMainScreen();
+    loadRecentBookmarks();
   } catch (error) {
     console.error('Registration error:', error);
-    showRegisterError('Network error. Please check your connection.');
+    showRegisterError(error.message || 'Registration failed. Please try again.');
   }
 }
 
-// Handle logout
 async function handleLogout() {
-  try {
-    // Clear auth data
-    await chrome.storage.local.remove(['auth_token', 'refresh_token', 'user', 'token_expires_at']);
-
-    // Show login screen
-    showLoginScreen();
-
-    // Clear bookmarks list
-    bookmarksList.innerHTML = '';
-  } catch (error) {
-    console.error('Logout error:', error);
-  }
+  await clearAuthData();
+  showLoginScreen();
+  bookmarksList.innerHTML = '';
 }
 
-// Load recent bookmarks
+// Bookmark Handlers
 async function loadRecentBookmarks() {
   showLoading();
+  resultsTitle.classList.add('hidden');
+  aiOverviewSection.classList.add('hidden');
+  currentPageSection.classList.remove('hidden');
 
   try {
-    const authData = await chrome.storage.local.get(['auth_token']);
-
-    // Only fetch completed bookmarks (hide pending/failed/processing)
-    const response = await fetch(`${API_BASE_URL}/bookmarks?limit=100&status=completed`, {
-      headers: {
-        'Authorization': `Bearer ${authData.auth_token}`
-      }
-    });
-
-    if (response.ok) {
-      const data = await response.json();
-      displayBookmarks(data.bookmarks || []);
+    const params = { limit: 100, status: 'completed' };
+    if (selectedFilterTags.length > 0) {
+      params.tags = selectedFilterTags;
+    }
+    
+    const data = await bookmarks.list(params);
+    displayBookmarks(data.bookmarks || []);
+    
+    // Update tag filter row if not currently filtering (to show available tags)
+    if (selectedFilterTags.length === 0) {
+      renderTagFilterRow(data.bookmarks || []);
     } else {
-      // Check if this is an authentication error
-      if (isAuthError(response)) {
-        await handleAuthError();
-        return;
-      }
-      showError('Failed to load bookmarks');
+      renderTagFilterRow(); // Just re-render active states
     }
   } catch (error) {
     console.error('Error loading bookmarks:', error);
-    // Check if this is an authentication error
-    if (isAuthError(null, error)) {
-      await handleAuthError();
-      return;
+    if (error.status === 401) {
+      await handleLogout();
+    } else {
+      showError('Failed to load bookmarks');
     }
-    showError('Network error');
   }
 }
 
-// Handle search
 async function handleSearch(query) {
   if (!query.trim()) {
-    // If search is empty, show recent bookmarks
     loadRecentBookmarks();
     return;
   }
 
   showLoading();
+  resultsTitle.classList.remove('hidden');
+  currentPageSection.classList.add('hidden');
 
   try {
-    const authData = await chrome.storage.local.get(['auth_token']);
-
-    const response = await fetch(`${API_BASE_URL}/search`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${authData.auth_token}`
-      },
-      body: JSON.stringify({
-        query,
-        limit: 100,
-        searchType: 'hybrid'
-      })
-    });
-
-    if (response.ok) {
-      const data = await response.json();
-      displayBookmarks(data.results || []);
-    } else {
-      // Check if this is an authentication error
-      if (isAuthError(response)) {
-        await handleAuthError();
-        return;
-      }
-      showError('Search failed');
+    const options = { query };
+    if (selectedFilterTags.length > 0) {
+      options.tags = selectedFilterTags;
     }
+    
+    const data = await search.query(options);
+
+    // Handle AI Answer
+    if (data.answer) {
+      aiAnswer.innerHTML = data.answer.answer.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+      aiOverviewSection.classList.remove('hidden');
+    } else {
+      aiOverviewSection.classList.add('hidden');
+    }
+
+    displayBookmarks(data.results || [], true);
   } catch (error) {
     console.error('Search error:', error);
-    // Check if this is an authentication error
-    if (isAuthError(null, error)) {
-      await handleAuthError();
-      return;
+    if (error.status === 401) {
+      await handleLogout();
+    } else {
+      showError('Search failed');
     }
-    showError('Network error');
   }
 }
 
-// Display bookmarks in the list
-function displayBookmarks(bookmarks) {
-  hideLoading();
+// Tag Filtering UI
+let availableTags = [];
 
+function renderTagFilterRow(bookmarks = null) {
+  if (bookmarks) {
+    // Extract top tags from bookmarks
+    const counts = {};
+    bookmarks.forEach(b => {
+      b.tags?.forEach(tag => {
+        counts[tag] = (counts[tag] || 0) + 1;
+      });
+    });
+    availableTags = Object.entries(counts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 15)
+      .map(entry => entry[0]);
+  }
+
+  if (availableTags.length === 0 && selectedFilterTags.length === 0) {
+    tagFilterContainer.classList.add('hidden');
+    return;
+  }
+
+  tagFilterContainer.classList.remove('hidden');
+  tagFilterList.innerHTML = '';
+
+  // Combine available and selected (ensure selected are always visible)
+  const tagsToShow = [...new Set([...selectedFilterTags, ...availableTags])];
+
+  tagsToShow.forEach(tag => {
+    const pill = document.createElement('div');
+    pill.className = `tag-pill ${selectedFilterTags.includes(tag) ? 'active' : ''}`;
+    pill.textContent = tag;
+    pill.addEventListener('click', () => toggleFilterTag(tag));
+    tagFilterList.appendChild(pill);
+  });
+}
+
+function toggleFilterTag(tag) {
+  if (selectedFilterTags.includes(tag)) {
+    selectedFilterTags = selectedFilterTags.filter(t => t !== tag);
+  } else {
+    selectedFilterTags.push(tag);
+  }
+  
+  renderTagFilterRow();
+  
+  if (searchInput.value.trim()) {
+    handleSearch(searchInput.value);
+  } else {
+    loadRecentBookmarks();
+  }
+}
+
+// UI Rendering
+function displayBookmarks(bookmarks, isSearch = false) {
+  hideLoading();
   if (bookmarks.length === 0) {
     showEmpty();
     return;
   }
-
   hideEmpty();
-
   bookmarksList.innerHTML = '';
 
-  bookmarks.forEach(bookmark => {
-    const card = createBookmarkCard(bookmark);
-    bookmarksList.appendChild(card);
+  if (isSearch) {
+    // Flat list for search results (relevance order matters)
+    bookmarks.forEach(bookmark => {
+      bookmarksList.appendChild(createBookmarkCard(bookmark));
+    });
+    return;
+  }
+
+  // Group by relative date for the recent view
+  const groups = groupByDate(bookmarks);
+  groups.forEach(({ label, items }) => {
+    const header = document.createElement('div');
+    header.className = 'timeline-group-header';
+    header.textContent = label;
+    bookmarksList.appendChild(header);
+
+    items.forEach(bookmark => {
+      bookmarksList.appendChild(createBookmarkCard(bookmark));
+    });
   });
 }
 
-// Create bookmark card element
+function groupByDate(bookmarks) {
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const yesterday = new Date(today); yesterday.setDate(today.getDate() - 1);
+  const weekAgo = new Date(today); weekAgo.setDate(today.getDate() - 7);
+
+  const buckets = { 'Today': [], 'Yesterday': [], 'This Week': [], 'Older': [] };
+
+  bookmarks.forEach(b => {
+    const d = new Date(b.created_at);
+    if (d >= today) buckets['Today'].push(b);
+    else if (d >= yesterday) buckets['Yesterday'].push(b);
+    else if (d >= weekAgo) buckets['This Week'].push(b);
+    else buckets['Older'].push(b);
+  });
+
+  return Object.entries(buckets)
+    .filter(([, items]) => items.length > 0)
+    .map(([label, items]) => ({ label, items }));
+}
+
 function createBookmarkCard(bookmark) {
   const card = document.createElement('div');
   card.className = 'bookmark-card';
-  card.dataset.id = bookmark.id;
 
-  // Extract domain from URL
   let domain = '';
   try {
     domain = new URL(bookmark.url).hostname.replace('www.', '');
@@ -354,24 +344,16 @@ function createBookmarkCard(bookmark) {
     domain = bookmark.url;
   }
 
-  // Format timestamp
   const timeAgo = getTimeAgo(bookmark.created_at);
-
-  // Determine status
   const status = bookmark.processing_status || 'completed';
   const statusText = status === 'pending' ? 'Processing...' : '';
-
-  // Format tags (show up to 5 tags)
-  const tags = bookmark.tags && bookmark.tags.length > 0 ?
-    bookmark.tags.slice(0, 5).map(tag =>
-      `<span class="bookmark-tag">${escapeHtml(tag)}</span>`
-    ).join('') : '';
+  const tags = bookmark.tags?.slice(0, 5).map(tag =>
+    `<span class="bookmark-tag">${escapeHtml(tag)}</span>`
+  ).join('') || '';
 
   card.innerHTML = `
     <div class="bookmark-favicon">
-      <img src="https://www.google.com/s2/favicons?domain=${domain}&sz=32"
-           alt=""
-           onerror="this.style.display='none'">
+      <img src="https://www.google.com/s2/favicons?domain=${domain}&sz=32" alt="" onerror="this.style.display='none'">
     </div>
     <div class="bookmark-content">
       <div class="bookmark-title">${escapeHtml(bookmark.title || bookmark.url)}</div>
@@ -384,7 +366,6 @@ function createBookmarkCard(bookmark) {
     </div>
   `;
 
-  // Click to open bookmark
   card.addEventListener('click', () => {
     chrome.tabs.create({ url: bookmark.url });
   });
@@ -392,311 +373,323 @@ function createBookmarkCard(bookmark) {
   return card;
 }
 
-// Helper: Get time ago string
+// Helpers
 function getTimeAgo(timestamp) {
-  const now = Date.now();
-  const created = new Date(timestamp).getTime();
-  const diff = now - created;
-
+  const diff = Date.now() - new Date(timestamp).getTime();
   const minutes = Math.floor(diff / 60000);
   const hours = Math.floor(diff / 3600000);
   const days = Math.floor(diff / 86400000);
 
   if (minutes < 1) return 'Just now';
-  if (minutes < 60) return `${minutes} min${minutes > 1 ? 's' : ''} ago`;
-  if (hours < 24) return `${hours} hour${hours > 1 ? 's' : ''} ago`;
-  return `${days} day${days > 1 ? 's' : ''} ago`;
+  if (minutes < 60) return `${minutes}m ago`;
+  if (hours < 24) return `${hours}h ago`;
+  return `${days}d ago`;
 }
 
-// Helper: Escape HTML
 function escapeHtml(text) {
   const div = document.createElement('div');
   div.textContent = text;
   return div.innerHTML;
 }
 
-// Open manager page with auto-login
 async function openManager(path = '') {
-  // Get the auth token from storage
-  const result = await chrome.storage.local.get(['auth_token']);
-  const token = result.auth_token;
-
-  // Pass token as URL parameter for seamless login
-  const url = token
-    ? `https://booksmart-backend-production-fe49.up.railway.app${path}?token=${encodeURIComponent(token)}`
-    : `https://booksmart-backend-production-fe49.up.railway.app${path}`;
-
+  const authData = await getAuthData();
+  const token = authData[STORAGE_KEYS.AUTH_TOKEN];
+  const baseUrl = globalThis.API_BASE_URL.replace('/api', '');
+  const url = token ? `${baseUrl}${path}?token=${encodeURIComponent(token)}` : `${baseUrl}${path}`;
   chrome.tabs.create({ url });
 }
 
-// UI State Management
+// UI States
 function showLoginScreen() {
   loginScreen.classList.remove('hidden');
   registerScreen.classList.add('hidden');
   mainScreen.classList.add('hidden');
-  // Clear any errors
-  loginError.classList.add('hidden');
-  registerError.classList.add('hidden');
 }
-
 function showRegisterScreen() {
   loginScreen.classList.add('hidden');
   registerScreen.classList.remove('hidden');
   mainScreen.classList.add('hidden');
-  // Clear any errors
-  loginError.classList.add('hidden');
-  registerError.classList.add('hidden');
 }
-
 function showMainScreen() {
   loginScreen.classList.add('hidden');
   registerScreen.classList.add('hidden');
   mainScreen.classList.remove('hidden');
 }
-
 function showLoading() {
   loadingState.classList.remove('hidden');
   bookmarksList.classList.add('hidden');
   emptyState.classList.add('hidden');
 }
-
 function hideLoading() {
   loadingState.classList.add('hidden');
   bookmarksList.classList.remove('hidden');
 }
-
 function showEmpty() {
   emptyState.classList.remove('hidden');
   bookmarksList.classList.add('hidden');
 }
-
 function hideEmpty() {
   emptyState.classList.add('hidden');
   bookmarksList.classList.remove('hidden');
 }
-
 function showError(message) {
   loginError.textContent = message;
   loginError.classList.remove('hidden');
   hideLoading();
 }
-
 function showRegisterError(message) {
   registerError.textContent = message;
   registerError.classList.remove('hidden');
 }
 
-// Import functionality
+// Import logic
 async function handleImport() {
   try {
-    const authData = await chrome.storage.local.get(['auth_token']);
+    const data = await bookmarks.list({ limit: 1 });
+    const existingCount = data.pagination?.total || 0;
 
-    // First, check if user has existing bookmarks
-    const countResponse = await fetch(`${API_BASE_URL}/bookmarks?limit=1`, {
-      headers: {
-        'Authorization': `Bearer ${authData.auth_token}`
-      }
-    });
-
-    if (!countResponse.ok) {
-      throw new Error('Failed to check existing bookmarks');
-    }
-
-    const countData = await countResponse.json();
-    const existingCount = countData.pagination?.total || 0;
-
-    // If user has existing bookmarks, ask if they want to delete them first
     if (existingCount > 0) {
-      const deleteConfirmed = confirm(
-        `You have ${existingCount} existing bookmark${existingCount > 1 ? 's' : ''} in BookSmart.\n\n` +
-        `Do you want to DELETE ALL existing bookmarks and re-import from Chrome?\n\n` +
-        `⚠️ WARNING: This cannot be undone!\n\n` +
-        `Click OK to delete and re-import, or Cancel to add Chrome bookmarks to your existing collection.`
-      );
-
-      if (deleteConfirmed) {
-        // Delete all existing bookmarks
+      if (confirm(`Delete all ${existingCount} existing bookmarks and re-import?`)) {
         showImportProgress();
-        updateImportProgress(0, existingCount, 0);
-        const progressText = document.getElementById('importProgressText');
-        progressText.textContent = 'Deleting existing bookmarks...';
-
-        const deleteResponse = await fetch(`${API_BASE_URL}/bookmarks/all`, {
-          method: 'DELETE',
-          headers: {
-            'Authorization': `Bearer ${authData.auth_token}`
-          }
-        });
-
-        if (!deleteResponse.ok) {
-          throw new Error('Failed to delete existing bookmarks');
-        }
-
-        const deleteData = await deleteResponse.json();
-        console.log(`Deleted ${deleteData.deletedCount} existing bookmarks`);
+        document.getElementById('importProgressText').textContent = 'Deleting existing bookmarks...';
+        await bookmarks.deleteAll();
       }
     }
 
-    // Get all Chrome bookmarks
-    const bookmarksTree = await chrome.bookmarks.getTree();
+    const tree = await chrome.bookmarks.getTree();
+    const flattened = [];
+    const traverse = (node) => {
+      if (node.url) flattened.push({ url: node.url, title: node.title });
+      node.children?.forEach(traverse);
+    };
+    tree.forEach(traverse);
 
-    // Flatten the bookmark tree into a list of URLs
-    const bookmarks = flattenBookmarks(bookmarksTree);
+    if (flattened.length === 0) return alert('No bookmarks found');
 
-    if (bookmarks.length === 0) {
-      alert('No bookmarks found to import');
-      hideImportProgress();
-      return;
-    }
+    if (existingCount === 0 && !confirm(`Import ${flattened.length} bookmarks?`)) return;
 
-    // Confirm import (if we didn't already ask about deletion)
-    if (existingCount === 0) {
-      const confirmed = confirm(
-        `Import ${bookmarks.length} Chrome bookmarks to BookSmart?\n\n` +
-        `This may take several minutes. You can close this popup and the import will continue in the background.`
-      );
-
-      if (!confirmed) {
-        return;
-      }
-    }
-
-    // Show import progress
     showImportProgress();
-
-    // Send bookmarks to backend in batches
-    await importBookmarksBatch(bookmarks);
-
+    const batchResult = await importJobs.batch(flattened);
+    await pollImportProgress(batchResult.jobId, flattened.length);
   } catch (error) {
     console.error('Import error:', error);
-    alert('Failed to import bookmarks: ' + error.message);
+    alert('Import failed: ' + error.message);
     hideImportProgress();
   }
 }
 
-// Flatten Chrome bookmarks tree into array
-function flattenBookmarks(nodes) {
-  const bookmarks = [];
-
-  function traverse(node) {
-    if (node.url) {
-      // This is a bookmark (has URL)
-      bookmarks.push({
-        url: node.url,
-        title: node.title
-      });
-    }
-
-    // Recursively traverse children
-    if (node.children) {
-      node.children.forEach(child => traverse(child));
-    }
-  }
-
-  nodes.forEach(node => traverse(node));
-  return bookmarks;
-}
-
-// Import bookmarks in batches
-async function importBookmarksBatch(bookmarks) {
-  try {
-    const authData = await chrome.storage.local.get(['auth_token']);
-
-    // Send all bookmarks in one batch to the backend
-    // Backend will create them as "pending" and worker will process
-    const response = await fetch(`${API_BASE_URL}/import/batch`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${authData.auth_token}`
-      },
-      body: JSON.stringify({
-        bookmarks
-      })
-    });
-
-    if (!response.ok) {
-      throw new Error(`Import failed: ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    const jobId = data.jobId;
-
-    // Poll for progress
-    await pollImportProgress(jobId, bookmarks.length);
-
-  } catch (error) {
-    console.error('Batch import error:', error);
-    throw error;
-  }
-}
-
-// Poll import progress
-async function pollImportProgress(jobId, totalBookmarks) {
-  const authData = await chrome.storage.local.get(['auth_token']);
-  const pollInterval = 2000; // Poll every 2 seconds
-
-  return new Promise((resolve, reject) => {
-    const interval = setInterval(async () => {
-      try {
-        const response = await fetch(`${API_BASE_URL}/import/${jobId}/status`, {
-          headers: {
-            'Authorization': `Bearer ${authData.auth_token}`
-          }
-        });
-
-        if (!response.ok) {
-          throw new Error('Failed to get import status');
-        }
-
-        const status = await response.json();
-
-        // Update progress UI
-        updateImportProgress(status.processedBookmarks, totalBookmarks, status.progress);
-
-        // Check if complete
-        if (status.status === 'completed') {
-          clearInterval(interval);
-          hideImportProgress();
-
-          // Show success message
-          alert(`Bookmarks Uploaded!\n\nAI processing started: ${status.successfulBookmarks} bookmarks queued\n${status.failedBookmarks} failed\n\nProcessing time: ~5-10 minutes\nYour bookmarks will appear as they're processed.`);
-
-          // Reload bookmarks
-          loadRecentBookmarks();
-
-          resolve();
-        }
-      } catch (error) {
+async function pollImportProgress(jobId, total) {
+  const interval = setInterval(async () => {
+    try {
+      const status = await importJobs.getStatus(jobId);
+      updateImportProgress(status.processedBookmarks, total, status.progress);
+      if (status.status === 'completed') {
         clearInterval(interval);
         hideImportProgress();
-        reject(error);
+        alert('Import complete!');
+        loadRecentBookmarks();
       }
-    }, pollInterval);
-  });
+    } catch (error) {
+      clearInterval(interval);
+      hideImportProgress();
+      console.error('Poll error:', error);
+    }
+  }, 2000);
 }
 
-// Show import progress UI
 function showImportProgress() {
   bookmarksList.classList.add('hidden');
   emptyState.classList.add('hidden');
   loadingState.classList.add('hidden');
   importProgressState.classList.remove('hidden');
 }
-
-// Hide import progress UI
 function hideImportProgress() {
   importProgressState.classList.add('hidden');
   bookmarksList.classList.remove('hidden');
 }
-
-// Update import progress
 function updateImportProgress(processed, total, percentage) {
-  const progressText = document.getElementById('importProgressText');
-  const progressFill = document.getElementById('importProgressFill');
-  const progressDetails = document.getElementById('importProgressDetails');
-
-  progressText.textContent = 'Importing bookmarks...';
-  progressFill.style.width = `${percentage}%`;
-  progressDetails.textContent = `${processed} / ${total} (${percentage}%)`;
+  document.getElementById('importProgressFill').style.width = `${percentage}%`;
+  document.getElementById('importProgressDetails').textContent = `${processed} / ${total} (${percentage}%)`;
 }
+
+// Current Page Intelligence
+let currentTabData = null;
+
+async function initializeCurrentPageContext() {
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!tab || !tab.url || tab.url.startsWith('chrome://')) {
+      currentPageSection.classList.add('hidden');
+      return;
+    }
+
+    currentTabData = tab;
+    currentPageTitle.textContent = tab.title;
+    currentPageUrl.textContent = new URL(tab.url).hostname;
+    currentPageFavicon.src = `https://www.google.com/s2/favicons?domain=${new URL(tab.url).hostname}&sz=32`;
+
+    // Check if already bookmarked
+    const data = await bookmarks.list({ url: tab.url });
+    const isBookmarked = data.bookmarks && data.bookmarks.length > 0;
+
+    if (isBookmarked) {
+      updateSaveBtnToSaved();
+    } else {
+      // Find related content to show "At your fingertips"
+      findRelatedContent(tab.title);
+      // Brand new analysis for discovery tags
+      analyzePageContent(tab);
+    }
+  } catch (error) {
+    console.error('Error initializing page context:', error);
+  }
+}
+
+async function findRelatedContent(title) {
+  try {
+    // Search library for things related to the current title
+    const data = await search.query({ query: title, limit: 5 });
+    const results = data.results || [];
+
+    if (results.length > 0) {
+      // Extract unique tags from related content
+      const tags = new Set();
+      results.forEach(item => {
+        if (item.tags) {
+          item.tags.forEach(tag => tags.add(tag));
+        }
+      });
+
+      if (tags.size > 0) {
+        suggestedTagsList.innerHTML = '';
+        Array.from(tags).slice(0, 8).forEach(tag => {
+          const pill = document.createElement('span');
+          pill.className = 'suggested-tag';
+          pill.textContent = tag;
+          suggestedTagsList.appendChild(pill);
+        });
+        suggestedTagsContainer.classList.remove('hidden');
+      } else {
+        suggestedTagsContainer.classList.add('hidden');
+      }
+
+      relatedList.innerHTML = '';
+      results.slice(0, 3).forEach(item => {
+        const link = document.createElement('a');
+        link.href = item.url;
+        link.className = 'related-item';
+        link.textContent = item.title;
+        link.title = item.title;
+        link.addEventListener('click', (e) => {
+          e.preventDefault();
+          chrome.tabs.create({ url: item.url });
+        });
+        relatedList.appendChild(link);
+      });
+      relatedContent.classList.remove('hidden');
+    }
+  } catch (error) {
+    console.error('Error finding related content:', error);
+  }
+}
+
+async function analyzePageContent(tab) {
+  try {
+    // 1. Try Local AI (Gemini Nano) first
+    const localTags = await tryLocalAiAnalysis(tab);
+    if (localTags && localTags.length > 0) {
+      displayDiscoveryTags(localTags, 'Local AI');
+      return;
+    }
+
+    // 2. Fallback to Cloud AI
+    console.log('Local AI not available, falling back to Cloud...');
+    localAiHelp.classList.remove('hidden');
+
+    const data = await bookmarks.analyze({ title: tab.title });
+    if (data.tags && data.tags.length > 0) {
+      displayDiscoveryTags(data.tags, 'Cloud AI');
+    }
+  } catch (error) {
+    console.error('Analysis failed:', error);
+  }
+}
+
+async function tryLocalAiAnalysis(tab) {
+  try {
+    // Check if the experimental prompt API exists
+    if (!window.ai || !window.ai.languageModel) return null;
+
+    const capabilities = await window.ai.languageModel.capabilities();
+    if (capabilities.available === 'no') return null;
+
+    const session = await window.ai.languageModel.create();
+    const prompt = `Suggest 3 unique tags for this webpage title: "${tab.title}". Return only the tags separated by commas.`;
+
+    const response = await session.prompt(prompt);
+    session.destroy();
+
+    return response.split(',').map(t => t.trim()).filter(t => t.length > 0);
+  } catch (e) {
+    console.log('Local AI check failed:', e);
+    return null;
+  }
+}
+
+function displayDiscoveryTags(tags, source) {
+  discoveryTagsList.innerHTML = '';
+  tags.slice(0, 5).forEach(tag => {
+    const pill = document.createElement('span');
+    pill.className = 'suggested-tag';
+    pill.style.background = '#F0FDF4';
+    pill.style.color = '#166534';
+    pill.style.borderColor = '#BBF7D0';
+    pill.textContent = tag;
+    discoveryTagsList.appendChild(pill);
+  });
+  discoveryTagsContainer.classList.remove('hidden');
+  console.log(`[Discovery] Tags generated via ${source}`);
+}
+
+async function handleSaveCurrentPage() {
+  if (!currentTabData) return;
+
+  savePageBtn.disabled = true;
+  savePageBtn.textContent = 'Saving...';
+
+  // Get both library suggestions and discovery suggestions
+  const libraryTags = Array.from(suggestedTagsList.querySelectorAll('.suggested-tag'))
+    .map(el => el.textContent);
+  const discoveryTags = Array.from(discoveryTagsList.querySelectorAll('.suggested-tag'))
+    .map(el => el.textContent);
+
+  const allTags = Array.from(new Set([...libraryTags, ...discoveryTags]));
+
+  try {
+    await bookmarks.create({
+      url: currentTabData.url,
+      title: currentTabData.title,
+      tags: allTags
+    });
+
+    updateSaveBtnToSaved();
+    // Refresh the list to show the new bookmark
+    loadRecentBookmarks();
+  } catch (error) {
+    console.error('Error saving bookmark:', error);
+    savePageBtn.disabled = false;
+    savePageBtn.textContent = 'Retry Save';
+  }
+}
+
+function updateSaveBtnToSaved() {
+  savePageBtn.disabled = true;
+  savePageBtn.className = 'btn btn-secondary btn-sm';
+  savePageBtn.innerHTML = `
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+    Saved to Library
+  `;
+  relatedContent.classList.add('hidden');
+}
+

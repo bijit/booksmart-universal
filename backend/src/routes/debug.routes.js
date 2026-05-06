@@ -6,7 +6,6 @@
 
 import { Router } from 'express';
 import { requireAuth } from '../middleware/auth.js';
-import { supabaseAdmin } from '../config/supabase.js';
 
 const router = Router();
 
@@ -16,6 +15,7 @@ const router = Router();
  */
 router.get('/pending-bookmarks', requireAuth, async (req, res) => {
   try {
+    const { supabaseAdmin } = await import('../config/supabase.js');
     const userId = req.user.id;
 
     // Get user's pending bookmarks
@@ -31,9 +31,9 @@ router.get('/pending-bookmarks', requireAuth, async (req, res) => {
     }
 
     // Get ALL pending bookmarks (for debugging)
-    const { data: allPending, error: allError, count: totalCount } = await supabaseAdmin
+    const { data: allPending, error: allError } = await supabaseAdmin
       .from('bookmarks')
-      .select('id, user_id, processing_status', { count: 'exact' })
+      .select('id, user_id, processing_status')
       .eq('processing_status', 'pending');
 
     if (allError) {
@@ -45,6 +45,10 @@ router.get('/pending-bookmarks', requireAuth, async (req, res) => {
       .from('bookmarks')
       .select('id, user_id, processing_status')
       .eq('processing_status', 'processing');
+
+    if (processingError) {
+      throw processingError;
+    }
 
     res.json({
       yourPendingBookmarks: userPending?.length || 0,
@@ -69,6 +73,7 @@ router.get('/pending-bookmarks', requireAuth, async (req, res) => {
  */
 router.get('/bookmark-stats', requireAuth, async (req, res) => {
   try {
+    const { supabaseAdmin } = await import('../config/supabase.js');
     const userId = req.user.id;
 
     // Get counts by status for user
@@ -106,6 +111,46 @@ router.get('/bookmark-stats', requireAuth, async (req, res) => {
     console.error('Debug stats error:', error);
     return res.status(500).json({
       error: 'Internal Server Error',
+      message: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/debug/info
+ * Basic system info for verification
+ */
+router.get('/info', async (req, res) => {
+  try {
+    // Dynamic imports to prevent startup blocking
+    const { supabase, supabaseAdmin } = await import('../config/supabase.js');
+    const { qdrantClient } = await import('../config/qdrant.js');
+    const { genAI } = await import('../services/gemini.service.js');
+
+    res.json({
+      status: 'online',
+      version: '1.0.0',
+      nodeVersion: process.version,
+      env: {
+        hasSupabaseUrl: !!process.env.SUPABASE_URL,
+        hasSupabaseAnonKey: !!process.env.SUPABASE_ANON_KEY,
+        hasSupabaseServiceRoleKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
+        hasQdrantUrl: !!process.env.QDRANT_URL,
+        hasQdrantApiKey: !!process.env.QDRANT_API_KEY,
+        hasGoogleAiApiKey: !!process.env.GOOGLE_AI_API_KEY,
+      },
+      clients: {
+        supabase: !!supabase,
+        supabaseAdmin: !!supabaseAdmin,
+        qdrant: !!qdrantClient,
+        gemini: !!genAI
+      },
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Debug info error:', error);
+    res.status(500).json({
+      error: 'Failed to load debug info',
       message: error.message
     });
   }

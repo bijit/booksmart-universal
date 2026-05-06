@@ -41,6 +41,8 @@ export async function createBookmarkRecord(userId, bookmarkData) {
         user_id: userId,
         url: bookmarkData.url,
         title: bookmarkData.title,
+        description: bookmarkData.description || null,
+        tags: bookmarkData.tags || [],
         qdrant_point_id: bookmarkData.qdrant_point_id,
         processing_status: bookmarkData.processing_status || 'completed',
         extraction_method: bookmarkData.extraction_method || 'jina',
@@ -60,6 +62,62 @@ export async function createBookmarkRecord(userId, bookmarkData) {
   } catch (error) {
     console.error('Error creating bookmark record in Supabase:', error);
     throw new Error(`Failed to create bookmark record: ${error.message}`);
+  }
+}
+
+/**
+ * Create multiple bookmark records in Supabase (batch insert)
+ */
+export async function createBookmarkRecordsBatch(userId, bookmarksData) {
+  try {
+    const records = bookmarksData.map(bookmark => ({
+      user_id: userId,
+      url: bookmark.url,
+      title: bookmark.title,
+      processing_status: bookmark.processing_status || 'pending',
+      extraction_method: bookmark.extraction_method || null,
+      tags: bookmark.tags || [],
+      retry_count: 0
+    }));
+
+    // Split into chunks of 100 to avoid request size limits
+    const CHUNK_SIZE = 100;
+    let allCreated = [];
+
+    for (let i = 0; i < records.length; i += CHUNK_SIZE) {
+      const chunk = records.slice(i, i + CHUNK_SIZE);
+      const { data, error } = await supabaseAdmin
+        .from('bookmarks')
+        .insert(chunk)
+        .select();
+
+      if (error) throw error;
+      if (data) allCreated = [...allCreated, ...data];
+    }
+
+    return allCreated;
+  } catch (error) {
+    console.error('Error batch creating bookmark records in Supabase:', error);
+    throw new Error(`Failed to batch create bookmark records: ${error.message}`);
+  }
+}
+
+/**
+ * Get all bookmark URLs for a user in a single efficient query
+ */
+export async function getAllUserBookmarkUrls(userId) {
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('bookmarks')
+      .select('url')
+      .eq('user_id', userId);
+
+    if (error) throw error;
+
+    return new Set(data.map(item => item.url));
+  } catch (error) {
+    console.error('Error fetching all user bookmark URLs:', error);
+    throw new Error(`Failed to fetch bookmark URLs: ${error.message}`);
   }
 }
 

@@ -19,7 +19,7 @@ router.use(requireAuth);
  */
 router.post('/', async (req, res) => {
   try {
-    const { query, tags, limit, scoreThreshold, searchType } = req.body;
+    const { query, tags, startDate, endDate, limit, scoreThreshold, searchType } = req.body;
     const userId = req.user.id;
 
     // Validate input
@@ -33,6 +33,8 @@ router.post('/', async (req, res) => {
     const options = {
       limit: parseInt(limit) || 10,
       tags: Array.isArray(tags) ? tags : null,
+      startDate: startDate || null,
+      endDate: endDate || null,
       scoreThreshold: parseFloat(scoreThreshold) || 0.5  // Higher threshold to filter irrelevant results
     };
 
@@ -52,13 +54,14 @@ router.post('/', async (req, res) => {
     }
 
     // Perform search based on type
-    let results;
+    let searchData;
     const type = searchType || 'hybrid';  // Default to hybrid
 
     if (type === 'semantic') {
-      results = await semanticSearch(userId, query, options);
+      const results = await semanticSearch(userId, query, options);
+      searchData = { results, answer: null };
     } else if (type === 'hybrid') {
-      results = await hybridSearch(userId, query, options);
+      searchData = await hybridSearch(userId, query, options);
     } else {
       return res.status(400).json({
         error: 'Bad Request',
@@ -66,9 +69,12 @@ router.post('/', async (req, res) => {
       });
     }
 
+    const { results, answer } = searchData;
+
     res.json({
       query,
       searchType: type,
+      answer, // New RAG answer field
       results: results.map(r => ({
         id: r.id,
         url: r.url,
@@ -76,7 +82,9 @@ router.post('/', async (req, res) => {
         description: r.description,
         tags: r.tags || [],
         created_at: r.created_at,
-        score: r.hybrid_score || r.score,
+        score: r.rerank_score || r.hybrid_score || r.score,
+        hybrid_score: r.hybrid_score,
+        rerank_score: r.rerank_score,
         ...(type === 'hybrid' && {
           semantic_score: r.semantic_score,
           text_match_score: r.text_match_score
