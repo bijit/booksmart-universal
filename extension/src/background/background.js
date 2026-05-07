@@ -1,5 +1,5 @@
 // BookSmart Background Service Worker
-// This script runs in the background and listens to Chrome bookmark events
+// This script runs in the background and listens to browser bookmark events
 
 import '../config.js';
 import { bookmarks, auth } from '../utils/api.js';
@@ -9,18 +9,18 @@ import { showNotification } from '../utils/notifications.js';
 const API_BASE_URL = globalThis.API_BASE_URL;
 
 // Extension Installation
-chrome.runtime.onInstalled.addListener((details) => {
+browser.runtime.onInstalled.addListener((details) => {
   console.log('BookSmart extension installed:', details.reason);
 
   if (details.reason === 'install') {
     console.log('Welcome to BookSmart!');
-    chrome.action.setBadgeText({ text: '' });
-    chrome.action.setBadgeBackgroundColor({ color: '#3B82F6' });
+    browser.action.setBadgeText({ text: '' });
+    browser.action.setBadgeBackgroundColor({ color: '#3B82F6' });
   }
 });
 
 // Listen to new bookmarks being created
-chrome.bookmarks.onCreated.addListener(async (id, bookmark) => {
+browser.bookmarks.onCreated.addListener(async (id, bookmark) => {
   console.log('New bookmark created:', bookmark);
   if (bookmark.url) {
     await handleNewBookmark(bookmark);
@@ -28,7 +28,7 @@ chrome.bookmarks.onCreated.addListener(async (id, bookmark) => {
 });
 
 // Listen to bookmarks being removed
-chrome.bookmarks.onRemoved.addListener(async (id, removeInfo) => {
+browser.bookmarks.onRemoved.addListener(async (id, removeInfo) => {
   console.log('Bookmark removed:', id, removeInfo);
   if (removeInfo.node && removeInfo.node.url) {
     await handleDeletedBookmark(removeInfo.node.url);
@@ -38,22 +38,22 @@ chrome.bookmarks.onRemoved.addListener(async (id, removeInfo) => {
 // Extract content from active tab
 async function extractContentFromActiveTab() {
   try {
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
     if (!tab || !tab.id) return null;
 
     console.log(`[BookSmart] Extracting content from tab: ${tab.title}`);
 
-    await chrome.scripting.executeScript({
+    await browser.scripting.executeScript({
       target: { tabId: tab.id },
       files: ['lib/Readability.js']
     });
 
-    await chrome.scripting.executeScript({
+    await browser.scripting.executeScript({
       target: { tabId: tab.id },
       files: ['content-extractor.js']
     });
 
-    const extractionResults = await chrome.scripting.executeScript({
+    const extractionResults = await browser.scripting.executeScript({
       target: { tabId: tab.id },
       func: function() {
         if (typeof extractPageContent === 'function') {
@@ -137,7 +137,7 @@ async function updateBadgeCount() {
   try {
     const authData = await getAuthData();
     if (!authData[STORAGE_KEYS.AUTH_TOKEN]) {
-      chrome.action.setBadgeText({ text: '' });
+      browser.action.setBadgeText({ text: '' });
       return;
     }
 
@@ -145,10 +145,10 @@ async function updateBadgeCount() {
     const pendingCount = data.total || 0;
 
     if (pendingCount > 0) {
-      chrome.action.setBadgeText({ text: String(pendingCount) });
-      chrome.action.setBadgeBackgroundColor({ color: '#F59E0B' });
+      browser.action.setBadgeText({ text: String(pendingCount) });
+      browser.action.setBadgeBackgroundColor({ color: '#F59E0B' });
     } else {
-      chrome.action.setBadgeText({ text: '' });
+      browser.action.setBadgeText({ text: '' });
     }
   } catch (error) {
     console.error('Error updating badge count:', error);
@@ -160,7 +160,7 @@ setInterval(updateBadgeCount, 30000);
 updateBadgeCount();
 
 // Message listener
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === 'updateBadge') {
     updateBadgeCount();
     sendResponse({ success: true });

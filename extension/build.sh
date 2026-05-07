@@ -22,10 +22,18 @@ cp src/config.js dist/
 # Copy utilities
 cp src/utils/*.js dist/utils/
 
+# Copy libraries
+cp src/lib/*.js dist/lib/
+
 # Copy background script
 cp src/background/background.js dist/
 # Fix imports in background.js (from ../ to ./)
 sed -i '' "s|'../|'./|g" dist/background.js
+# Prepend polyfill import to background.js if it's a module
+# For V3, we often need to include the polyfill at the top
+echo "import './lib/browser-polyfill.js';" > dist/background.js.tmp
+cat dist/background.js >> dist/background.js.tmp
+mv dist/background.js.tmp dist/background.js
 
 # Copy content extraction files
 cp src/content-extractor.js dist/

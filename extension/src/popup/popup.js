@@ -367,7 +367,7 @@ function createBookmarkCard(bookmark) {
   `;
 
   card.addEventListener('click', () => {
-    chrome.tabs.create({ url: bookmark.url });
+    browser.tabs.create({ url: bookmark.url });
   });
 
   return card;
@@ -397,7 +397,7 @@ async function openManager(path = '') {
   const token = authData[STORAGE_KEYS.AUTH_TOKEN];
   const baseUrl = globalThis.API_BASE_URL.replace('/api', '');
   const url = token ? `${baseUrl}${path}?token=${encodeURIComponent(token)}` : `${baseUrl}${path}`;
-  chrome.tabs.create({ url });
+  browser.tabs.create({ url });
 }
 
 // UI States
@@ -457,7 +457,7 @@ async function handleImport() {
       }
     }
 
-    const tree = await chrome.bookmarks.getTree();
+    const tree = await browser.bookmarks.getTree();
     const flattened = [];
     const traverse = (node) => {
       if (node.url) flattened.push({ url: node.url, title: node.title });
@@ -518,7 +518,7 @@ let currentTabData = null;
 
 async function initializeCurrentPageContext() {
   try {
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
     if (!tab || !tab.url || tab.url.startsWith('chrome://')) {
       currentPageSection.classList.add('hidden');
       return;
@@ -583,7 +583,7 @@ async function findRelatedContent(title) {
         link.title = item.title;
         link.addEventListener('click', (e) => {
           e.preventDefault();
-          chrome.tabs.create({ url: item.url });
+          browser.tabs.create({ url: item.url });
         });
         relatedList.appendChild(link);
       });

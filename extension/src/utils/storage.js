@@ -21,7 +21,7 @@ export async function saveAuthData(data) {
       [STORAGE_KEYS.USER]: data.user,
       [STORAGE_KEYS.TOKEN_EXPIRES_AT]: data.session.expires_at
     };
-    await chrome.storage.local.set(storageData);
+    await browser.storage.local.set(storageData);
     console.log('[Storage] Auth data saved successfully');
     return true;
   } catch (error) {
@@ -41,7 +41,7 @@ export async function getAuthData() {
       STORAGE_KEYS.USER,
       STORAGE_KEYS.TOKEN_EXPIRES_AT
     ];
-    return await chrome.storage.local.get(keys);
+    return await browser.storage.local.get(keys);
   } catch (error) {
     console.error('[Storage] Error getting auth data:', error);
     return {};
@@ -59,7 +59,7 @@ export async function clearAuthData() {
       STORAGE_KEYS.USER,
       STORAGE_KEYS.TOKEN_EXPIRES_AT
     ];
-    await chrome.storage.local.remove(keys);
+    await browser.storage.local.remove(keys);
     console.log('[Storage] Auth data cleared');
     return true;
   } catch (error) {
@@ -81,7 +81,7 @@ export async function isAuthenticated() {
  */
 export async function setStorageItem(key, value) {
   try {
-    await chrome.storage.local.set({ [key]: value });
+    await browser.storage.local.set({ [key]: value });
     return true;
   } catch (error) {
     console.error(`[Storage] Error setting item ${key}:`, error);
@@ -94,7 +94,7 @@ export async function setStorageItem(key, value) {
  */
 export async function getStorageItem(key) {
   try {
-    const result = await chrome.storage.local.get([key]);
+    const result = await browser.storage.local.get([key]);
     return result[key];
   } catch (error) {
     console.error(`[Storage] Error getting item ${key}:`, error);

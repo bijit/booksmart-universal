@@ -18,7 +18,7 @@ async function apiClient(endpoint, options = {}) {
   };
 
   if (auth) {
-    const { auth_token } = await chrome.storage.local.get(['auth_token']);
+    const { auth_token } = await browser.storage.local.get(['auth_token']);
     if (auth_token) {
       headers['Authorization'] = `Bearer ${auth_token}`;
     }
