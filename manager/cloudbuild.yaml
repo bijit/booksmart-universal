@@ -1,0 +1,12 @@
+steps:
+- name: 'gcr.io/cloud-builders/docker'
+  args: [
+    'build', 
+    '--tag', 'gcr.io/$PROJECT_ID/booksmart-manager', 
+    '--build-arg', 'VITE_API_BASE_URL=$_VITE_API_BASE_URL',
+    '--build-arg', 'VITE_SUPABASE_URL=$_VITE_SUPABASE_URL',
+    '--build-arg', 'VITE_SUPABASE_ANON_KEY=$_VITE_SUPABASE_ANON_KEY',
+    '.'
+  ]
+images:
+- 'gcr.io/$PROJECT_ID/booksmart-manager'

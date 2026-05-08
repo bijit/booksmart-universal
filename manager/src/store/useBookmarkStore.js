@@ -8,6 +8,8 @@ const useBookmarkStore = create((set, get) => ({
   loading: false,
   error: null,
   aiAnswer: null,
+  allFolders: [], // Full unique list of folder paths
+
 
   // Pagination
   currentPage: 1,
@@ -18,8 +20,10 @@ const useBookmarkStore = create((set, get) => ({
   // Filters
   searchQuery: '',
   selectedTags: [],
+  selectedFolder: null, // Full path string
   dateRange: { start: null, end: null },
   sortBy: 'date_added', // date_added, title, date_published
+
 
   // View mode
   viewMode: 'cards', // cards, list, timeline
@@ -53,7 +57,7 @@ const useBookmarkStore = create((set, get) => ({
     set({ loading: true, error: null, aiAnswer: null })
 
     try {
-      const { selectedTags, dateRange } = get()
+      const { selectedTags, dateRange, selectedFolder } = get()
       const token = localStorage.getItem('authToken')
       const response = await fetch(`${API_BASE_URL}/search`, {
         method: 'POST',
@@ -67,9 +71,11 @@ const useBookmarkStore = create((set, get) => ({
           scoreThreshold: 0.3,
           tags: selectedTags.length > 0 ? selectedTags : null,
           startDate: dateRange.start ? dateRange.start.toISOString() : null,
-          endDate: dateRange.end ? dateRange.end.toISOString() : null
+          endDate: dateRange.end ? dateRange.end.toISOString() : null,
+          folderPath: selectedFolder
         })
       })
+
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => null)
@@ -178,6 +184,32 @@ const useBookmarkStore = create((set, get) => ({
     }
   },
 
+  // Folders
+  setSelectedFolder: async (folderPath) => {
+    set({ selectedFolder: folderPath })
+    
+    // Refetch with new filter (respect search if active)
+    const state = get()
+    if (state.searchQuery.trim()) {
+      await state.performSearch(state.searchQuery)
+    } else {
+      await state.fetchBookmarks()
+    }
+  },
+
+  clearFolder: async () => {
+    set({ selectedFolder: null })
+    
+    // Refetch without folder filter (respect search if active)
+    const state = get()
+    if (state.searchQuery.trim()) {
+      await state.performSearch(state.searchQuery)
+    } else {
+      await state.fetchBookmarks()
+    }
+  },
+
+
   // Sort
   setSortBy: (sortBy) => set({ sortBy }),
 
@@ -212,8 +244,9 @@ const useBookmarkStore = create((set, get) => ({
 
   // Fetch bookmarks from API (page 1 by default)
   fetchBookmarks: async (page = 1) => {
-    const { pageSize, selectedTags, dateRange } = get()
+    const { pageSize, selectedTags, dateRange, selectedFolder } = get()
     set({ loading: true, error: null, currentPage: page })
+
 
     try {
       const token = localStorage.getItem('authToken')
@@ -240,6 +273,12 @@ const useBookmarkStore = create((set, get) => ({
       if (dateRange.end) {
         params.append('end_date', dateRange.end.toISOString())
       }
+
+      // Add folder filtering
+      if (selectedFolder) {
+        params.append('folder_path', selectedFolder)
+      }
+
 
       const response = await fetch(
         `${API_BASE_URL}/bookmarks?${params.toString()}`,
@@ -411,6 +450,28 @@ const useBookmarkStore = create((set, get) => ({
         return
       }
       throw error
+    }
+  },
+
+
+  // Fetch all unique folders
+  fetchFolders: async () => {
+    try {
+      const token = localStorage.getItem('authToken')
+      if (!token) return
+
+      const response = await fetch(`${API_BASE_URL}/bookmarks/folders`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        set({ allFolders: data.folders || [] })
+      }
+    } catch (error) {
+      console.error('Failed to fetch unique folders:', error)
     }
   }
 }))

@@ -1,13 +1,14 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import Header from '../components/Header'
 import Sidebar from '../components/Sidebar'
 import BookmarkCard from '../components/BookmarkCard'
+
 import TagCloudView from '../components/TagCloudView'
 import EmptyState from '../components/EmptyState'
 import ImportBookmarks from '../components/ImportBookmarks'
 import Pagination from '../components/Pagination'
 import useBookmarkStore from '../store/useBookmarkStore'
-import { Sparkles } from 'lucide-react'
+import { Sparkles, LayoutGrid, Columns } from 'lucide-react'
 
 function Dashboard({ darkMode, toggleDarkMode, onLogout }) {
   const [showImport, setShowImport] = useState(false)
@@ -26,6 +27,39 @@ function Dashboard({ darkMode, toggleDarkMode, onLogout }) {
     currentPage,
     totalPages
   } = useBookmarkStore()
+  
+  const [sidebarWidth, setSidebarWidth] = useState(280)
+  const [layoutMode, setLayoutMode] = useState('gallery')
+  const [isResizing, setIsResizing] = useState(false)
+  const sidebarRef = useRef(null)
+
+  const startResizing = useCallback((e) => {
+    setIsResizing(true)
+    e.preventDefault()
+  }, [])
+
+  const stopResizing = useCallback(() => {
+    setIsResizing(false)
+  }, [])
+
+  const resize = useCallback((e) => {
+    if (isResizing) {
+      const newWidth = e.clientX
+      if (newWidth > 200 && newWidth < 600) {
+        setSidebarWidth(newWidth)
+      }
+    }
+  }, [isResizing])
+
+  useEffect(() => {
+    window.addEventListener('mousemove', resize)
+    window.addEventListener('mouseup', stopResizing)
+    return () => {
+      window.removeEventListener('mousemove', resize)
+      window.removeEventListener('mouseup', stopResizing)
+    }
+  }, [resize, stopResizing])
+
 
   useEffect(() => {
     fetchBookmarks()
@@ -51,9 +85,19 @@ function Dashboard({ darkMode, toggleDarkMode, onLogout }) {
 
       <div className="flex flex-1 overflow-hidden">
         {/* Sidebar - Hidden on mobile */}
-        <div className="hidden lg:flex lg:h-full">
+        <div 
+          className="hidden lg:flex lg:h-full relative flex-shrink-0"
+          style={{ width: `${sidebarWidth}px` }}
+        >
           <Sidebar />
+          
+          {/* Resize Handle */}
+          <div
+            className={`absolute top-0 right-0 w-1 h-full cursor-col-resize hover:bg-accent/50 transition-colors ${isResizing ? 'bg-accent' : 'bg-transparent'}`}
+            onMouseDown={startResizing}
+          />
         </div>
+
 
         {/* Main Content */}
         <main className="flex-1 overflow-y-auto">
@@ -211,13 +255,40 @@ function Dashboard({ darkMode, toggleDarkMode, onLogout }) {
                     }, {})
                   ).map(([date, bookmarks]) => (
                     <div key={date}>
-                      <h2 className="text-lg sm:text-xl font-bold mb-4 flex items-center gap-2 sm:gap-3">
-                        <span className="text-accent dark:text-accent-dark whitespace-nowrap">{date}</span>
-                        <div className="flex-1 h-px bg-light-border dark:bg-dark-border min-w-0"></div>
-                      </h2>
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+                      <div className="flex items-center justify-between mb-4">
+                        <h2 className="text-lg sm:text-xl font-bold flex items-center gap-2 sm:gap-3 flex-1">
+                          <span className="text-accent dark:text-accent-dark whitespace-nowrap">{date}</span>
+                          <div className="flex-1 h-px bg-light-border dark:bg-dark-border min-w-0 mr-4"></div>
+                        </h2>
+                        
+                        {/* Layout Toggle - only show on first group if multiple dates */}
+                        <div className="flex items-center bg-gray-100 dark:bg-gray-800 rounded-lg p-1 border border-light-border dark:border-dark-border">
+                          <button
+                            onClick={() => setLayoutMode('gallery')}
+                            className={`p-1.5 rounded-md transition-colors ${layoutMode === 'gallery' ? 'bg-white dark:bg-gray-700 shadow-sm text-accent dark:text-accent-dark' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}
+                            title="Gallery View"
+                          >
+                            <LayoutGrid className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => setLayoutMode('pinterest')}
+                            className={`p-1.5 rounded-md transition-colors ${layoutMode === 'pinterest' ? 'bg-white dark:bg-gray-700 shadow-sm text-accent dark:text-accent-dark' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}
+                            title="Pinterest View"
+                          >
+                            <Columns className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className={
+                        layoutMode === 'pinterest' 
+                          ? "columns-1 md:columns-2 xl:columns-3 gap-4 sm:gap-6 space-y-4 sm:space-y-6" 
+                          : "grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6"
+                      }>
                         {bookmarks.map(bookmark => (
-                          <BookmarkCard key={bookmark.id} bookmark={bookmark} />
+                          <div key={bookmark.id} className={layoutMode === 'pinterest' ? "break-inside-avoid" : ""}>
+                            <BookmarkCard bookmark={bookmark} />
+                          </div>
                         ))}
                       </div>
                     </div>

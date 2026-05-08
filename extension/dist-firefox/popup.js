@@ -1,10 +1,10 @@
 // BookSmart Popup Script
 // This script handles the popup UI logic
 
-import { MANAGER_URL } from '../config.js';
+import { MANAGER_URL } from './config.js';
 
-import { auth, bookmarks, search, importJobs } from '../utils/api.js';
-import { getAuthData, saveAuthData, clearAuthData, STORAGE_KEYS } from '../utils/storage.js';
+import { auth, bookmarks, search, importJobs } from './utils/api.js';
+import { getAuthData, saveAuthData, clearAuthData, STORAGE_KEYS } from './utils/storage.js';
 
 // DOM Elements
 const loginScreen = document.getElementById('loginScreen');

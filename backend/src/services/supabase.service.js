@@ -35,21 +35,36 @@ export async function checkBookmarkExists(userId, url) {
  */
 export async function createBookmarkRecord(userId, bookmarkData) {
   try {
+    const record = {
+      user_id: userId,
+      url: bookmarkData.url,
+      title: bookmarkData.title,
+      description: bookmarkData.description || null,
+      tags: bookmarkData.tags || [],
+      qdrant_point_id: bookmarkData.qdrant_point_id,
+      processing_status: bookmarkData.processing_status || 'completed',
+      extraction_method: bookmarkData.extraction_method || 'jina',
+      extracted_content: bookmarkData.extracted_content || null,
+      folder_id: bookmarkData.folder_id || null,
+      folder_path: bookmarkData.folder_path || null,
+      sources: bookmarkData.sources || (bookmarkData.folder_path ? [{
+        browser: bookmarkData.browser || 'unknown',
+        folder_id: bookmarkData.folder_id || null,
+        folder_path: bookmarkData.folder_path || null,
+        updated_at: new Date().toISOString()
+      }] : []),
+      error_message: bookmarkData.error_message || null,
+      retry_count: bookmarkData.retry_count || 0
+    };
+
+    // Only include image fields if they have actual values
+    // This prevents errors when the columns don't exist yet in the database
+    if (bookmarkData.cover_image) record.cover_image = bookmarkData.cover_image;
+    if (bookmarkData.extracted_images && bookmarkData.extracted_images.length > 0) record.extracted_images = bookmarkData.extracted_images;
+
     const { data, error } = await supabaseAdmin
       .from('bookmarks')
-      .insert({
-        user_id: userId,
-        url: bookmarkData.url,
-        title: bookmarkData.title,
-        description: bookmarkData.description || null,
-        tags: bookmarkData.tags || [],
-        qdrant_point_id: bookmarkData.qdrant_point_id,
-        processing_status: bookmarkData.processing_status || 'completed',
-        extraction_method: bookmarkData.extraction_method || 'jina',
-        extracted_content: bookmarkData.extracted_content || null,
-        error_message: bookmarkData.error_message || null,
-        retry_count: bookmarkData.retry_count || 0
-      })
+      .insert(record)
       .select()
       .single();
 
@@ -70,15 +85,28 @@ export async function createBookmarkRecord(userId, bookmarkData) {
  */
 export async function createBookmarkRecordsBatch(userId, bookmarksData) {
   try {
-    const records = bookmarksData.map(bookmark => ({
-      user_id: userId,
-      url: bookmark.url,
-      title: bookmark.title,
-      processing_status: bookmark.processing_status || 'pending',
-      extraction_method: bookmark.extraction_method || null,
-      tags: bookmark.tags || [],
-      retry_count: 0
-    }));
+    const records = bookmarksData.map(bookmark => {
+      const rec = {
+        user_id: userId,
+        url: bookmark.url,
+        title: bookmark.title,
+        processing_status: bookmark.processing_status || 'pending',
+        extraction_method: bookmark.extraction_method || null,
+        folder_id: bookmark.folder_id || null,
+        folder_path: bookmark.folder_path || null,
+        tags: bookmark.tags || [],
+        sources: bookmark.sources || (bookmark.folder_path ? [{
+          browser: bookmark.browser || 'unknown',
+          folder_id: bookmark.folder_id || null,
+          folder_path: bookmark.folder_path || null,
+          updated_at: new Date().toISOString()
+        }] : []),
+        retry_count: 0
+      };
+      if (bookmark.cover_image) rec.cover_image = bookmark.cover_image;
+      if (bookmark.extracted_images && bookmark.extracted_images.length > 0) rec.extracted_images = bookmark.extracted_images;
+      return rec;
+    });
 
     // Split into chunks of 100 to avoid request size limits
     const CHUNK_SIZE = 100;
@@ -149,6 +177,62 @@ export async function updateBookmarkRecord(bookmarkId, updates) {
 }
 
 /**
+ * Upsert a source in the bookmark's sources array
+ */
+export async function upsertBookmarkSource(bookmarkId, sourceData) {
+  try {
+    // 1. Fetch current sources
+    const { data: bookmark, error: fetchError } = await supabaseAdmin
+      .from('bookmarks')
+      .select('sources')
+      .eq('id', bookmarkId)
+      .single();
+
+    if (fetchError) throw fetchError;
+
+    let sources = bookmark.sources || [];
+    if (!Array.isArray(sources)) sources = [];
+
+    // 2. Find if source already exists (by browser name)
+    const sourceIndex = sources.findIndex(s => s.browser === sourceData.browser);
+
+    const newSourceEntry = {
+      browser: sourceData.browser,
+      folder_id: sourceData.folder_id,
+      folder_path: sourceData.folder_path,
+      updated_at: new Date().toISOString()
+    };
+
+    if (sourceIndex >= 0) {
+      sources[sourceIndex] = newSourceEntry;
+    } else {
+      sources.push(newSourceEntry);
+    }
+
+    // 3. Update the record
+    // We also update legacy fields for compatibility
+    const { data, error } = await supabaseAdmin
+      .from('bookmarks')
+      .update({
+        sources,
+        folder_id: sourceData.folder_id,
+        folder_path: sourceData.folder_path,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', bookmarkId)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error('Error upserting bookmark source:', error);
+    throw new Error(`Failed to upsert bookmark source: ${error.message}`);
+  }
+}
+
+
+/**
  * Get a bookmark record by ID
  */
 export async function getBookmarkRecord(bookmarkId) {
@@ -180,7 +264,9 @@ export async function getUserBookmarkCount(userId, options = {}) {
       status = null,
       url = null,
       start_date = null,
-      end_date = null
+      end_date = null,
+      folder_path = null,
+      folder_id = null
     } = options;
 
     let query = supabaseAdmin
@@ -204,6 +290,15 @@ export async function getUserBookmarkCount(userId, options = {}) {
     if (end_date) {
       query = query.lte('created_at', end_date);
     }
+
+    if (folder_path) {
+      query = query.eq('folder_path', folder_path);
+    }
+
+    if (folder_id) {
+      query = query.eq('folder_id', folder_id);
+    }
+
 
     const { count, error } = await query;
 
@@ -230,7 +325,9 @@ export async function getUserBookmarkRecords(userId, options = {}) {
       status = null,
       url = null,
       start_date = null,
-      end_date = null
+      end_date = null,
+      folder_path = null,
+      folder_id = null
     } = options;
 
     let query = supabaseAdmin
@@ -243,6 +340,15 @@ export async function getUserBookmarkRecords(userId, options = {}) {
     if (status) {
       query = query.eq('processing_status', status);
     }
+
+    if (folder_path) {
+      query = query.eq('folder_path', folder_path);
+    }
+
+    if (folder_id) {
+      query = query.eq('folder_id', folder_id);
+    }
+
 
     if (url) {
       query = query.eq('url', url);
@@ -467,3 +573,32 @@ export async function deleteAllUserBookmarks(userId) {
     throw new Error(`Failed to delete all user bookmarks: ${error.message}`);
   }
 }
+
+/**
+ * Get all unique folder paths for a user
+ *
+ * @param {string} userId - User ID
+ * @returns {Promise<string[]>} List of unique folder paths
+ */
+export async function getUserUniqueFolderPaths(userId) {
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('bookmarks')
+      .select('folder_path')
+      .eq('user_id', userId)
+      .not('folder_path', 'is', null);
+
+    if (error) {
+      throw error;
+    }
+
+    // Extract unique paths and filter out empty strings
+    const uniquePaths = [...new Set(data.map(d => d.folder_path))].filter(Boolean);
+    return uniquePaths;
+
+  } catch (error) {
+    console.error('Error fetching unique folder paths from Supabase:', error);
+    throw new Error(`Failed to fetch unique folder paths: ${error.message}`);
+  }
+}
+

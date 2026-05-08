@@ -1,10 +1,11 @@
+import './lib/browser-polyfill.js';
 // BookSmart Background Service Worker
 // This script runs in the background and listens to browser bookmark events
 
-import '../config.js';
-import { bookmarks, auth } from '../utils/api.js';
-import { getAuthData, saveAuthData, STORAGE_KEYS } from '../utils/storage.js';
-import { showNotification } from '../utils/notifications.js';
+import './config.js';
+import { bookmarks, auth } from './utils/api.js';
+import { getAuthData, saveAuthData, STORAGE_KEYS } from './utils/storage.js';
+import { showNotification } from './utils/notifications.js';
 
 const API_BASE_URL = globalThis.API_BASE_URL;
 

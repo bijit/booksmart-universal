@@ -76,7 +76,22 @@ function BookmarkCard({ bookmark }) {
         ? 'border-accent/30 dark:border-accent-dark/30 shadow-sm shadow-accent/5' 
         : ''
     }`}>
-      <div className={`p-5 ${isSearchResult ? 'bg-accent/5 dark:bg-accent-dark/5 rounded-lg' : ''}`}>
+      {/* Cover Image */}
+      {bookmark.cover_image && (
+        <div className="w-full h-48 overflow-hidden rounded-t-lg bg-gray-100 dark:bg-gray-800 border-b border-light-border dark:border-dark-border">
+          <img 
+            src={bookmark.cover_image} 
+            alt={bookmark.title || 'Cover image'} 
+            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+            onError={(e) => {
+              e.target.style.display = 'none';
+              e.target.parentElement.style.display = 'none';
+            }}
+          />
+        </div>
+      )}
+      
+      <div className={`p-5 ${isSearchResult ? 'bg-accent/5 dark:bg-accent-dark/5' : ''} ${bookmark.cover_image ? 'rounded-b-lg' : 'rounded-lg'}`}>
         {/* Header */}
         <div className="flex items-start justify-between gap-3 mb-3">
           <div className="flex items-start gap-2 flex-1 min-w-0">
@@ -148,20 +163,47 @@ function BookmarkCard({ bookmark }) {
 
         {/* Description */}
         {bookmark.description && (
-          <div className="mb-4">
-            <p className={`text-sm text-light-text-secondary dark:text-dark-text-secondary ${isDescriptionExpanded ? '' : 'line-clamp-5'}`}>
+          <div className="mt-3 text-light-text-secondary dark:text-dark-text-secondary">
+            <p className={isDescriptionExpanded ? '' : 'line-clamp-3'}>
               {bookmark.description}
             </p>
-            {bookmark.description.length > 200 && (
+            {bookmark.description.length > 150 && (
               <button 
-                onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)}
-                className="mt-1 text-xs font-semibold text-accent dark:text-accent-dark hover:underline"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setIsDescriptionExpanded(!isDescriptionExpanded);
+                }}
+                className="text-xs text-accent dark:text-accent-dark hover:underline mt-1"
               >
                 {isDescriptionExpanded ? 'Show less' : 'Read more'}
               </button>
             )}
           </div>
         )}
+
+        {/* Extracted Images Gallery Indicator */}
+        {bookmark.extracted_images && bookmark.extracted_images.length > 0 && (
+          <div className="mt-4 flex flex-wrap gap-2">
+            {bookmark.extracted_images.slice(0, 4).map((imgUrl, idx) => (
+              <div key={idx} className="w-12 h-12 rounded overflow-hidden border border-light-border dark:border-dark-border opacity-80 hover:opacity-100 transition-opacity">
+                <img 
+                  src={imgUrl} 
+                  alt={`Extracted visual ${idx+1}`} 
+                  className="w-full h-full object-cover"
+                  onError={(e) => e.target.parentElement.style.display = 'none'}
+                />
+              </div>
+            ))}
+            {bookmark.extracted_images.length > 4 && (
+              <div className="w-12 h-12 rounded bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-xs font-medium text-gray-500 border border-light-border dark:border-dark-border">
+                +{bookmark.extracted_images.length - 4}
+              </div>
+            )}
+          </div>
+        )}
+
+
 
         {/* Deep Summary Display */}
         {bookmark.detailed_summary && (

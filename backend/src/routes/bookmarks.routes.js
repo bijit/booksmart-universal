@@ -13,8 +13,10 @@ import {
   getUserBookmarkCount,
   updateBookmarkRecord,
   deleteBookmarkRecord,
-  deleteAllUserBookmarks
+  deleteAllUserBookmarks,
+  getUserUniqueFolderPaths
 } from '../services/supabase.service.js';
+
 import {
   getBookmarkById,
   deleteBookmark as deleteQdrantBookmark,
@@ -32,16 +34,21 @@ router.use(requireAuth);
  */
 router.post('/', async (req, res) => {
   try {
-    const {
-      url,
-      title,
-      tags,
-      extractedContent,
-      extractedTitle,
+    const { 
+      url, 
+      title, 
+      extractedContent, 
+      extractedTitle, 
       extractedExcerpt,
-      extractedMethod,
-      extractedLength
+      extractedMethod, 
+      extractedLength,
+      folder_id,
+      folder_path,
+      browser,
+      cover_image,
+      extracted_images
     } = req.body;
+
     const userId = req.user.id;
 
     // Validate input
@@ -80,7 +87,14 @@ router.post('/', async (req, res) => {
       processing_status: 'pending',
       extraction_method: hasExtractedContent ? extractedMethod : null,
       extracted_content: hasExtractedContent ? extractedContent : null,
+      folder_id: folder_id || null,
+      folder_path: folder_path || null,
+      browser: browser || 'unknown',
+      cover_image: cover_image || null,
+      extracted_images: extracted_images || null,
       qdrant_point_id: null,
+
+
       error_message: null,
       retry_count: 0
     });
@@ -123,7 +137,9 @@ router.get('/', async (req, res) => {
       url = null,
       tags = null,
       start_date = null,
-      end_date = null
+      end_date = null,
+      folder_path = null,
+      folder_id = null
     } = req.query;
 
     // Parse tags if provided (comma-separated)
@@ -134,7 +150,9 @@ router.get('/', async (req, res) => {
       status,
       url,
       start_date,
-      end_date
+      end_date,
+      folder_path,
+      folder_id
     });
 
     // If limit=0, just return the count (used for badge polling)
@@ -158,7 +176,9 @@ router.get('/', async (req, res) => {
       status,
       url,
       start_date,
-      end_date
+      end_date,
+      folder_path,
+      folder_id
     });
 
     // Handle empty or null bookmarks
@@ -235,6 +255,25 @@ router.get('/', async (req, res) => {
 });
 
 /**
+ * GET /api/bookmarks/folders
+ * Get all unique folder paths for the user
+ */
+router.get('/folders', async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const folderPaths = await getUserUniqueFolderPaths(userId);
+    res.json({ folders: folderPaths });
+  } catch (error) {
+    console.error('Fetch unique folders error:', error);
+    return res.status(500).json({
+      error: 'Internal Server Error',
+      message: 'Failed to fetch unique folder paths'
+    });
+  }
+});
+
+
+/**
  * GET /api/bookmarks/:id
  * Get a single bookmark by ID
  */
@@ -296,7 +335,9 @@ router.put('/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const userId = req.user.id;
-    const { title, tags } = req.body;
+    const { title, tags, folder_id, folder_path, browser } = req.body;
+
+
 
     // Get bookmark to check ownership
     const bookmark = await getBookmarkRecord(id);
@@ -321,9 +362,27 @@ router.put('/:id', async (req, res) => {
     if (title !== undefined) {
       supabaseUpdates.title = title;
     }
+    if (folder_id !== undefined) {
+      supabaseUpdates.folder_id = folder_id;
+    }
+    if (folder_path !== undefined) {
+      supabaseUpdates.folder_path = folder_path;
+    }
+
+
+    // Update folder hierarchy with source tracking
+    if (browser && (folder_path !== undefined || folder_id !== undefined)) {
+      const { upsertBookmarkSource } = await import('../services/supabase.service.js');
+      await upsertBookmarkSource(id, {
+        browser,
+        folder_id: folder_id || null,
+        folder_path: folder_path || null
+      });
+    }
 
     // Update Supabase record
     const updatedBookmark = await updateBookmarkRecord(id, supabaseUpdates);
+
 
     // If bookmark is completed and has Qdrant data, update that too
     if (bookmark.processing_status === 'completed' && bookmark.qdrant_point_id) {
@@ -332,6 +391,9 @@ router.put('/:id', async (req, res) => {
         const qdrantUpdates = {};
         if (title !== undefined) qdrantUpdates.title = title;
         if (tags !== undefined) qdrantUpdates.tags = tags;
+        if (folder_id !== undefined) qdrantUpdates.folder_id = folder_id;
+        if (folder_path !== undefined) qdrantUpdates.folder_path = folder_path;
+
 
         if (Object.keys(qdrantUpdates).length > 0) {
           await updateBookmark(bookmark.qdrant_point_id, qdrantUpdates);
@@ -483,7 +545,9 @@ router.post('/analyze', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'Title is required' });
     }
 
+    const { suggestTags } = await import('../services/gemini.service.js');
     const tags = await suggestTags(title, content);
+
     
     res.json({ tags });
   } catch (error) {

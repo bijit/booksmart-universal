@@ -64,6 +64,13 @@ async function ensurePayloadIndexes() {
       wait: true
     });
 
+    await qdrantClient.createPayloadIndex(COLLECTION_NAME, {
+      field_name: 'folder_path',
+      field_schema: 'keyword',
+      wait: true
+    });
+
+
     console.log('[Qdrant] Payload indexes verified/created');
   } catch (error) {
     console.warn('[Qdrant] Warning: Could not ensure payload indexes:', error.message);
@@ -116,6 +123,8 @@ export async function createBookmark(userId, bookmarkData) {
         content: bookmarkData.content, // Full extracted content
         tags: bookmarkData.tags || [],
         favicon_url: bookmarkData.favicon_url || null,
+        folder_id: bookmarkData.folder_id || null,
+        folder_path: bookmarkData.folder_path || null,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       }
@@ -141,7 +150,8 @@ export async function updateBookmark(pointId, bookmarkData) {
   try {
     // Get existing point to preserve user_id
     const existingPoints = await qdrantClient.retrieve(COLLECTION_NAME, {
-      ids: [pointId]
+      ids: [pointId],
+      with_vector: true
     });
 
     if (existingPoints.length === 0) {
@@ -160,6 +170,8 @@ export async function updateBookmark(pointId, bookmarkData) {
         content: bookmarkData.content !== undefined ? bookmarkData.content : existingPayload.content,
         tags: bookmarkData.tags !== undefined ? bookmarkData.tags : existingPayload.tags,
         favicon_url: bookmarkData.favicon_url !== undefined ? bookmarkData.favicon_url : existingPayload.favicon_url,
+        folder_id: bookmarkData.folder_id !== undefined ? bookmarkData.folder_id : (existingPayload.folder_id || null),
+        folder_path: bookmarkData.folder_path !== undefined ? bookmarkData.folder_path : (existingPayload.folder_path || null),
         updated_at: new Date().toISOString()
       }
     };
@@ -206,7 +218,8 @@ export async function searchBookmarks(userId, queryEmbedding, options = {}) {
       tags = null,
       startDate = null,
       endDate = null,
-      scoreThreshold = 0.5
+      scoreThreshold = 0.5,
+      folderPath = null
     } = options;
 
     // Build filter
@@ -218,6 +231,15 @@ export async function searchBookmarks(userId, queryEmbedding, options = {}) {
         }
       ]
     };
+    
+    // Add folder filter if provided
+    if (folderPath) {
+      filter.must.push({
+        key: 'folder_path',
+        match: { value: folderPath }
+      });
+    }
+
 
     // Add tag filter if provided
     if (tags && tags.length > 0) {
@@ -382,7 +404,8 @@ export async function countUserBookmarks(userId) {
  */
 export async function createBookmarkChunks(userId, bookmarkData) {
   try {
-    const { bookmark_id, url, title, description, content, tags, chunks, favicon_url } = bookmarkData;
+    const { bookmark_id, url, title, description, content, tags, chunks, favicon_url, folder_id, folder_path } = bookmarkData;
+
 
     if (!chunks || chunks.length === 0) {
       throw new Error('No chunks provided for bookmark');
@@ -403,6 +426,9 @@ export async function createBookmarkChunks(userId, bookmarkData) {
         content: content, // Store full content in each chunk for retrieval
         tags: tags || [],
         favicon_url: favicon_url || null,
+        folder_id: folder_id || null,
+        folder_path: folder_path || null,
+
         // Chunk-specific data
         chunk_index: chunk.index,
         chunk_text: chunk.text,
@@ -448,7 +474,8 @@ export async function searchChunks(userId, queryEmbedding, options = {}) {
       tags = null,
       startDate = null,
       endDate = null,
-      scoreThreshold = 0.3
+      scoreThreshold = 0.3,
+      folderPath = null
     } = options;
 
     // Build filter for chunks
@@ -460,6 +487,15 @@ export async function searchChunks(userId, queryEmbedding, options = {}) {
         }
       ]
     };
+
+    // Add folder filter if provided
+    if (folderPath) {
+      filter.must.push({
+        key: 'folder_path',
+        match: { value: folderPath }
+      });
+    }
+
 
     // Add tag filter if provided
     if (tags && tags.length > 0) {

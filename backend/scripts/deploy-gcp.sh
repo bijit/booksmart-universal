@@ -41,6 +41,10 @@ echo "🚀 Starting deployment to GCP Cloud Run..."
 echo "Project ID: $PROJECT_ID"
 echo "Region: $REGION"
 
+# Navigate to backend directory relative to this script
+cd "$(dirname "$0")/.."
+
+
 # 2. Deploy BookSmart Backend
 echo "--------------------------------------------------"
 echo "📦 Step 2: Deploying BookSmart Backend..."

@@ -46,11 +46,19 @@ cp src/popup/popup.js dist/
 # Fix imports in popup.js (from ../ to ./)
 sed -i '' "s|'../|'./|g" dist/popup.js
 
+echo "Creating Firefox specific distribution..."
+rm -rf dist-firefox
+cp -r dist dist-firefox
+# Replace service_worker with scripts array for Firefox MV3 compatibility
+sed -i '' 's/"service_worker": "background.js"/"scripts": ["background.js"]/g' dist-firefox/manifest.json
+
 echo "Build complete!"
 echo ""
-echo "To load the extension in Chrome:"
-echo "1. Open Chrome and go to chrome://extensions/"
-echo "2. Enable 'Developer mode' (top right)"
-echo "3. Click 'Load unpacked'"
-echo "4. Select the 'extension/dist' folder"
-echo "5. Extension should now appear in your toolbar!"
+echo "To load the extension in Chrome/Edge:"
+echo "1. Enable 'Developer mode' at chrome://extensions/"
+echo "2. Click 'Load unpacked' and select the 'extension/dist' folder"
+echo ""
+echo "To load the extension in Firefox:"
+echo "1. Go to about:debugging#/runtime/this-firefox"
+echo "2. Click 'Load Temporary Add-on...'"
+echo "3. Select manifest.json from the 'extension/dist-firefox' folder"

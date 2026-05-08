@@ -19,7 +19,7 @@ router.use(requireAuth);
  */
 router.post('/', async (req, res) => {
   try {
-    const { query, tags, startDate, endDate, limit, scoreThreshold, searchType } = req.body;
+    const { query, tags, startDate, endDate, limit, scoreThreshold, searchType, folderPath } = req.body;
     const userId = req.user.id;
 
     // Validate input
@@ -35,6 +35,7 @@ router.post('/', async (req, res) => {
       tags: Array.isArray(tags) ? tags : null,
       startDate: startDate || null,
       endDate: endDate || null,
+      folderPath: folderPath || null,
       scoreThreshold: parseFloat(scoreThreshold) || 0.5  // Higher threshold to filter irrelevant results
     };
 

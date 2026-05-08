@@ -1,7 +1,9 @@
 import { useState } from 'react'
-import { X, Tag, SortAsc, Search, Check } from 'lucide-react'
+import { X, Tag, SortAsc, Search, Check, FolderTree } from 'lucide-react'
 import TimelineSlider from './TimelineSlider'
+import FolderExplorer from './FolderExplorer'
 import useBookmarkStore from '../store/useBookmarkStore'
+
 
 function Sidebar() {
   const {
@@ -14,7 +16,9 @@ function Sidebar() {
     setSortBy,
     dateRange,
     setDateRange,
-    clearDateRange
+    clearDateRange,
+    selectedFolder,
+    clearFolder
   } = useBookmarkStore()
   
   const [tagSearch, setTagSearch] = useState('')
@@ -40,7 +44,7 @@ function Sidebar() {
   }, {})
 
   return (
-    <aside className="w-64 h-full bg-light-card dark:bg-dark-card border-r border-light-border dark:border-dark-border p-6 overflow-y-auto">
+    <aside className="w-full h-full bg-light-card dark:bg-dark-card border-r border-light-border dark:border-dark-border p-6 overflow-y-auto">
       {/* Sort */}
       <div className="mb-6">
         <div className="flex items-center gap-2 mb-3">
@@ -57,6 +61,26 @@ function Sidebar() {
           <option value="date_published">Date Published</option>
         </select>
       </div>
+
+      {/* Folders */}
+      <div className="mb-6">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <FolderTree className="w-4 h-4 text-light-text-secondary dark:text-dark-text-secondary" />
+            <h3 className="font-medium text-sm">Folders</h3>
+          </div>
+          {selectedFolder && (
+            <button
+              onClick={clearFolder}
+              className="text-xs text-accent dark:text-accent-dark hover:underline"
+            >
+              Clear
+            </button>
+          )}
+        </div>
+        <FolderExplorer />
+      </div>
+
 
       {/* Tags */}
       <div className="mb-6">

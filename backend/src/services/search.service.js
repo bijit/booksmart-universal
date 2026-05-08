@@ -122,7 +122,8 @@ export async function semanticSearch(userId, query, options = {}) {
       tags = null,
       startDate = null,
       endDate = null,
-      scoreThreshold = 0.3  // More forgiving threshold to show relevant matches
+      scoreThreshold = 0.3,
+      folderPath = null
     } = options;
 
     console.log(`[Search] Semantic search for: "${query}" (${query.length} chars)`);
@@ -150,7 +151,8 @@ export async function semanticSearch(userId, query, options = {}) {
           tags,
           startDate,
           endDate,
-          scoreThreshold
+          scoreThreshold,
+          folderPath
         });
         console.log(`[Search] Qdrant returned ${chunkResults.length} matching chunks`);
         results = aggregateChunksByBookmark(chunkResults, limit);
@@ -167,7 +169,8 @@ export async function semanticSearch(userId, query, options = {}) {
           tags,
           startDate,
           endDate,
-          scoreThreshold
+          scoreThreshold,
+          folderPath
         });
         console.log(`[Search] Qdrant returned ${results.length} results`);
       } catch (qdrantError) {
@@ -210,10 +213,11 @@ export async function hybridSearch(userId, query, options = {}) {
       startDate = null,
       endDate = null,
       scoreThreshold = 0.3,
+      folderPath = null,
       generateAnswer = true // New flag for RAG
     } = options;
 
-    const semanticResults = await semanticSearch(userId, query, { limit: limit * 2, tags, startDate, endDate, scoreThreshold });
+    const semanticResults = await semanticSearch(userId, query, { limit: limit * 2, tags, startDate, endDate, scoreThreshold, folderPath });
     const resultsWithBM25 = scoreBM25(query, semanticResults);
 
     const scoredResults = resultsWithBM25.map(result => {
