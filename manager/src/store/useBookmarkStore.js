@@ -473,6 +473,48 @@ const useBookmarkStore = create((set, get) => ({
     } catch (error) {
       console.error('Failed to fetch unique folders:', error)
     }
+  },
+  
+  // Research more on the web
+  researchOnWeb: async (e) => {
+    if (e) {
+      e.preventDefault()
+      e.stopPropagation()
+    }
+    
+    const { searchQuery, aiAnswer } = get()
+    if (!searchQuery || !aiAnswer) return
+    
+    set({ loading: true })
+    
+    try {
+      const token = localStorage.getItem('authToken')
+      const response = await fetch(`${API_BASE_URL}/search/web-query`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          query: searchQuery,
+          overview: aiAnswer.answer
+        })
+      })
+      
+      if (!response.ok) throw new Error('Failed to generate web query')
+      
+      const { refinedQuery } = await response.json()
+      
+      // Open Google Search with the refined query in a new tab
+      window.open(`https://www.google.com/search?q=${encodeURIComponent(refinedQuery)}`, '_blank')
+      
+    } catch (error) {
+      console.error('Research on web error:', error)
+      // Fallback: search with original query
+      window.open(`https://www.google.com/search?q=${encodeURIComponent(searchQuery)}`, '_blank')
+    } finally {
+      set({ loading: false })
+    }
   }
 }))
 

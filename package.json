@@ -10,7 +10,7 @@
     "shared"
   ],
   "scripts": {
-    "dev": "concurrently \"npm run dev -w backend\" \"npm run dev -w manager\"",
+    "dev": "npx concurrently \"npm run dev -w backend\" \"npm run dev -w manager\"",
     "dev:backend": "npm run dev -w backend",
     "dev:extension": "npm run dev -w extension",
     "dev:manager": "npm run dev -w manager",

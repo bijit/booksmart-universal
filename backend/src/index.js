@@ -52,20 +52,17 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// Serve static files from backend/public
-const managerPath = resolve(__dirname, '../public');
-app.use(express.static(managerPath));
+// Serve static files from backend/public - DISABLED: using dedicated manager service
+// const managerPath = resolve(__dirname, '../public');
+// app.use(express.static(managerPath));
 
-// Serve index.html for all non-API routes
-app.get('*', (req, res) => {
-  if (req.path.startsWith('/api')) {
-    return res.status(404).json({
-      error: 'Not Found',
-      message: `Cannot ${req.method} ${req.path}`,
-      timestamp: new Date().toISOString()
-    });
-  }
-  res.sendFile(resolve(managerPath, 'index.html'));
+// Standard 404 for all non-API routes
+app.all('*', (req, res) => {
+  res.status(404).json({
+    error: 'Not Found',
+    message: `Cannot ${req.method} ${req.path}. Please use the dedicated Manager URL for the frontend.`,
+    timestamp: new Date().toISOString()
+  });
 });
 
 // Error handler

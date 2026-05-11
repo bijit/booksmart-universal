@@ -622,3 +622,45 @@ export async function testGeminiService() {
     return false;
   }
 }
+
+/**
+ * Generate a refined web search query based on an AI overview
+ * 
+ * @param {string} originalQuery - The user's original search query
+ * @param {string} overview - The AI overview generated from bookmarks
+ * @returns {Promise<string>} A refined search query for the web
+ */
+export async function generateWebSearchQuery(originalQuery, overview) {
+  try {
+    if (!genAI) {
+      throw new Error('Gemini AI is not initialized');
+    }
+
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+
+    const prompt = `You are a research assistant for "BookSmart". 
+A user has performed a search in their personal bookmarks and received an AI overview. 
+Now, the user wants to expand their research to the wider web to find NEW information NOT covered in the overview.
+
+Original User Query: "${originalQuery}"
+AI Overview of existing bookmarks:
+"${overview}"
+
+Your task is to generate ONE single, highly-effective web search query (e.g. for Google) that:
+1. Targets gaps or missing details in the current overview.
+2. Expands on the original query with more professional, technical, or scientific terms if appropriate.
+3. Is optimized for finding fresh, authoritative, and relevant material on the web.
+
+Respond with ONLY the search query string. No quotes, no explanations, no prefix.`;
+
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    const text = response.text().trim().replace(/^["']|["']$/g, '');
+    
+    console.log(`[Gemini] Generated refined web search query: "${text}"`);
+    return text;
+  } catch (error) {
+    console.error('[Gemini] Error generating web search query:', error.message);
+    return originalQuery; // Fallback to original query
+  }
+}

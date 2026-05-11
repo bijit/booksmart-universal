@@ -146,4 +146,35 @@ router.get('/tags', async (req, res) => {
   }
 });
 
+/**
+ * POST /api/search/web-query
+ * Generate a refined web search query based on context
+ */
+router.post('/web-query', async (req, res) => {
+  try {
+    const { query, overview } = req.body;
+
+    if (!query || !overview) {
+      return res.status(400).json({
+        error: 'Bad Request',
+        message: 'query and overview are required'
+      });
+    }
+
+    const { generateWebSearchQuery } = await import('../services/gemini.service.js');
+    const refinedQuery = await generateWebSearchQuery(query, overview);
+
+    res.json({
+      originalQuery: query,
+      refinedQuery
+    });
+  } catch (error) {
+    console.error('Web query generation error:', error);
+    res.status(500).json({
+      error: 'Internal Server Error',
+      message: 'Failed to generate web search query'
+    });
+  }
+});
+
 export default router;

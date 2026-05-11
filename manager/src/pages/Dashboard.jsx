@@ -8,7 +8,7 @@ import EmptyState from '../components/EmptyState'
 import ImportBookmarks from '../components/ImportBookmarks'
 import Pagination from '../components/Pagination'
 import useBookmarkStore from '../store/useBookmarkStore'
-import { Sparkles, LayoutGrid, Columns } from 'lucide-react'
+import { Sparkles, LayoutGrid, Columns, Globe, ExternalLink } from 'lucide-react'
 
 function Dashboard({ darkMode, toggleDarkMode, onLogout }) {
   const [showImport, setShowImport] = useState(false)
@@ -25,7 +25,8 @@ function Dashboard({ darkMode, toggleDarkMode, onLogout }) {
     selectedTags,
     sortBy,
     currentPage,
-    totalPages
+    totalPages,
+    researchOnWeb
   } = useBookmarkStore()
   
   const [sidebarWidth, setSidebarWidth] = useState(280)
@@ -157,6 +158,19 @@ function Dashboard({ darkMode, toggleDarkMode, onLogout }) {
                           ))}
                         </div>
                       )}
+
+                      <div className="flex justify-end mt-4 pt-4 border-t border-accent/5">
+                        <button
+                          type="button"
+                          onClick={(e) => researchOnWeb(e)}
+                          disabled={loading}
+                          className="flex items-center gap-2 px-4 py-2 bg-white/50 dark:bg-dark-card/50 hover:bg-white dark:hover:bg-dark-card border border-accent/20 rounded-xl text-sm font-bold text-accent dark:text-accent-dark transition-all hover:shadow-md active:scale-95 disabled:opacity-50"
+                        >
+                          <Globe className="w-4 h-4" />
+                          <span>Expand Search to Web</span>
+                          <ExternalLink className="w-3 h-3 opacity-50" />
+                        </button>
+                      </div>
                     </div>
                   ) : null}
                 </div>

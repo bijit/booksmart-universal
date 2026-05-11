@@ -1,7 +1,7 @@
 # BookSmart - AI-Powered Bookmark Management
 
-**Version:** 1.0.0
-**Status:** In Development
+**Version:** 1.0.1
+**Status:** Optimization & Deployment Phase
 
 BookSmart is an intelligent Chrome extension that transforms bookmark management through AI-powered content understanding and semantic search. Never lose a bookmark again - search by concept, not just keywords.
 
@@ -30,13 +30,13 @@ BookSmart is an intelligent Chrome extension that transforms bookmark management
 - IndexedDB for local caching
 
 **Backend:**
-- Node.js on Vercel Functions
+- Node.js on GCP Cloud Run
 - Qdrant Cloud (vector database)
 - Supabase (PostgreSQL + Auth)
 
 **AI Services:**
 - Google Gemini Flash (summarization & vision)
-- Google Text Embeddings (768-dimensional vectors)
+- Google Gemini Embeddings (3072-dimensional vectors)
 - Jina AI Reader (content extraction)
 
 **Cost:** $0/month for MVP (free tiers for all services)
@@ -46,7 +46,7 @@ BookSmart is an intelligent Chrome extension that transforms bookmark management
 ## Project Structure
 
 ```
-booksmart_v1.0/
+booksmart/
 ├── backend/              # Node.js API server
 │   ├── src/
 │   │   ├── services/     # Business logic
@@ -85,7 +85,7 @@ Just want to use BookSmart? Follow these simple steps:
 2. Open Chrome and navigate to `chrome://extensions/`
 3. Enable **"Developer mode"** (toggle in top right)
 4. Click **"Load unpacked"**
-5. Select the `extension/` folder
+5. Select the `extension/dist` folder
 6. The BookSmart extension icon will appear in your toolbar
 
 ### Step 2: Create Your Account
@@ -133,7 +133,7 @@ Want to run your own BookSmart instance? Follow these detailed instructions:
 ```bash
 # Clone the repository
 git clone https://github.com/kniyogi/booksmart.git
-cd booksmart_v1.0
+cd booksmart
 
 # Install backend dependencies
 cd backend
@@ -162,7 +162,7 @@ QDRANT_URL=your_qdrant_cluster_url
 QDRANT_API_KEY=your_qdrant_api_key
 
 # Required - Get from https://makersuite.google.com/app/apikey
-GEMINI_API_KEY=your_gemini_api_key
+GOOGLE_AI_API_KEY=your_google_ai_api_key
 
 # Optional - Get from https://jina.ai (free tier: 1000 requests/day)
 JINA_API_KEY=your_jina_api_key
@@ -210,7 +210,7 @@ Keep this terminal running.
 1. Open Chrome and navigate to `chrome://extensions/`
 2. Enable **"Developer mode"** (toggle in top right)
 3. Click **"Load unpacked"**
-4. Navigate to and select: `booksmart_v1.0/extension/` folder
+4. Navigate to and select: `extension/dist` folder
 5. The BookSmart extension icon should appear in your toolbar
 
 ### Step 6: Create Your Account
@@ -266,7 +266,7 @@ bookmarks (
 ```
 
 The Qdrant collection stores:
-- 768-dimensional embeddings (Google Text Embeddings)
+- 3072-dimensional embeddings (Google Gemini Embeddings)
 - Full page content and metadata
 - Tags and descriptions for semantic search
 
@@ -400,7 +400,7 @@ user_preferences (
 ```javascript
 {
   id: "bookmark-uuid",
-  vector: [768-dimensional array],
+  vector: [3072-dimensional array],
   payload: {
     user_id: "user-id",
     url: "https://...",
@@ -460,17 +460,18 @@ refactor: Code refactoring
 ### Backend API
 
 ```bash
-# Deploy to Vercel
+# Deploy to GCP Cloud Run
 cd backend
-vercel --prod
+./scripts/deploy-gcp.sh
 ```
 
 ### Manager Page
 
 ```bash
-# Deploy to Vercel
+# Deploy to GCP Cloud Run (if applicable) or Vercel
 cd manager
-vercel --prod
+npm run build
+# Deploy command for your chosen provider
 ```
 
 ### Chrome Extension
@@ -549,4 +550,4 @@ For questions or issues, please open an issue on GitHub.
 
 ---
 
-**Status:** Active Development | **Current Phase:** Week 0 - Foundation Setup
+**Status:** Optimization & Deployment | **Current Phase:** Final Verification
