@@ -244,6 +244,23 @@
     </div>
 
     <script src="lib/browser-polyfill.js"></script>
+    <!-- Import Confirmation Modal -->
+    <div id="importConfirmModal" class="modal hidden">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>Existing Bookmarks</h3>
+          <button id="closeImportModal" class="close-modal">&times;</button>
+        </div>
+        <div class="modal-body">
+          <p id="importModalText">Existing bookmarks detected in your library.</p>
+          <div class="modal-actions">
+            <button id="importDeleteBtn" class="btn btn-danger">Delete & Re-import</button>
+            <button id="importAddBtn" class="btn btn-success">Add to Existing</button>
+          </div>
+          <button id="importCancelBtn" class="btn btn-text btn-sm w-full">Cancel</button>
+        </div>
+      </div>
+    </div>
     <script type="module" src="popup.js"></script>
 </body>
 
