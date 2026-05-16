@@ -18,11 +18,13 @@ function Dashboard({ darkMode, toggleDarkMode, onLogout }) {
     isDeepSearching,
     error,
     fetchBookmarks,
+    performSearch,
     goToPage,
     getFilteredBookmarks,
     viewMode,
     searchQuery,
     aiAnswer,
+    hasMoreResults,
     dateRange,
     selectedTags,
     selectedFolder,
@@ -31,11 +33,17 @@ function Dashboard({ darkMode, toggleDarkMode, onLogout }) {
     totalPages,
     researchOnWeb
   } = useBookmarkStore()
-  
+
   const [sidebarWidth, setSidebarWidth] = useState(280)
   const [layoutMode, setLayoutMode] = useState('gallery')
   const [isResizing, setIsResizing] = useState(false)
   const sidebarRef = useRef(null)
+
+  const loadMoreResults = useCallback(() => {
+    if (!loading && !isDeepSearching && hasMoreResults && searchQuery) {
+      performSearch(searchQuery, true)
+    }
+  }, [loading, isDeepSearching, hasMoreResults, searchQuery, performSearch])
 
   const startResizing = useCallback((e) => {
     setIsResizing(true)
@@ -89,12 +97,12 @@ function Dashboard({ darkMode, toggleDarkMode, onLogout }) {
 
       <div className="flex flex-1">
         {/* Sidebar - Hidden on mobile */}
-        <div 
+        <div
           className="hidden lg:flex sticky top-16 h-[calc(100vh-64px)] relative flex-shrink-0"
           style={{ width: `${sidebarWidth}px` }}
         >
           <Sidebar />
-          
+
           {/* Resize Handle */}
           <div
             className={`absolute top-0 right-0 w-1 h-full cursor-col-resize hover:bg-accent/50 transition-colors ${isResizing ? 'bg-accent' : 'bg-transparent'}`}
@@ -106,7 +114,7 @@ function Dashboard({ darkMode, toggleDarkMode, onLogout }) {
         {/* Main Content */}
         <main className="flex-1">
           <div className="w-full max-w-7xl mx-auto px-4 py-4 sm:px-6 sm:py-6 lg:px-8 lg:py-8">
-            
+
             {/* Search Header */}
             {searchQuery && (
               <div className="mb-6 flex items-baseline justify-between">
@@ -132,7 +140,7 @@ function Dashboard({ darkMode, toggleDarkMode, onLogout }) {
               <div className="mb-8 p-6 bg-gradient-to-br from-accent/10 to-accent-dark/10 dark:from-accent/20 dark:to-accent-dark/20 rounded-2xl border border-accent/20 dark:border-accent-dark/20 shadow-lg shadow-accent/5 overflow-hidden relative">
                 {/* Decorative background element */}
                 <div className="absolute -top-10 -right-10 w-40 h-40 bg-accent/10 rounded-full blur-3xl"></div>
-                
+
                 <div className="relative z-10">
                   <div className="flex items-center gap-2 mb-4">
                     <div className="p-1.5 bg-accent text-white rounded-lg">
@@ -152,12 +160,12 @@ function Dashboard({ darkMode, toggleDarkMode, onLogout }) {
                       <div className="text-light-text dark:text-dark-text leading-relaxed mb-6 prose dark:prose-invert max-w-none">
                         {aiAnswer.answer}
                       </div>
-                      
+
                       {aiAnswer.sources && aiAnswer.sources.length > 0 && (
                         <div className="flex flex-wrap gap-2 pt-4 border-t border-accent/10">
                           <span className="text-xs font-bold uppercase tracking-wider text-light-text-secondary dark:text-dark-text-secondary w-full mb-1">Sources</span>
                           {aiAnswer.sources.map((source) => (
-                            <div 
+                            <div
                               key={source.index}
                               className="flex items-center gap-2 px-2.5 py-1 bg-white dark:bg-dark-card border border-accent/20 rounded-full text-xs font-medium text-light-text hover:border-accent transition-colors"
                             >
@@ -244,18 +252,42 @@ function Dashboard({ darkMode, toggleDarkMode, onLogout }) {
                         <BookmarkCard bookmark={bookmark} layoutMode="pinterest" />
                       </div>
                     ))}
+                    {searchQuery && hasMoreResults && (
+                      <div className="flex justify-center py-8 col-span-full">
+                        <button
+                          onClick={loadMoreResults}
+                          disabled={isDeepSearching}
+                          className="px-6 py-2 bg-accent text-white rounded-full hover:bg-accent/90 transition-colors flex items-center gap-2"
+                        >
+                          {isDeepSearching && <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>}
+                          {isDeepSearching ? 'Searching...' : 'Load More Results'}
+                        </button>
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <VirtuosoGrid
                     useWindowScroll
                     data={filteredBookmarks}
+                    endReached={loadMoreResults}
+                    overscan={400}
+                    increaseViewportBy={300}
                     listClassName="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6"
                     itemContent={(index, bookmark) => (
                       <BookmarkCard key={bookmark.id} bookmark={bookmark} layoutMode="gallery" />
                     )}
+                    components={{
+                      Footer: () => (
+                        searchQuery && hasMoreResults ? (
+                          <div className="flex justify-center py-8">
+                            <div className="animate-spin rounded-full h-8 w-8 border-2 border-accent border-t-transparent"></div>
+                          </div>
+                        ) : null
+                      )
+                    }}
                   />
                 )}
-                
+
                 {/* Only show pagination if we are not showing the 'entire set' via tags/folders */}
                 {selectedTags.length === 0 && !selectedFolder && (
                   <Pagination
@@ -274,13 +306,25 @@ function Dashboard({ darkMode, toggleDarkMode, onLogout }) {
                 <Virtuoso
                   useWindowScroll
                   data={filteredBookmarks}
+                  endReached={loadMoreResults}
+                  overscan={400}
+                  increaseViewportBy={300}
                   itemContent={(index, bookmark) => (
                     <div className="mb-3 sm:mb-4">
                       <BookmarkCard key={bookmark.id} bookmark={bookmark} />
                     </div>
                   )}
+                  components={{
+                    Footer: () => (
+                      searchQuery && hasMoreResults ? (
+                        <div className="flex justify-center py-8">
+                          <div className="animate-spin rounded-full h-8 w-8 border-2 border-accent border-t-transparent"></div>
+                        </div>
+                      ) : null
+                    )
+                  }}
                 />
-                
+
                 {/* Only show pagination if we are not showing the 'entire set' via tags/folders */}
                 {selectedTags.length === 0 && !selectedFolder && (
                   <Pagination
@@ -330,7 +374,7 @@ function Dashboard({ darkMode, toggleDarkMode, onLogout }) {
                           <span className="text-accent dark:text-accent-dark whitespace-nowrap">{date}</span>
                           <div className="flex-1 h-px bg-light-border dark:bg-dark-border min-w-0 mr-4"></div>
                         </h2>
-                        
+
                         {/* Layout Toggle - only show on first group if multiple dates */}
                         <div className="flex items-center bg-gray-100 dark:bg-gray-800 rounded-lg p-1 border border-light-border dark:border-dark-border">
                           <button
@@ -351,8 +395,8 @@ function Dashboard({ darkMode, toggleDarkMode, onLogout }) {
                       </div>
 
                       <div className={
-                        layoutMode === 'pinterest' 
-                          ? "columns-1 md:columns-2 xl:columns-3 gap-4 sm:gap-6 space-y-4 sm:space-y-6" 
+                        layoutMode === 'pinterest'
+                          ? "columns-1 md:columns-2 xl:columns-3 gap-4 sm:gap-6 space-y-4 sm:space-y-6"
                           : "grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6"
                       }>
                         {bookmarks.map(bookmark => (

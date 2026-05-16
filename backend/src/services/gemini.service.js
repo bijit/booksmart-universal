@@ -40,8 +40,8 @@ export async function summarizeContent(content, url) {
   try {
     console.log(`[Gemini] Summarizing content (${content.length} chars)...`);
 
-    // Use Gemini 2.5 Flash for fast summarization
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+    // Use Gemini 1.5 Flash for fast summarization
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
     // Truncate content if too long (Gemini has token limits)
     const truncatedContent = content.substring(0, 8000);
@@ -197,7 +197,7 @@ export async function summarizeFromMetadata(url, title) {
   try {
     console.log(`[Gemini] Generating summary from metadata only for: ${url}`);
 
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
     const prompt = `You are a helpful assistant that creates summaries for bookmarks based on limited information.
 
@@ -385,7 +385,7 @@ export async function rerankResults(query, results) {
 
     console.log(`[Gemini] Reranking ${results.length} results for query: "${query}"`);
 
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
     // Prepare results for reranking (use titles and descriptions)
     const resultsForReranking = results.map((r, idx) => ({
@@ -456,7 +456,7 @@ export async function generateSearchAnswer(query, results) {
 
     console.log(`[Gemini] Generating RAG answer for query: "${query}" using ${results.length} sources`);
 
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
     // Prepare context from results
     // We use the first few matches to keep context clean
@@ -528,7 +528,7 @@ Respond with a JSON object:
  */
 export async function suggestTags(title, content = '') {
   try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
     
     const prompt = `You are a professional librarian for "BookSmart". 
 Suggest 3-5 concise, professional tags for this page.
@@ -564,7 +564,7 @@ export async function generateDeepSummary(content, title) {
   try {
     console.log(`[Gemini] Generating deep summary for: "${title}" (${content.length} chars)`);
 
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
     // Truncate to a reasonable limit for summarization (e.g., 30,000 characters)
     const truncatedContent = content.substring(0, 30000);
@@ -651,7 +651,7 @@ export async function generateWebSearchQuery(originalQuery, overview) {
       throw new Error('Gemini AI is not initialized');
     }
 
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
     const prompt = `You are a research assistant for "BookSmart". 
 A user has performed a search in their personal bookmarks and received an AI overview. 
@@ -692,7 +692,7 @@ export async function parseSearchIntent(query) {
 
     console.log(`[Gemini] Parsing search intent for: "${query}"`);
 
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
     const now = new Date();
     const dateContext = `Current date: ${now.toISOString()}. 
     Relative date hints: 

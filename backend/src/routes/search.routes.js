@@ -20,7 +20,7 @@ router.use(requireAuth);
  */
 router.post('/', async (req, res) => {
   try {
-    const { query, tags, startDate, endDate, limit, scoreThreshold, searchType, folderPath } = req.body;
+    const { query, tags, startDate, endDate, limit, scoreThreshold, searchType, folderPath, offset } = req.body;
     const userId = req.user.id;
 
     // Validate input
@@ -36,9 +36,12 @@ router.post('/', async (req, res) => {
     let effectiveStartDate = startDate;
     let effectiveEndDate = endDate;
 
-    // AI Intent Parsing for natural language queries
-    if (query.split(' ').length > 3) {
+    const deepSearch = req.body.deepSearch === true || req.body.deepSearch === 'true';
+
+    // AI Intent Parsing for natural language queries (only if deepSearch is enabled)
+    if (deepSearch && query.split(' ').length > 3) {
       try {
+        console.log('[Search] Deep search enabled: Parsing intent...');
         const intent = await parseSearchIntent(query);
         effectiveQuery = intent.refinedQuery;
         // Merge AI-extracted filters with existing ones (existing take precedence if provided)
@@ -51,12 +54,15 @@ router.post('/', async (req, res) => {
     }
 
     const options = {
-      limit: parseInt(limit) || 10,
+      limit: parseInt(limit) || 20,
+      offset: parseInt(offset) || 0,
       tags: Array.isArray(effectiveTags) ? effectiveTags : null,
       startDate: effectiveStartDate || null,
       endDate: effectiveEndDate || null,
       folderPath: folderPath || null,
-      scoreThreshold: parseFloat(scoreThreshold) || 0.5  // Higher threshold to filter irrelevant results
+      scoreThreshold: parseFloat(scoreThreshold) || 0.5,
+      deepSearch, // Pass the deep search flag
+      generateAnswer: req.body.generateAnswer !== false // Default to true if not specified
     };
 
     // Validate limits

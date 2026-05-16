@@ -72,7 +72,9 @@ function BookmarkCard({ bookmark, layoutMode = 'gallery' }) {
   }
 
   return (
-    <div className={`card group relative ${isDeleting ? 'opacity-50 pointer-events-none' : ''} ${
+    <div className={`card group relative flex flex-col overflow-hidden ${isDeleting ? 'opacity-50 pointer-events-none' : ''} ${
+      layoutMode === 'gallery' ? 'h-[580px]' : ''
+    } ${
       isSearchResult 
         ? 'border-accent/30 dark:border-accent-dark/30 shadow-sm shadow-accent/5' 
         : ''
@@ -96,9 +98,9 @@ function BookmarkCard({ bookmark, layoutMode = 'gallery' }) {
         </div>
       )}
       
-      <div className={`p-5 ${isSearchResult ? 'bg-accent/5 dark:bg-accent-dark/5' : ''} ${bookmark.cover_image ? 'rounded-b-lg' : 'rounded-lg'}`}>
-        {/* Header */}
-        <div className="flex items-start justify-between gap-3 mb-3">
+      <div className={`p-5 flex-1 flex flex-col min-h-0 ${isSearchResult ? 'bg-accent/5 dark:bg-accent-dark/5' : ''} ${bookmark.cover_image ? 'rounded-b-lg' : 'rounded-lg'}`}>
+        {/* Header - FIXED */}
+        <div className="flex items-start justify-between gap-3 mb-4 flex-shrink-0">
           <div className="flex items-start gap-2 flex-1 min-w-0">
             {/* Favicon */}
             {faviconUrl ? (
@@ -175,196 +177,145 @@ function BookmarkCard({ bookmark, layoutMode = 'gallery' }) {
           />
         )}
 
-        {/* Description */}
-        {bookmark.description && (
-          <div className="mt-3 text-light-text-secondary dark:text-dark-text-secondary">
-            <p className={isDescriptionExpanded ? '' : 'line-clamp-3'}>
-              {bookmark.description}
-            </p>
-            {bookmark.description.length > 150 && (
-              <button 
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  setIsDescriptionExpanded(!isDescriptionExpanded);
-                }}
-                className="text-xs text-accent dark:text-accent-dark hover:underline mt-1"
-              >
-                {isDescriptionExpanded ? 'Show less' : 'Read more'}
-              </button>
-            )}
-          </div>
-        )}
-
-        {/* Notes Section */}
-        {bookmark.notes && (
-          <div className="mt-4 p-3 bg-yellow-50/50 dark:bg-yellow-900/10 border border-yellow-200/50 dark:border-yellow-800/30 rounded-lg">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-yellow-700/70 dark:text-yellow-500/70 mb-1 flex items-center gap-1">
-              <Edit2 className="w-2.5 h-2.5" />
-              My Notes
-            </p>
-            <p className="text-sm text-light-text dark:text-dark-text whitespace-pre-wrap line-clamp-4">
-              {bookmark.notes}
-            </p>
-          </div>
-        )}
-
-        {/* Extracted Images Gallery Indicator */}
-        {bookmark.extracted_images && bookmark.extracted_images.length > 0 && (
-          <div className="mt-4">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-light-text-secondary dark:text-dark-text-secondary mb-2">Visual Content</p>
-            <div className="flex flex-wrap gap-2">
-              {bookmark.extracted_images.slice(0, showAllImages ? undefined : 4).map((imgUrl, idx) => (
-                <div 
-                  key={idx} 
-                  className="group/img w-14 h-14 rounded-lg overflow-hidden border border-light-border dark:border-dark-border bg-gray-50 dark:bg-gray-900 cursor-zoom-in relative"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    window.open(imgUrl, '_blank');
-                  }}
-                >
-                  <img 
-                    src={imgUrl} 
-                    alt={`Extracted visual ${idx+1}`} 
-                    className="w-full h-full object-cover transition-transform duration-300 group-hover/img:scale-110"
-                    onError={(e) => e.target.parentElement.style.display = 'none'}
-                  />
-                  <div className="absolute inset-0 bg-black/0 group-hover/img:bg-black/10 transition-colors" />
-                </div>
-              ))}
-              {bookmark.extracted_images.length > 4 && !showAllImages && (
+        {/* SCROLLABLE CONTENT SECTION */}
+        <div className="flex-1 overflow-y-auto pr-2 mb-4 scrollbar-thin scrollbar-thumb-gray-200 dark:scrollbar-thumb-gray-800 hover:scrollbar-thumb-gray-300 dark:hover:scrollbar-thumb-gray-700">
+          {/* Description */}
+          {bookmark.description && (
+            <div className="mb-4 text-light-text-secondary dark:text-dark-text-secondary">
+              <p className={isDescriptionExpanded ? '' : 'line-clamp-4'}>
+                {bookmark.description}
+              </p>
+              {bookmark.description.length > 200 && (
                 <button 
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    setShowAllImages(true);
+                    setIsDescriptionExpanded(!isDescriptionExpanded);
                   }}
-                  className="w-14 h-14 rounded-lg bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-xs font-bold text-accent dark:text-accent-dark border border-accent/20 hover:bg-accent/5 transition-colors"
+                  className="text-xs text-accent dark:text-accent-dark hover:underline mt-1"
                 >
-                  +{bookmark.extracted_images.length - 4}
+                  {isDescriptionExpanded ? 'Show less' : 'Read more'}
                 </button>
               )}
             </div>
-          </div>
-        )}
-
-
-
-        {/* Deep Summary Display */}
-        {bookmark.detailed_summary && (
-          <div className="mb-4 bg-accent/5 dark:bg-accent-dark/5 border border-accent/10 dark:border-accent-dark/10 rounded-lg overflow-hidden">
-            <button 
-              onClick={() => setShowSummary(!showSummary)}
-              className="w-full flex items-center justify-between p-3 text-sm font-medium text-accent dark:text-accent-dark hover:bg-accent/10 transition-colors"
-            >
-              <div className="flex items-center gap-2">
-                <Sparkles className="w-4 h-4" />
-                <span>Deep Summary Analysis</span>
-              </div>
-              {showSummary ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-            </button>
-            
-            {showSummary && (
-              <div className="p-3 pt-0 text-sm space-y-3 animate-in fade-in slide-in-from-top-1">
-                <div>
-                  <p className="font-semibold text-xs uppercase tracking-wider text-light-text-secondary dark:text-dark-text-secondary mb-1">TL;DR</p>
-                  <p className="text-light-text dark:text-dark-text">{bookmark.detailed_summary.tldr}</p>
-                </div>
-                
-                <div>
-                  <p className="font-semibold text-xs uppercase tracking-wider text-light-text-secondary dark:text-dark-text-secondary mb-1">Key Takeaways</p>
-                  <ul className="space-y-1">
-                    {bookmark.detailed_summary.key_takeaways.map((point, i) => (
-                      <li key={i} className="flex gap-2 text-light-text dark:text-dark-text">
-                        <CheckCircle2 className="w-3.5 h-3.5 mt-0.5 text-accent dark:text-accent-dark flex-shrink-0" />
-                        <span>{point}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-
-                {bookmark.detailed_summary.analysis && (
-                  <div>
-                    <p className="font-semibold text-xs uppercase tracking-wider text-light-text-secondary dark:text-dark-text-secondary mb-1">Analysis</p>
-                    <p className="text-light-text-secondary dark:text-dark-text-secondary italic">"{bookmark.detailed_summary.analysis}"</p>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Tags */}
-        {bookmark.tags && bookmark.tags.length > 0 && (
-          <div className="flex flex-wrap gap-2 mb-4">
-            {bookmark.tags.slice(0, 5).map((tag, index) => (
-              <span
-                key={index}
-                onClick={() => handleTagClick(tag)}
-                className="tag"
-              >
-                {tag}
-              </span>
-            ))}
-            {bookmark.tags.length > 5 && (
-              <span className="tag">
-                +{bookmark.tags.length - 5} more
-              </span>
-            )}
-          </div>
-        )}
-
-        {/* Footer */}
-        <div className="flex items-center justify-between text-xs text-light-text-secondary dark:text-dark-text-secondary">
-          <div className="flex items-center gap-4">
-            {bookmark.created_at && (
-              <div className="flex items-center gap-1" title={new Date(bookmark.created_at).toLocaleString()}>
-                <Clock className="w-3 h-3" />
-                <span>{formatDistanceToNow(new Date(bookmark.created_at), { addSuffix: true })}</span>
-              </div>
-            )}
-            {bookmark.published_date && (
-              <div className="flex items-center gap-1" title={new Date(bookmark.published_date).toLocaleString()}>
-                <Calendar className="w-3 h-3" />
-                <span>{new Date(bookmark.published_date).toLocaleDateString()}</span>
-              </div>
-            )}
-            {bookmark.reading_time && (
-              <div className="flex items-center gap-1" title="Estimated reading time">
-                <Clock className="w-3 h-3" />
-                <span>{bookmark.reading_time} min read</span>
-              </div>
-            )}
-            {bookmark.score && (
-              <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded-md font-bold text-[11px] border transition-all ${getScoreColor()}`} title={
-                bookmark.rerank_score ? "Precision Reranked Score" : 
-                bookmark.hybrid_score ? "Hybrid (Semantic + Text) Score" : "Semantic Score"
-              }>
-                <Sparkles className="w-3 h-3" />
-                <span>{(bookmark.score * 100).toFixed(0)}% Match</span>
-              </div>
-            )}
-          </div>
-          {bookmark.processing_status === 'pending' && (
-            <span className="px-2 py-1 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300 rounded text-xs">
-              Processing...
-            </span>
           )}
-          {bookmark.processing_status === 'failed' && (
-            <span className="px-2 py-1 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 rounded text-xs">
-              Failed
-            </span>
+
+          {/* Notes Section */}
+          {bookmark.notes && (
+            <div className="mb-4 p-3 bg-yellow-50/50 dark:bg-yellow-900/10 border border-yellow-200/50 dark:border-yellow-800/30 rounded-lg">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-yellow-700/70 dark:text-yellow-500/70 mb-1 flex items-center gap-1">
+                <Edit2 className="w-2.5 h-2.5" />
+                My Notes
+              </p>
+              <p className="text-sm text-light-text dark:text-dark-text whitespace-pre-wrap">
+                {bookmark.notes}
+              </p>
+            </div>
+          )}
+
+          {/* Extracted Images Gallery */}
+          {bookmark.extracted_images && bookmark.extracted_images.length > 0 && (
+            <div className="mb-4">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-light-text-secondary dark:text-dark-text-secondary mb-2">Visual Content</p>
+              <div className="flex flex-wrap gap-2">
+                {bookmark.extracted_images.slice(0, showAllImages ? undefined : 4).map((imgUrl, idx) => (
+                  <div 
+                    key={idx} 
+                    className="group/img w-14 h-14 rounded-lg overflow-hidden border border-light-border dark:border-dark-border bg-gray-50 dark:bg-gray-900 cursor-zoom-in relative"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      window.open(imgUrl, '_blank');
+                    }}
+                  >
+                    <img 
+                      src={imgUrl} 
+                      alt={`Extracted visual ${idx+1}`} 
+                      className="w-full h-full object-cover transition-transform duration-300 group-hover/img:scale-110"
+                      onError={(e) => e.target.parentElement.style.display = 'none'}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Deep Summary Display */}
+          {bookmark.detailed_summary && (
+            <div className="mb-4 bg-accent/5 dark:bg-accent-dark/5 border border-accent/10 dark:border-accent-dark/10 rounded-lg overflow-hidden">
+              <button 
+                onClick={() => setShowSummary(!showSummary)}
+                className="w-full flex items-center justify-between p-3 text-sm font-medium text-accent dark:text-accent-dark hover:bg-accent/10 transition-colors"
+              >
+                <div className="flex items-center gap-2">
+                  <Sparkles className="w-4 h-4" />
+                  <span>Deep Summary</span>
+                </div>
+                {showSummary ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+              </button>
+              
+              {showSummary && (
+                <div className="p-3 pt-0 text-sm space-y-3">
+                  <div>
+                    <p className="font-semibold text-xs uppercase tracking-wider opacity-60 mb-1">TL;DR</p>
+                    <p className="">{bookmark.detailed_summary.tldr}</p>
+                  </div>
+                  
+                  <div>
+                    <p className="font-semibold text-xs uppercase tracking-wider opacity-60 mb-1">Key Takeaways</p>
+                    <ul className="space-y-1">
+                      {bookmark.detailed_summary.key_takeaways.map((point, i) => (
+                        <li key={i} className="flex gap-2">
+                          <CheckCircle2 className="w-3.5 h-3.5 mt-0.5 text-accent flex-shrink-0" />
+                          <span>{point}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Tags */}
+          {bookmark.tags && bookmark.tags.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {bookmark.tags.map((tag, index) => (
+                <span
+                  key={index}
+                  onClick={() => handleTagClick(tag)}
+                  className="tag"
+                >
+                  {tag}
+                </span>
+              ))}
+            </div>
           )}
         </div>
 
-        {/* URL */}
-        <div className="mt-3 pt-3 border-t border-light-border dark:border-dark-border">
+        {/* Footer - FIXED */}
+        <div className="mt-auto pt-4 border-t border-light-border dark:border-dark-border flex-shrink-0">
+          <div className="flex items-center justify-between text-xs text-light-text-secondary dark:text-dark-text-secondary mb-3">
+            <div className="flex items-center gap-4">
+              {bookmark.created_at && (
+                <div className="flex items-center gap-1" title={new Date(bookmark.created_at).toLocaleString()}>
+                  <Clock className="w-3 h-3" />
+                  <span>{formatDistanceToNow(new Date(bookmark.created_at), { addSuffix: true })}</span>
+                </div>
+              )}
+              {bookmark.score && (
+                <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded-md font-bold text-[11px] border transition-all ${getScoreColor()}`}>
+                  <Sparkles className="w-3 h-3" />
+                  <span>{(bookmark.score * 100).toFixed(0)}% Match</span>
+                </div>
+              )}
+            </div>
+          </div>
           <a
             href={bookmark.url}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-xs text-accent dark:text-accent-dark hover:underline line-clamp-1"
+            className="text-xs text-accent dark:text-accent-dark hover:underline line-clamp-1 block"
           >
             {bookmark.url}
           </a>

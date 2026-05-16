@@ -118,7 +118,8 @@ function aggregateChunksByBookmark(chunks, limit = 10) {
 export async function semanticSearch(userId, query, options = {}) {
   try {
     const {
-      limit = 10,
+      limit = 20,
+      offset = 0,
       tags = null,
       startDate = null,
       endDate = null,
@@ -148,6 +149,7 @@ export async function semanticSearch(userId, query, options = {}) {
       try {
         const chunkResults = await searchChunks(userId, queryEmbedding, {
           limit: limit * 5, // Fetch more chunks to aggregate into top bookmarks
+          offset: offset * 5, // Support pagination for chunks
           tags,
           startDate,
           endDate,
@@ -166,6 +168,7 @@ export async function semanticSearch(userId, query, options = {}) {
       try {
         results = await searchQdrant(userId, queryEmbedding, {
           limit,
+          offset,
           tags,
           startDate,
           endDate,
@@ -208,16 +211,18 @@ export async function semanticSearch(userId, query, options = {}) {
 export async function hybridSearch(userId, query, options = {}) {
   try {
     const {
-      limit = 10,
+      limit = 20,
+      offset = 0,
       tags = null,
       startDate = null,
       endDate = null,
       scoreThreshold = 0.3,
       folderPath = null,
-      generateAnswer = true // New flag for RAG
+      generateAnswer = true,
+      deepSearch = false // Default to fast search
     } = options;
 
-    const semanticResults = await semanticSearch(userId, query, { limit: limit * 2, tags, startDate, endDate, scoreThreshold, folderPath });
+    const semanticResults = await semanticSearch(userId, query, { limit: limit * 2, offset, tags, startDate, endDate, scoreThreshold, folderPath });
     const resultsWithBM25 = scoreBM25(query, semanticResults);
 
     const scoredResults = resultsWithBM25.map(result => {
@@ -247,16 +252,17 @@ export async function hybridSearch(userId, query, options = {}) {
       .sort((a, b) => b.hybrid_score - a.hybrid_score)
       .slice(0, limit);
 
-    // Apply LLM-based reranking if enabled (for premium quality)
-    if (ENABLE_RERANKING && rankedResults.length > 1) {
-      console.log(`[Search] Applying LLM-based reranking to top ${rankedResults.length} results...`);
+    // Apply LLM-based reranking if explicitly requested via deepSearch
+    if (deepSearch && ENABLE_RERANKING && rankedResults.length > 1) {
+      console.log(`[Search] Deep search enabled: Applying LLM-based reranking to top ${rankedResults.length} results...`);
       rankedResults = await rerankResults(query, rankedResults);
     }
 
-    // Step 5: RAG Answer Generation (New)
+    // Step 5: RAG Answer Generation (only if deepSearch is enabled)
     let answer = null;
-    if (generateAnswer && rankedResults.length > 0 && query.length > 5) {
+    if (deepSearch && generateAnswer && rankedResults.length > 0 && query.length > 5) {
       try {
+        console.log('[Search] Deep search enabled: Generating AI answer...');
         answer = await generateSearchAnswer(query, rankedResults);
       } catch (error) {
         console.error('[Search] RAG generation failed:', error);

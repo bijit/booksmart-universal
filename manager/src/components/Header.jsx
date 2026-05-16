@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef } from 'react'
-import { Search, Moon, Sun, LogOut, Grid, List, Clock, Layers, Upload, X } from 'lucide-react'
+import { Search, Moon, Sun, LogOut, Grid, List, Clock, Layers, Upload, X, Sparkles } from 'lucide-react'
 import useBookmarkStore from '../store/useBookmarkStore'
 
 function Header({ darkMode, toggleDarkMode, onLogout, onOpenImport }) {
-  const { searchQuery, setSearchQuery, viewMode, setViewMode } = useBookmarkStore()
+  const { searchQuery, setSearchQuery, viewMode, setViewMode, deepSearchEnabled, setDeepSearchEnabled } = useBookmarkStore()
   const [searchFocused, setSearchFocused] = useState(false)
   const [localSearchQuery, setLocalSearchQuery] = useState(searchQuery)
   const searchTimeoutRef = useRef(null)
@@ -40,26 +40,43 @@ function Header({ darkMode, toggleDarkMode, onLogout, onOpenImport }) {
 
           {/* Search Bar */}
           <div className="flex-1 max-w-2xl min-w-0 mx-2 sm:mx-4 lg:mx-8">
-            <div className={`relative transition-all duration-200 ${searchFocused ? 'transform scale-105' : ''}`}>
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-light-text-secondary dark:text-dark-text-secondary w-5 h-5" />
-              <input
-                type="text"
-                placeholder="Search bookmarks..."
-                value={localSearchQuery}
-                onChange={(e) => setLocalSearchQuery(e.target.value)}
-                onFocus={() => setSearchFocused(true)}
-                onBlur={() => setSearchFocused(false)}
-                className="input pl-10 pr-10 w-full"
-              />
-              {localSearchQuery && (
-                <button
-                  onClick={() => setLocalSearchQuery('')}
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-light-text-secondary dark:text-dark-text-secondary hover:text-light-text dark:hover:text-dark-text transition-colors"
-                  title="Clear search"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              )}
+            <div className="flex items-center gap-2">
+              <div className={`relative flex-1 transition-all duration-200 ${searchFocused ? 'transform scale-105' : ''}`}>
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-light-text-secondary dark:text-dark-text-secondary w-5 h-5" />
+                <input
+                  type="text"
+                  placeholder="Search bookmarks..."
+                  value={localSearchQuery}
+                  onChange={(e) => setLocalSearchQuery(e.target.value)}
+                  onFocus={() => setSearchFocused(true)}
+                  onBlur={() => setSearchFocused(false)}
+                  className="input pl-10 pr-10 w-full"
+                />
+                {localSearchQuery && (
+                  <button
+                    onClick={() => setLocalSearchQuery('')}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-light-text-secondary dark:text-dark-text-secondary hover:text-light-text dark:hover:text-dark-text transition-colors"
+                    title="Clear search"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+              
+              <button
+                onClick={() => setDeepSearchEnabled(!deepSearchEnabled)}
+                className={`p-2.5 rounded-xl transition-all duration-300 flex items-center gap-2 group ${
+                  deepSearchEnabled 
+                    ? 'bg-accent text-white shadow-lg shadow-accent/20' 
+                    : 'bg-light-bg dark:bg-dark-bg text-light-text-secondary dark:text-dark-text-secondary hover:bg-accent/10 hover:text-accent'
+                }`}
+                title={deepSearchEnabled ? "Deep Search Enabled (High Quality)" : "Deep Search Disabled (Snappy)"}
+              >
+                <Sparkles className={`w-5 h-5 ${deepSearchEnabled ? 'animate-pulse' : 'group-hover:scale-110 transition-transform'}`} />
+                <span className={`hidden lg:inline text-xs font-bold uppercase tracking-widest ${deepSearchEnabled ? 'block' : 'hidden group-hover:block'}`}>
+                  Deep
+                </span>
+              </button>
             </div>
           </div>
 
