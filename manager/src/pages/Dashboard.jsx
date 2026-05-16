@@ -7,6 +7,7 @@ import TagCloudView from '../components/TagCloudView'
 import EmptyState from '../components/EmptyState'
 import ImportBookmarks from '../components/ImportBookmarks'
 import Pagination from '../components/Pagination'
+import { Virtuoso, VirtuosoGrid } from 'react-virtuoso'
 import useBookmarkStore from '../store/useBookmarkStore'
 import { Sparkles, LayoutGrid, Columns, Globe, ExternalLink } from 'lucide-react'
 
@@ -14,6 +15,7 @@ function Dashboard({ darkMode, toggleDarkMode, onLogout }) {
   const [showImport, setShowImport] = useState(false)
   const {
     loading,
+    isDeepSearching,
     error,
     fetchBookmarks,
     goToPage,
@@ -23,6 +25,7 @@ function Dashboard({ darkMode, toggleDarkMode, onLogout }) {
     aiAnswer,
     dateRange,
     selectedTags,
+    selectedFolder,
     sortBy,
     currentPage,
     totalPages,
@@ -76,7 +79,7 @@ function Dashboard({ darkMode, toggleDarkMode, onLogout }) {
   const filteredBookmarks = getFilteredBookmarks()
 
   return (
-    <div className="flex flex-col h-screen">
+    <div className="flex flex-col min-h-screen">
       <Header
         darkMode={darkMode}
         toggleDarkMode={toggleDarkMode}
@@ -84,10 +87,10 @@ function Dashboard({ darkMode, toggleDarkMode, onLogout }) {
         onOpenImport={() => setShowImport(true)}
       />
 
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1">
         {/* Sidebar - Hidden on mobile */}
         <div 
-          className="hidden lg:flex lg:h-full relative flex-shrink-0"
+          className="hidden lg:flex sticky top-16 h-[calc(100vh-64px)] relative flex-shrink-0"
           style={{ width: `${sidebarWidth}px` }}
         >
           <Sidebar />
@@ -101,7 +104,7 @@ function Dashboard({ darkMode, toggleDarkMode, onLogout }) {
 
 
         {/* Main Content */}
-        <main className="flex-1 overflow-y-auto">
+        <main className="flex-1">
           <div className="w-full max-w-7xl mx-auto px-4 py-4 sm:px-6 sm:py-6 lg:px-8 lg:py-8">
             
             {/* Search Header */}
@@ -110,8 +113,14 @@ function Dashboard({ darkMode, toggleDarkMode, onLogout }) {
                 <h2 className="text-2xl font-bold flex items-center gap-2">
                   <span>Results for</span>
                   <span className="text-accent dark:text-accent-dark italic">"{searchQuery}"</span>
+                  {isDeepSearching && (
+                    <div className="flex items-center gap-2 ml-2 px-2 py-0.5 bg-accent/10 rounded-full">
+                      <div className="w-1.5 h-1.5 bg-accent rounded-full animate-pulse"></div>
+                      <span className="text-[10px] uppercase tracking-widest font-bold text-accent">Deep Searching...</span>
+                    </div>
+                  )}
                 </h2>
-                {!loading && (
+                {!isDeepSearching && (
                   <span className="text-sm text-light-text-secondary dark:text-dark-text-secondary font-medium">
                     {filteredBookmarks.length} matches
                   </span>
@@ -119,7 +128,7 @@ function Dashboard({ darkMode, toggleDarkMode, onLogout }) {
               </div>
             )}
             {/* AI Overview (RAG) Section */}
-            {searchQuery && (loading || aiAnswer) && (
+            {searchQuery && (isDeepSearching || aiAnswer) && (
               <div className="mb-8 p-6 bg-gradient-to-br from-accent/10 to-accent-dark/10 dark:from-accent/20 dark:to-accent-dark/20 rounded-2xl border border-accent/20 dark:border-accent-dark/20 shadow-lg shadow-accent/5 overflow-hidden relative">
                 {/* Decorative background element */}
                 <div className="absolute -top-10 -right-10 w-40 h-40 bg-accent/10 rounded-full blur-3xl"></div>
@@ -127,12 +136,12 @@ function Dashboard({ darkMode, toggleDarkMode, onLogout }) {
                 <div className="relative z-10">
                   <div className="flex items-center gap-2 mb-4">
                     <div className="p-1.5 bg-accent text-white rounded-lg">
-                      <Sparkles className={`w-5 h-5 ${loading ? 'animate-pulse' : ''}`} />
+                      <Sparkles className={`w-5 h-5 ${isDeepSearching ? 'animate-pulse' : ''}`} />
                     </div>
                     <h3 className="text-lg font-bold">AI Overview</h3>
                   </div>
 
-                  {loading ? (
+                  {isDeepSearching ? (
                     <div className="space-y-3">
                       <div className="h-4 bg-accent/10 rounded w-3/4 animate-pulse"></div>
                       <div className="h-4 bg-accent/10 rounded w-full animate-pulse delay-75"></div>
@@ -204,41 +213,88 @@ function Dashboard({ darkMode, toggleDarkMode, onLogout }) {
             )}
 
             {/* Cards View */}
-            {!loading && filteredBookmarks.length > 0 && viewMode === 'cards' && (
+            {filteredBookmarks.length > 0 && viewMode === 'cards' && (
               <>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-                  {filteredBookmarks.map(bookmark => (
-                    <BookmarkCard key={bookmark.id} bookmark={bookmark} />
-                  ))}
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-lg font-bold text-light-text-secondary dark:text-dark-text-secondary uppercase tracking-wider">
+                    {searchQuery ? 'Search Results' : 'All Bookmarks'}
+                  </h3>
+                  <div className="flex items-center bg-gray-100 dark:bg-gray-800 rounded-lg p-1 border border-light-border dark:border-dark-border">
+                    <button
+                      onClick={() => setLayoutMode('gallery')}
+                      className={`p-1.5 rounded-md transition-colors ${layoutMode === 'gallery' ? 'bg-white dark:bg-gray-700 shadow-sm text-accent dark:text-accent-dark' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}
+                      title="Gallery View"
+                    >
+                      <LayoutGrid className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => setLayoutMode('pinterest')}
+                      className={`p-1.5 rounded-md transition-colors ${layoutMode === 'pinterest' ? 'bg-white dark:bg-gray-700 shadow-sm text-accent dark:text-accent-dark' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}
+                      title="Pinterest View"
+                    >
+                      <Columns className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
-                <Pagination
-                  currentPage={currentPage}
-                  totalPages={totalPages}
-                  onPageChange={goToPage}
-                  loading={loading}
-                />
+
+                {layoutMode === 'pinterest' ? (
+                  <div className="columns-1 md:columns-2 lg:columns-3 gap-4 sm:gap-6 space-y-4 sm:space-y-6">
+                    {filteredBookmarks.map(bookmark => (
+                      <div key={bookmark.id} className="break-inside-avoid">
+                        <BookmarkCard bookmark={bookmark} layoutMode="pinterest" />
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <VirtuosoGrid
+                    useWindowScroll
+                    data={filteredBookmarks}
+                    listClassName="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6"
+                    itemContent={(index, bookmark) => (
+                      <BookmarkCard key={bookmark.id} bookmark={bookmark} layoutMode="gallery" />
+                    )}
+                  />
+                )}
+                
+                {/* Only show pagination if we are not showing the 'entire set' via tags/folders */}
+                {selectedTags.length === 0 && !selectedFolder && (
+                  <Pagination
+                    currentPage={currentPage}
+                    totalPages={totalPages}
+                    onPageChange={goToPage}
+                    loading={loading}
+                  />
+                )}
               </>
             )}
 
             {/* List View */}
-            {!loading && filteredBookmarks.length > 0 && viewMode === 'list' && (
+            {filteredBookmarks.length > 0 && viewMode === 'list' && (
               <>
-                <div className="space-y-3 sm:space-y-4">
-                  {filteredBookmarks.map(bookmark => (
-                    <BookmarkCard key={bookmark.id} bookmark={bookmark} />
-                  ))}
-                </div>
-                <Pagination
-                  currentPage={currentPage}
-                  totalPages={totalPages}
-                  onPageChange={goToPage}
-                  loading={loading}
+                <Virtuoso
+                  useWindowScroll
+                  data={filteredBookmarks}
+                  itemContent={(index, bookmark) => (
+                    <div className="mb-3 sm:mb-4">
+                      <BookmarkCard key={bookmark.id} bookmark={bookmark} />
+                    </div>
+                  )}
                 />
+                
+                {/* Only show pagination if we are not showing the 'entire set' via tags/folders */}
+                {selectedTags.length === 0 && !selectedFolder && (
+                  <Pagination
+                    currentPage={currentPage}
+                    totalPages={totalPages}
+                    onPageChange={goToPage}
+                    loading={loading}
+                  />
+                )}
               </>
             )}
 
             {/* Timeline View */}
-            {!loading && filteredBookmarks.length > 0 && viewMode === 'timeline' && (
+            {filteredBookmarks.length > 0 && viewMode === 'timeline' && (
               <>
                 <div className="space-y-8">
                   {filteredBookmarks.reduce((acc, bookmark) => {
@@ -301,7 +357,7 @@ function Dashboard({ darkMode, toggleDarkMode, onLogout }) {
                       }>
                         {bookmarks.map(bookmark => (
                           <div key={bookmark.id} className={layoutMode === 'pinterest' ? "break-inside-avoid" : ""}>
-                            <BookmarkCard bookmark={bookmark} />
+                            <BookmarkCard bookmark={bookmark} layoutMode={layoutMode} />
                           </div>
                         ))}
                       </div>

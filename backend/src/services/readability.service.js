@@ -39,6 +39,8 @@ export async function extractContent(url) {
     // Extract metadata before Readability alters the DOM
     const metaDescription = extractMetaDescription(doc.window.document);
     const favicon = extractFavicon(doc.window.document, url);
+    const coverImage = extractCoverImage(doc.window.document, url);
+    const contentImages = extractContentImages(doc.window.document, url);
 
     // 3. Run Readability to extract clean article content
     const reader = new Readability(doc.window.document);
@@ -55,9 +57,13 @@ export async function extractContent(url) {
       content: article.textContent.trim(), // We use raw text content instead of HTML for embedding
       url: url,
       favicon: favicon,
+      cover_image: coverImage,
+      extracted_images: contentImages,
       author: article.byline || null,
-      siteName: article.siteName || null,
-      publishedTime: null // Readability doesn't reliably extract published time
+      site_name: article.siteName || null,
+      published_date: article.publishedTime || null,
+      reading_time: Math.ceil(article.textContent.split(/\s+/).length / 200), // Approx 200 wpm
+      language: article.lang || null
     };
 
     console.log(`[Readability] Successfully extracted ${result.content.length} characters from ${url}`);
@@ -121,4 +127,64 @@ function extractFavicon(document, baseUrl) {
   } catch (e) {
     return null;
   }
+}
+
+/**
+ * Extract cover image (OG image or Twitter image)
+ */
+function extractCoverImage(document, baseUrl) {
+  const selectors = [
+    'meta[property="og:image"]',
+    'meta[name="twitter:image"]',
+    'meta[property="twitter:image"]',
+    'link[rel="image_src"]'
+  ];
+
+  for (const selector of selectors) {
+    const el = document.querySelector(selector);
+    if (el) {
+      const content = el.getAttribute('content') || el.getAttribute('href');
+      if (content) {
+        try {
+          return new URL(content, baseUrl).href;
+        } catch (e) {
+          return content;
+        }
+      }
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Extract images from the content area
+ */
+function extractContentImages(document, baseUrl) {
+  const images = [];
+  const imgElements = Array.from(document.querySelectorAll('article img, main img, .content img, #content img'));
+  
+  // If no specific content container images, try all images
+  const targetElements = imgElements.length > 0 ? imgElements : Array.from(document.querySelectorAll('img'));
+
+  for (const img of targetElements) {
+    const src = img.getAttribute('src') || img.getAttribute('data-src');
+    if (src && !src.startsWith('data:')) {
+      try {
+        const absoluteUrl = new URL(src, baseUrl).href;
+        // Basic filtering for tiny icons/tracking pixels
+        const width = parseInt(img.getAttribute('width') || '0');
+        const height = parseInt(img.getAttribute('height') || '0');
+        
+        if (!images.includes(absoluteUrl) && (width === 0 || width > 100)) {
+          images.push(absoluteUrl);
+        }
+      } catch (e) {
+        // Skip invalid URLs
+      }
+    }
+    if (images.length >= 10) break; // Limit to 10 images
+  }
+
+  return images;
 }

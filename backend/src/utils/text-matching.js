@@ -99,7 +99,12 @@ export function scoreBM25(query, documents) {
   const processedDocs = documents.map(doc => {
     const titleTerms = tokenizeAndStem(doc.title || '');
     const descTerms = tokenizeAndStem(doc.description || '');
-    const allTerms = [...titleTerms, ...descTerms];
+    const notesTerms = tokenizeAndStem(doc.notes || '');
+    const authorTerms = tokenizeAndStem(doc.author || '');
+    const siteTerms = tokenizeAndStem(doc.site_name || '');
+    const tagsTerms = (doc.tags || []).flatMap(tag => tokenizeAndStem(tag));
+    
+    const allTerms = [...titleTerms, ...descTerms, ...notesTerms, ...authorTerms, ...siteTerms, ...tagsTerms];
 
     return {
       ...doc,
@@ -152,10 +157,16 @@ export function scoreBM25(query, documents) {
  * @param {string} description - Document description
  * @returns {number} Match score (0-1)
  */
-export function enhancedTextMatch(query, title = '', description = '') {
+export function enhancedTextMatch(query, bookmark = {}) {
+  const { title = '', description = '', notes = '', author = '', site_name = '', tags = [] } = bookmark;
+  
   const queryTerms = tokenizeAndStem(query);
   const titleTerms = tokenizeAndStem(title);
   const descTerms = tokenizeAndStem(description);
+  const notesTerms = tokenizeAndStem(notes);
+  const authorTerms = tokenizeAndStem(author);
+  const siteTerms = tokenizeAndStem(site_name);
+  const tagsTerms = tags.flatMap(tag => tokenizeAndStem(tag));
 
   if (queryTerms.length === 0) {
     return 0;
@@ -173,9 +184,27 @@ export function enhancedTextMatch(query, title = '', description = '') {
       termMatched = true;
     }
 
-    // Check description (lower weight)
+    // Check description (medium weight)
     if (descTerms.includes(qTerm)) {
       score += 0.2;
+      termMatched = true;
+    }
+
+    // Check notes (medium-high weight since user wrote them)
+    if (notesTerms.includes(qTerm)) {
+      score += 0.3;
+      termMatched = true;
+    }
+
+    // Check tags (high weight)
+    if (tagsTerms.includes(qTerm)) {
+      score += 0.4;
+      termMatched = true;
+    }
+
+    // Check metadata (lower weight)
+    if (authorTerms.includes(qTerm) || siteTerms.includes(qTerm)) {
+      score += 0.15;
       termMatched = true;
     }
 

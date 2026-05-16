@@ -299,6 +299,42 @@ input::placeholder {
   flex-shrink: 0;
 }
 
+/* Deep Search Indicator */
+.deep-search-indicator {
+  position: absolute;
+  right: 40px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(59, 130, 246, 0.1);
+  padding: 4px 8px;
+  border-radius: 4px;
+  pointer-events: none;
+  animation: fadeIn 0.3s ease-out;
+}
+
+.deep-search-indicator span {
+  font-size: 10px;
+  font-weight: 700;
+  color: #3B82F6;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.dot-pulse {
+  width: 6px;
+  height: 6px;
+  background-color: #3B82F6;
+  border-radius: 50%;
+  animation: pulse 1.5s infinite ease-in-out;
+}
+
+@keyframes pulse {
+  0% { transform: scale(0.8); opacity: 0.5; }
+  50% { transform: scale(1.2); opacity: 1; }
+  100% { transform: scale(0.8); opacity: 0.5; }
+}
+
 /* Tag Filter Row */
 .tag-filter-container {
   margin-top: 8px;
@@ -473,6 +509,24 @@ input::placeholder {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.bookmark-site {
+  font-weight: 600;
+  color: #6B7280;
+}
+
+.bookmark-author {
+  font-style: italic;
+  color: #9CA3AF;
+}
+
+.bookmark-author::before {
+  content: "by ";
+  font-style: normal;
 }
 
 .bookmark-tags {
@@ -525,6 +579,56 @@ input::placeholder {
 .bookmark-status.failed {
   background: #FEE2E2;
   color: #991B1B;
+}
+
+/* Notes Section */
+.bookmark-notes-section {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed #E5E7EB;
+}
+
+.notes-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: #9CA3AF;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+
+.notes-textarea {
+  width: 100%;
+  min-height: 40px;
+  padding: 6px 8px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: #4B5563;
+  background: #F9FAFB;
+  resize: vertical;
+  transition: all 0.2s;
+  font-family: inherit;
+}
+
+.notes-textarea:focus {
+  outline: none;
+  background: #FFFFFF;
+  border-color: #3B82F6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+}
+
+.notes-status {
+  font-size: 10px;
+  color: #10B981;
+  margin-top: 2px;
+  height: 12px;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.notes-status.visible {
+  opacity: 1;
 }
 
 /* State Messages */

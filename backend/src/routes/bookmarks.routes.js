@@ -46,7 +46,8 @@ router.post('/', async (req, res) => {
       folder_path,
       browser,
       cover_image,
-      extracted_images
+      extracted_images,
+      created_at
     } = req.body;
 
     const userId = req.user.id;
@@ -92,6 +93,7 @@ router.post('/', async (req, res) => {
       browser: browser || 'unknown',
       cover_image: cover_image || null,
       extracted_images: extracted_images || null,
+      created_at: created_at || null,
       qdrant_point_id: null,
 
 

@@ -21,9 +21,14 @@ function ImportBookmarks({ onClose, onImportComplete }) {
     links.forEach(link => {
       const url = link.getAttribute('href')
       const title = link.textContent
+      const addDate = link.getAttribute('add_date') // Unix timestamp in seconds
 
       if (url && url.startsWith('http')) {
-        bookmarks.push({ url, title })
+        bookmarks.push({ 
+          url, 
+          title,
+          created_at: addDate ? new Date(parseInt(addDate) * 1000).toISOString() : new Date().toISOString()
+        })
       }
     })
 

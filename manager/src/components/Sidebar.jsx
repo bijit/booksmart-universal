@@ -82,84 +82,100 @@ function Sidebar() {
       </div>
 
 
-      {/* Tags */}
-      <div className="mb-6">
-        <div className="flex items-center justify-between mb-3">
+      {/* Tags Section */}
+      <div className="mb-8">
+        <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
-            <Tag className="w-4 h-4 text-light-text-secondary dark:text-dark-text-secondary" />
-            <h3 className="font-medium text-sm">Tags</h3>
+            <div className="p-1.5 bg-accent/10 rounded-lg">
+              <Tag className="w-4 h-4 text-accent" />
+            </div>
+            <h3 className="font-bold text-sm uppercase tracking-wider text-light-text-secondary dark:text-dark-text-secondary">Tags</h3>
           </div>
           {selectedTags.length > 0 && (
             <button
               onClick={clearTags}
-              className="text-xs text-accent dark:text-accent-dark hover:underline"
+              className="text-xs font-medium text-accent hover:text-accent-dark transition-colors px-2 py-1 bg-accent/5 rounded-md"
             >
-              Clear
+              Clear All
             </button>
           )}
         </div>
 
-        {allTags.length > 5 && (
-          <div className="mb-3">
-            <div className="relative mb-2">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3 h-3 text-light-text-secondary dark:text-dark-text-secondary" />
-              <input
-                type="text"
-                placeholder="Search tags (e.g. ai, web)..."
-                value={tagSearch}
-                onChange={(e) => setTagSearch(e.target.value)}
-                className="w-full pl-8 pr-3 py-1.5 text-xs bg-light-bg dark:bg-dark-bg border border-light-border dark:border-dark-border rounded-md focus:outline-none focus:ring-1 focus:ring-accent"
-              />
-              {tagSearch && (
-                <button 
-                  onClick={() => setTagSearch('')}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-light-text-secondary hover:text-accent"
-                >
-                  <X className="w-3 h-3" />
-                </button>
-              )}
-            </div>
-            
-            {tagSearch && filteredTags.length > 0 && (
+        {/* Selected Tags (Active Filters) */}
+        {selectedTags.length > 0 && (
+          <div className="mb-4 flex flex-wrap gap-2 animate-fadeIn">
+            {selectedTags.map(tag => (
               <button
-                onClick={handleSelectAllFiltered}
-                className="w-full flex items-center justify-center gap-1.5 py-1 px-2 text-[10px] font-medium uppercase tracking-wider text-accent border border-accent/20 rounded hover:bg-accent/5 transition-colors"
+                key={`active-${tag}`}
+                onClick={() => toggleTag(tag)}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-accent text-white text-xs font-semibold rounded-full shadow-sm hover:bg-accent-dark transition-all transform hover:scale-105"
               >
-                <Check className="w-3 h-3" />
-                Select All Matching
+                <span>{tag}</span>
+                <X className="w-3 h-3" />
               </button>
-            )}
+            ))}
           </div>
         )}
 
+        {/* Tag Search */}
+        <div className="relative mb-4 group">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-light-text-secondary group-focus-within:text-accent transition-colors" />
+          <input
+            type="text"
+            placeholder="Filter tags..."
+            value={tagSearch}
+            onChange={(e) => setTagSearch(e.target.value)}
+            className="w-full pl-9 pr-8 py-2 text-xs bg-light-bg/50 dark:bg-dark-bg/50 border border-light-border dark:border-dark-border rounded-xl focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent transition-all"
+          />
+          {tagSearch && (
+            <button 
+              onClick={() => setTagSearch('')}
+              className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-light-text-secondary hover:text-accent bg-light-bg dark:bg-dark-bg rounded-md shadow-sm"
+            >
+              <X className="w-3 h-3" />
+            </button>
+          )}
+        </div>
+
+        {/* Tag Selection Actions */}
+        {tagSearch && filteredTags.length > 0 && (
+          <button
+            onClick={handleSelectAllFiltered}
+            className="w-full mb-4 flex items-center justify-center gap-1.5 py-2 px-3 text-[10px] font-bold uppercase tracking-widest text-accent bg-accent/5 border border-accent/20 rounded-xl hover:bg-accent/10 transition-all active:scale-95"
+          >
+            <Check className="w-3.5 h-3.5" />
+            Select {filteredTags.length} Matching
+          </button>
+        )}
+
+        {/* Tags List (Pills) */}
         {allTags.length === 0 ? (
-          <p className="text-xs text-light-text-secondary dark:text-dark-text-secondary">
-            No tags yet
-          </p>
+          <div className="text-center py-4 px-2 border-2 border-dashed border-light-border dark:border-dark-border rounded-2xl">
+             <p className="text-xs text-light-text-secondary dark:text-dark-text-secondary">No tags yet</p>
+          </div>
         ) : filteredTags.length === 0 ? (
-          <p className="text-xs text-light-text-secondary dark:text-dark-text-secondary py-2 italic text-center">
-            No matching tags
+          <p className="text-xs text-light-text-secondary dark:text-dark-text-secondary py-4 italic text-center">
+            No matching tags found
           </p>
         ) : (
-          <div className="space-y-1 max-h-64 overflow-y-auto">
-            {filteredTags.map(tag => (
-              <button
-                key={tag}
-                onClick={() => toggleTag(tag)}
-                className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors ${
-                  selectedTags.includes(tag)
-                    ? 'bg-accent text-white'
-                    : 'hover:bg-light-bg dark:hover:bg-dark-bg'
-                }`}
-              >
-                <span className="truncate">{tag}</span>
-                <span className={`text-xs ml-2 ${
-                  selectedTags.includes(tag) ? 'text-white/80' : 'text-light-text-secondary dark:text-dark-text-secondary'
-                }`}>
-                  {tagCounts[tag]}
-                </span>
-              </button>
-            ))}
+          <div className="flex flex-wrap gap-2 max-h-80 overflow-y-auto pr-1 scrollbar-thin">
+            {filteredTags.map(tag => {
+              const isSelected = selectedTags.includes(tag);
+              if (isSelected) return null; // Don't show in the main list if already in "Active"
+              
+              return (
+                <button
+                  key={tag}
+                  onClick={() => toggleTag(tag)}
+                  className="group flex items-center gap-1.5 px-3 py-1.5 bg-light-bg dark:bg-dark-bg border border-light-border dark:border-dark-border rounded-full text-xs font-medium hover:border-accent hover:text-accent hover:shadow-sm transition-all active:scale-95"
+                >
+                  <span className="max-w-[120px] truncate">{tag}</span>
+                  <span className="px-1.5 py-0.5 bg-light-border dark:bg-dark-border text-[9px] rounded-full group-hover:bg-accent/10 group-hover:text-accent">
+                    {tagCounts[tag]}
+                  </span>
+                </button>
+              );
+            })}
           </div>
         )}
       </div>

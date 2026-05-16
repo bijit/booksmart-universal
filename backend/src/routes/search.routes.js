@@ -7,6 +7,7 @@
 import { Router } from 'express';
 import { requireAuth } from '../middleware/auth.js';
 import { semanticSearch, hybridSearch, searchByTags } from '../services/search.service.js';
+import { parseSearchIntent } from '../services/gemini.service.js';
 
 const router = Router();
 
@@ -30,11 +31,30 @@ router.post('/', async (req, res) => {
       });
     }
 
+    let effectiveQuery = query;
+    let effectiveTags = tags;
+    let effectiveStartDate = startDate;
+    let effectiveEndDate = endDate;
+
+    // AI Intent Parsing for natural language queries
+    if (query.split(' ').length > 3) {
+      try {
+        const intent = await parseSearchIntent(query);
+        effectiveQuery = intent.refinedQuery;
+        // Merge AI-extracted filters with existing ones (existing take precedence if provided)
+        effectiveTags = tags || intent.tags;
+        effectiveStartDate = startDate || intent.startDate;
+        effectiveEndDate = endDate || intent.endDate;
+      } catch (err) {
+        console.warn('[Search] Intent parsing failed, falling back to raw query:', err.message);
+      }
+    }
+
     const options = {
       limit: parseInt(limit) || 10,
-      tags: Array.isArray(tags) ? tags : null,
-      startDate: startDate || null,
-      endDate: endDate || null,
+      tags: Array.isArray(effectiveTags) ? effectiveTags : null,
+      startDate: effectiveStartDate || null,
+      endDate: effectiveEndDate || null,
       folderPath: folderPath || null,
       scoreThreshold: parseFloat(scoreThreshold) || 0.5  // Higher threshold to filter irrelevant results
     };
@@ -59,10 +79,10 @@ router.post('/', async (req, res) => {
     const type = searchType || 'hybrid';  // Default to hybrid
 
     if (type === 'semantic') {
-      const results = await semanticSearch(userId, query, options);
+      const results = await semanticSearch(userId, effectiveQuery, options);
       searchData = { results, answer: null };
     } else if (type === 'hybrid') {
-      searchData = await hybridSearch(userId, query, options);
+      searchData = await hybridSearch(userId, effectiveQuery, options);
     } else {
       return res.status(400).json({
         error: 'Bad Request',

@@ -54,7 +54,15 @@ export async function createBookmarkRecord(userId, bookmarkData) {
         updated_at: new Date().toISOString()
       }] : []),
       error_message: bookmarkData.error_message || null,
-      retry_count: bookmarkData.retry_count || 0
+      retry_count: bookmarkData.retry_count || 0,
+      author: bookmarkData.author || null,
+      site_name: bookmarkData.site_name || null,
+      favicon_url: bookmarkData.favicon || bookmarkData.favicon_url || null,
+      published_date: bookmarkData.published_date || null,
+      reading_time: bookmarkData.reading_time || null,
+      language: bookmarkData.language || null,
+      notes: bookmarkData.notes || null,
+      created_at: bookmarkData.created_at || new Date().toISOString()
     };
 
     // Only include image fields if they have actual values
@@ -101,7 +109,8 @@ export async function createBookmarkRecordsBatch(userId, bookmarksData) {
           folder_path: bookmark.folder_path || null,
           updated_at: new Date().toISOString()
         }] : []),
-        retry_count: 0
+        retry_count: 0,
+        created_at: bookmark.created_at || new Date().toISOString()
       };
       if (bookmark.cover_image) rec.cover_image = bookmark.cover_image;
       if (bookmark.extracted_images && bookmark.extracted_images.length > 0) rec.extracted_images = bookmark.extracted_images;

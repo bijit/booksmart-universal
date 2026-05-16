@@ -115,6 +115,10 @@
             <path d="M21 21L16.65 16.65" stroke="#6B7280" stroke-width="2" stroke-linecap="round" />
           </svg>
           <input type="text" id="searchInput" placeholder="Search your library..." autocomplete="off">
+          <div id="deepSearchIndicator" class="deep-search-indicator hidden">
+            <div class="dot-pulse"></div>
+            <span>Deep Search</span>
+          </div>
           <button id="clearSearchBtn" class="clear-search-btn hidden" title="Clear search">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path d="M18 6L6 18M6 6L18 18" stroke="#6B7280" stroke-width="2" stroke-linecap="round" />
@@ -133,8 +137,7 @@
           <div class="section-title">Current Page</div>
           <div id="currentPageCard" class="current-page-card">
             <div class="current-page-info">
-              <img id="currentPageFavicon" src="" alt="" class="current-page-favicon"
-                onerror="this.style.display='none'">
+              <img id="currentPageFavicon" src="" alt="" class="current-page-favicon">
               <div class="current-page-text">
                 <div id="currentPageTitle" class="current-page-title">Loading...</div>
                 <div id="currentPageUrl" class="current-page-url">...</div>

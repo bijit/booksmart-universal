@@ -4,12 +4,13 @@ import { formatDistanceToNow } from 'date-fns'
 import useBookmarkStore from '../store/useBookmarkStore'
 import EditBookmarkModal from './EditBookmarkModal'
 
-function BookmarkCard({ bookmark }) {
+function BookmarkCard({ bookmark, layoutMode = 'gallery' }) {
   const [isDeleting, setIsDeleting] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
   const [isSummarizing, setIsSummarizing] = useState(false)
   const [showSummary, setShowSummary] = useState(false)
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false)
+  const [showAllImages, setShowAllImages] = useState(false)
   const { deleteBookmark, toggleTag, generateSummary } = useBookmarkStore()
 
   const handleDelete = async () => {
@@ -78,11 +79,15 @@ function BookmarkCard({ bookmark }) {
     }`}>
       {/* Cover Image */}
       {bookmark.cover_image && (
-        <div className="w-full h-48 overflow-hidden rounded-t-lg bg-gray-100 dark:bg-gray-800 border-b border-light-border dark:border-dark-border">
+        <div className={`w-full overflow-hidden rounded-t-lg bg-gray-100 dark:bg-gray-800 border-b border-light-border dark:border-dark-border ${
+          layoutMode === 'pinterest' ? 'min-h-[120px]' : 'h-48'
+        }`}>
           <img 
             src={bookmark.cover_image} 
             alt={bookmark.title || 'Cover image'} 
-            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+            className={`w-full object-cover transition-transform duration-300 group-hover:scale-105 ${
+              layoutMode === 'pinterest' ? 'h-auto' : 'h-full'
+            }`}
             onError={(e) => {
               e.target.style.display = 'none';
               e.target.parentElement.style.display = 'none';
@@ -110,9 +115,18 @@ function BookmarkCard({ bookmark }) {
                 <ExternalLink className="w-3 h-3" />
               </div>
             )}
-            <h3 className="text-lg font-semibold line-clamp-2 flex-1 min-w-0">
-              {bookmark.title || 'Untitled'}
-            </h3>
+            <div className="flex-1 min-w-0">
+              <h3 className="text-lg font-semibold line-clamp-2">
+                {bookmark.title || 'Untitled'}
+              </h3>
+              {(bookmark.author || bookmark.site_name) && (
+                <div className="flex items-center gap-2 mt-1 text-xs text-light-text-secondary dark:text-dark-text-secondary">
+                  {bookmark.author && <span className="truncate">By {bookmark.author}</span>}
+                  {bookmark.author && bookmark.site_name && <span>•</span>}
+                  {bookmark.site_name && <span className="truncate">{bookmark.site_name}</span>}
+                </div>
+              )}
+            </div>
           </div>
           <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
             <a
@@ -182,24 +196,56 @@ function BookmarkCard({ bookmark }) {
           </div>
         )}
 
+        {/* Notes Section */}
+        {bookmark.notes && (
+          <div className="mt-4 p-3 bg-yellow-50/50 dark:bg-yellow-900/10 border border-yellow-200/50 dark:border-yellow-800/30 rounded-lg">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-yellow-700/70 dark:text-yellow-500/70 mb-1 flex items-center gap-1">
+              <Edit2 className="w-2.5 h-2.5" />
+              My Notes
+            </p>
+            <p className="text-sm text-light-text dark:text-dark-text whitespace-pre-wrap line-clamp-4">
+              {bookmark.notes}
+            </p>
+          </div>
+        )}
+
         {/* Extracted Images Gallery Indicator */}
         {bookmark.extracted_images && bookmark.extracted_images.length > 0 && (
-          <div className="mt-4 flex flex-wrap gap-2">
-            {bookmark.extracted_images.slice(0, 4).map((imgUrl, idx) => (
-              <div key={idx} className="w-12 h-12 rounded overflow-hidden border border-light-border dark:border-dark-border opacity-80 hover:opacity-100 transition-opacity">
-                <img 
-                  src={imgUrl} 
-                  alt={`Extracted visual ${idx+1}`} 
-                  className="w-full h-full object-cover"
-                  onError={(e) => e.target.parentElement.style.display = 'none'}
-                />
-              </div>
-            ))}
-            {bookmark.extracted_images.length > 4 && (
-              <div className="w-12 h-12 rounded bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-xs font-medium text-gray-500 border border-light-border dark:border-dark-border">
-                +{bookmark.extracted_images.length - 4}
-              </div>
-            )}
+          <div className="mt-4">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-light-text-secondary dark:text-dark-text-secondary mb-2">Visual Content</p>
+            <div className="flex flex-wrap gap-2">
+              {bookmark.extracted_images.slice(0, showAllImages ? undefined : 4).map((imgUrl, idx) => (
+                <div 
+                  key={idx} 
+                  className="group/img w-14 h-14 rounded-lg overflow-hidden border border-light-border dark:border-dark-border bg-gray-50 dark:bg-gray-900 cursor-zoom-in relative"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    window.open(imgUrl, '_blank');
+                  }}
+                >
+                  <img 
+                    src={imgUrl} 
+                    alt={`Extracted visual ${idx+1}`} 
+                    className="w-full h-full object-cover transition-transform duration-300 group-hover/img:scale-110"
+                    onError={(e) => e.target.parentElement.style.display = 'none'}
+                  />
+                  <div className="absolute inset-0 bg-black/0 group-hover/img:bg-black/10 transition-colors" />
+                </div>
+              ))}
+              {bookmark.extracted_images.length > 4 && !showAllImages && (
+                <button 
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setShowAllImages(true);
+                  }}
+                  className="w-14 h-14 rounded-lg bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-xs font-bold text-accent dark:text-accent-dark border border-accent/20 hover:bg-accent/5 transition-colors"
+                >
+                  +{bookmark.extracted_images.length - 4}
+                </button>
+              )}
+            </div>
           </div>
         )}
 
@@ -282,6 +328,12 @@ function BookmarkCard({ bookmark }) {
               <div className="flex items-center gap-1" title={new Date(bookmark.published_date).toLocaleString()}>
                 <Calendar className="w-3 h-3" />
                 <span>{new Date(bookmark.published_date).toLocaleDateString()}</span>
+              </div>
+            )}
+            {bookmark.reading_time && (
+              <div className="flex items-center gap-1" title="Estimated reading time">
+                <Clock className="w-3 h-3" />
+                <span>{bookmark.reading_time} min read</span>
               </div>
             )}
             {bookmark.score && (

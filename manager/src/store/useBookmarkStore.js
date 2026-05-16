@@ -2,10 +2,15 @@ import { create } from 'zustand'
 import { API_BASE_URL } from '../config'
 import { isAuthError, handleAuthError } from '../utils/auth'
 
-const useBookmarkStore = create((set, get) => ({
+const useBookmarkStore = create((set, get) => {
+  let searchTimeout = null;
+
+  return {
   // Bookmarks data
   bookmarks: [],
+  cachedBookmarks: [], // Cache of non-search results for instant filtering
   loading: false,
+  isDeepSearching: false, // API search in progress
   error: null,
   aiAnswer: null,
   allFolders: [], // Full unique list of folder paths
@@ -39,22 +44,59 @@ const useBookmarkStore = create((set, get) => ({
 
   // Search
   setSearchQuery: async (query) => {
+    const state = get()
+    const trimmedQuery = query.trim()
     set({ searchQuery: query })
 
-    // If there's a search query, use semantic search API
-    if (query.trim()) {
-      const store = get()
-      await store.performSearch(query)
+    // If there's a search query, perform Instant Local Search first
+    if (trimmedQuery) {
+      // 1. Perform local keyword match on currently loaded bookmarks
+      // Use cachedBookmarks if we were already searching, or the current bookmarks if we just started
+      const sourceList = state.cachedBookmarks.length > 0 ? state.cachedBookmarks : state.bookmarks
+      
+      // If this is the first search character, save current bookmarks to cache
+      if (state.cachedBookmarks.length === 0) {
+        set({ cachedBookmarks: [...state.bookmarks] })
+      }
+
+      const queryLower = trimmedQuery.toLowerCase()
+      const localMatches = sourceList.filter(b => 
+        (b.title || '').toLowerCase().includes(queryLower) ||
+        (b.description || '').toLowerCase().includes(queryLower) ||
+        (b.notes || '').toLowerCase().includes(queryLower) ||
+        (b.site_name || '').toLowerCase().includes(queryLower) ||
+        (b.author || '').toLowerCase().includes(queryLower) ||
+        (b.tags || []).some(t => t.toLowerCase().includes(queryLower))
+      )
+
+      // Show local results immediately
+      set({ bookmarks: localMatches, totalBookmarks: localMatches.length })
+
+      // 2. Trigger Deep Semantic Search (Debounced)
+      if (searchTimeout) clearTimeout(searchTimeout)
+      searchTimeout = setTimeout(async () => {
+        await get().performSearch(trimmedQuery)
+      }, 600) // 600ms debounce
     } else {
-      // If search is cleared, reload all bookmarks
-      const store = get()
-      await store.fetchBookmarks()
+      // If search is cleared, cancel pending search and restore from cache
+      if (searchTimeout) clearTimeout(searchTimeout)
+      
+      if (state.cachedBookmarks.length > 0) {
+        set({ 
+          bookmarks: state.cachedBookmarks, 
+          cachedBookmarks: [], 
+          isDeepSearching: false,
+          aiAnswer: null
+        })
+      } else {
+        await state.fetchBookmarks()
+      }
     }
   },
 
   // Perform semantic search using the API
   performSearch: async (query) => {
-    set({ loading: true, error: null, aiAnswer: null })
+    set({ isDeepSearching: true, error: null, aiAnswer: null })
 
     try {
       const { selectedTags, dateRange, selectedFolder } = get()
@@ -91,7 +133,7 @@ const useBookmarkStore = create((set, get) => ({
       set({
         bookmarks: results,
         aiAnswer: aiAnswer,
-        loading: false,
+        isDeepSearching: false,
         error: null,
         currentPage: 1,
         totalPages: 0, // 0 indicates search mode (pagination hidden)
@@ -103,7 +145,7 @@ const useBookmarkStore = create((set, get) => ({
         handleAuthError()
         return
       }
-      set({ error: error.message, loading: false })
+      set({ error: error.message, isDeepSearching: false })
     }
   },
 
@@ -114,18 +156,6 @@ const useBookmarkStore = create((set, get) => ({
       ? state.selectedTags.filter(t => t !== tag)
       : [...state.selectedTags, tag]
     set({ selectedTags })
-    
-    // Refetch with new filter (respect search if active)
-    if (state.searchQuery.trim()) {
-      await state.performSearch(state.searchQuery)
-    } else {
-      await state.fetchBookmarks()
-    }
-  },
-
-  setSelectedTags: async (tags) => {
-    const state = get()
-    set({ selectedTags: tags })
     
     // Refetch with new filter (respect search if active)
     if (state.searchQuery.trim()) {
@@ -244,13 +274,90 @@ const useBookmarkStore = create((set, get) => ({
 
   // Fetch bookmarks from API (page 1 by default)
   fetchBookmarks: async (page = 1) => {
-    const { pageSize, selectedTags, dateRange, selectedFolder } = get()
-    set({ loading: true, error: null, currentPage: page })
+    const { pageSize, selectedTags, dateRange, selectedFolder, searchQuery } = get()
+    
+    // If search is active, do not fetch standard bookmarks
+    if (searchQuery.trim()) return;
 
+    set({ loading: true, error: null, currentPage: page })
 
     try {
       const token = localStorage.getItem('authToken')
 
+      // SPECIAL CASE: If tags or folder filter is active, fetch entire set via search API
+      if (selectedTags.length > 0 || selectedFolder) {
+        let endpoint = `${API_BASE_URL}/search/tags?limit=10000`;
+        if (selectedTags.length > 0) {
+           endpoint += `&tags=${selectedTags.join(',')}`;
+        }
+        if (selectedFolder) {
+           // We might need to add folderPath to the search/tags endpoint, or use POST /api/search with empty query
+           // Since GET /api/search/tags doesn't currently accept folder_path, we will use POST /api/search
+           const response = await fetch(`${API_BASE_URL}/search`, {
+             method: 'POST',
+             headers: {
+               'Content-Type': 'application/json',
+               'Authorization': `Bearer ${token}`
+             },
+             body: JSON.stringify({
+               query: " ", // Empty query for pure filter
+               limit: 5000,
+               searchType: 'semantic', // Fallback to semantic which just delegates to Qdrant filters if query is weak
+               tags: selectedTags.length > 0 ? selectedTags : null,
+               folderPath: selectedFolder
+             })
+           });
+
+           if (!response.ok) throw new Error('Failed to fetch filtered bookmarks');
+           const data = await response.json();
+           
+           // De-duplicate results by ID as a safety measure
+           const rawResults = data.results || [];
+           const uniqueResults = [];
+           const seenIds = new Set();
+           for (const item of rawResults) {
+             if (!seenIds.has(item.id)) {
+               seenIds.add(item.id);
+               uniqueResults.push(item);
+             }
+           }
+           
+           set({
+             bookmarks: uniqueResults,
+             totalBookmarks: uniqueResults.length,
+             totalPages: 1, // Single massive page
+             loading: false
+           });
+           return;
+        } else {
+           // Just tags, use the GET endpoint
+           const response = await fetch(endpoint, {
+             headers: { 'Authorization': `Bearer ${token}` }
+           });
+           if (!response.ok) throw new Error('Failed to fetch filtered bookmarks');
+           const data = await response.json();
+           
+           const rawResults = data.results || [];
+           const uniqueResults = [];
+           const seenIds = new Set();
+           for (const item of rawResults) {
+             if (!seenIds.has(item.id)) {
+               seenIds.add(item.id);
+               uniqueResults.push(item);
+             }
+           }
+           
+           set({
+             bookmarks: uniqueResults,
+             totalBookmarks: uniqueResults.length,
+             totalPages: 1, // Single massive page
+             loading: false
+           });
+           return;
+        }
+      }
+
+      // STANDARD FETCH (No tags/folders)
       // Calculate offset from page number
       const offset = (page - 1) * pageSize
 
@@ -260,11 +367,6 @@ const useBookmarkStore = create((set, get) => ({
         limit: pageSize,
         offset: offset
       })
-
-      // Add tag filtering
-      if (selectedTags.length > 0) {
-        params.append('tags', selectedTags.join(','))
-      }
 
       // Add date range filtering
       if (dateRange.start) {
@@ -315,6 +417,25 @@ const useBookmarkStore = create((set, get) => ({
         return
       }
       set({ error: error.message, loading: false })
+    }
+  },
+
+  // Fetch unique folder paths
+  fetchFolders: async () => {
+    try {
+      const token = localStorage.getItem('authToken')
+      const response = await fetch(`${API_BASE_URL}/bookmarks/folders`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        set({ allFolders: data.folders || [] })
+      }
+    } catch (error) {
+      console.error('Error fetching folders:', error)
     }
   },
 
@@ -516,6 +637,6 @@ const useBookmarkStore = create((set, get) => ({
       set({ loading: false })
     }
   }
-}))
+}})
 
 export default useBookmarkStore

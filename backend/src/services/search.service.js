@@ -223,7 +223,7 @@ export async function hybridSearch(userId, query, options = {}) {
     const scoredResults = resultsWithBM25.map(result => {
       const semanticScore = result.score; // Vector similarity score (0-1)
       const bm25Score = result.bm25_score || 0;
-      const textMatchScore = enhancedTextMatch(query, result.title, result.description);
+      const textMatchScore = enhancedTextMatch(query, result);
 
       // HYBRID FORMULA:
       // - 70% Semantic (Vector)
@@ -292,13 +292,23 @@ export async function searchByTags(userId, tags, options = {}) {
 
     const { getBookmarksByUser } = await import('./qdrant.service.js');
     const results = await getBookmarksByUser(userId, {
-      limit,
+      limit: 1000, // Get more raw points to account for chunks
       tags
     });
 
-    console.log(`[Search] Found ${results.length} results for tags`);
+    // De-duplicate by bookmark_id since multiple chunks may have the same tags
+    const bookmarkMap = new Map();
+    for (const item of results) {
+      const id = item.bookmark_id || item.id;
+      if (!bookmarkMap.has(id)) {
+        bookmarkMap.set(id, item);
+      }
+    }
 
-    return results;
+    const uniqueResults = Array.from(bookmarkMap.values()).slice(0, limit);
+    console.log(`[Search] Found ${uniqueResults.length} unique results for tags (from ${results.length} raw points)`);
+
+    return uniqueResults;
 
   } catch (error) {
     console.error('[Search] Tag search failed:', error);

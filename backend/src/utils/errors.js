@@ -38,3 +38,38 @@ export function isQuotaError(error) {
 
   return quotaKeywords.some(keyword => errorMessage.includes(keyword));
 }
+
+/**
+ * Retry a function with exponential backoff
+ * 
+ * @param {Function} fn - The async function to retry
+ * @param {Object} options - Retry options
+ * @param {number} options.maxRetries - Maximum number of retries
+ * @param {number} options.initialDelay - Initial delay in ms
+ * @returns {Promise<any>} Result of the function
+ */
+export async function withRetry(fn, { maxRetries = 3, initialDelay = 1000 } = {}) {
+  let lastError;
+  let delay = initialDelay;
+
+  for (let i = 0; i <= maxRetries; i++) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error;
+      
+      // Don't retry if it's not a quota error or if we're at max retries
+      if (!isQuotaError(error) || i === maxRetries) {
+        throw error;
+      }
+
+      console.warn(`[Retry] Attempt ${i + 1} failed. Retrying in ${delay}ms...`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+      
+      // Exponential backoff
+      delay *= 2;
+    }
+  }
+
+  throw lastError;
+}

@@ -5,6 +5,7 @@ import useBookmarkStore from '../store/useBookmarkStore'
 function EditBookmarkModal({ bookmark, onClose }) {
   const [title, setTitle] = useState(bookmark.title || '')
   const [tags, setTags] = useState(bookmark.tags ? bookmark.tags.join(', ') : '')
+  const [notes, setNotes] = useState(bookmark.notes || '')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
   const { updateBookmark } = useBookmarkStore()
@@ -22,7 +23,8 @@ function EditBookmarkModal({ bookmark, onClose }) {
 
       await updateBookmark(bookmark.id, {
         title,
-        tags: tagArray
+        tags: tagArray,
+        notes: notes
       })
       onClose()
     } catch (err) {
@@ -33,7 +35,7 @@ function EditBookmarkModal({ bookmark, onClose }) {
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-light-card dark:bg-dark-card rounded-lg shadow-xl p-6 max-w-lg w-full mx-4">
+      <div className="bg-light-card dark:bg-dark-card rounded-lg shadow-xl p-6 max-w-lg w-full mx-4 overflow-y-auto max-h-[90vh]">
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-xl font-semibold">Edit Bookmark</h2>
           <button
@@ -77,6 +79,40 @@ function EditBookmarkModal({ bookmark, onClose }) {
               />
             </div>
           </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1 text-light-text-secondary dark:text-dark-text-secondary">
+              Personal Notes
+            </label>
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              className="input w-full h-32 py-2"
+              placeholder="Add your own thoughts, summary, or reminders..."
+            />
+          </div>
+
+          {/* Metadata Display (Read-only for context) */}
+          {(bookmark.author || bookmark.site_name) && (
+            <div className="pt-2 border-t border-light-border dark:border-dark-border grid grid-cols-2 gap-4">
+              {bookmark.author && (
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-light-text-secondary dark:text-dark-text-secondary mb-1">
+                    Author
+                  </label>
+                  <p className="text-sm truncate">{bookmark.author}</p>
+                </div>
+              )}
+              {bookmark.site_name && (
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-light-text-secondary dark:text-dark-text-secondary mb-1">
+                    Website
+                  </label>
+                  <p className="text-sm truncate">{bookmark.site_name}</p>
+                </div>
+              )}
+            </div>
+          )}
 
           {error && (
             <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3 text-sm text-red-700 dark:text-red-300">

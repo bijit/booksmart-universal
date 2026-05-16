@@ -84,6 +84,9 @@ router.post('/batch', async (req, res) => {
         toCreate.push({
           url: bookmark.url,
           title: bookmark.title || null,
+          created_at: bookmark.created_at || null,
+          folder_path: bookmark.folder_path || null,
+          folder_id: bookmark.folder_id || null,
           processing_status: 'pending'
         });
       }

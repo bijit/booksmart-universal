@@ -98,6 +98,14 @@ function App() {
                 <Navigate to="/login" replace />
             }
           />
+          <Route
+            path="/dashboard"
+            element={<Navigate to="/" replace />}
+          />
+          <Route
+            path="*"
+            element={<Navigate to="/" replace />}
+          />
         </Routes>
       </div>
     </Router>

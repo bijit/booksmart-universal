@@ -8,6 +8,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import { config } from 'dotenv';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import { withRetry } from '../utils/errors.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -116,32 +117,34 @@ Respond in JSON format:
  * @returns {Promise<number[]>} 768-dimensional embedding vector
  */
 export async function generateEmbedding(text) {
-  try {
-    if (!genAI) {
-      throw new Error('Gemini AI is not initialized. Check your GOOGLE_AI_API_KEY.');
+  return withRetry(async () => {
+    try {
+      if (!genAI) {
+        throw new Error('Gemini AI is not initialized. Check your GOOGLE_AI_API_KEY.');
+      }
+
+      // Using the stable and available gemini-embedding-001 model
+      const model = genAI.getGenerativeModel({ model: 'models/gemini-embedding-001' });
+
+      const result = await model.embedContent({
+        content: { parts: [{ text: text.substring(0, 10000) }] },
+        taskType: 'RETRIEVAL_QUERY',
+        outputDimensionality: 3072
+      });
+
+      if (!result.embedding || !result.embedding.values) {
+        throw new Error('Invalid embedding response from Gemini');
+      }
+
+      const vector = result.embedding.values;
+      console.log(`[Embeddings] Successfully generated ${vector.length}D vector`);
+      return vector;
+
+    } catch (error) {
+      console.error('[Embeddings] Error generating embedding:', error.message);
+      throw error; // Rethrow for withRetry
     }
-
-    // Using the stable and available gemini-embedding-001 model
-    const model = genAI.getGenerativeModel({ model: 'models/gemini-embedding-001' });
-
-    const result = await model.embedContent({
-      content: { parts: [{ text: text.substring(0, 10000) }] },
-      taskType: 'RETRIEVAL_QUERY',
-      outputDimensionality: 3072
-    });
-
-    if (!result.embedding || !result.embedding.values) {
-      throw new Error('Invalid embedding response from Gemini');
-    }
-
-    const vector = result.embedding.values;
-    console.log(`[Embeddings] Successfully generated ${vector.length}D vector`);
-    return vector;
-
-  } catch (error) {
-    console.error('[Embeddings] Error generating embedding:', error.message);
-    throw new Error(`Embedding generation failed: ${error.message}`);
-  }
+  }, { maxRetries: 3, initialDelay: 2000 });
 }
 
 // Helper to ensure database compatibility
@@ -269,9 +272,14 @@ export async function generateBatchEmbeddings(texts) {
 
     const model = genAI.getGenerativeModel({ model: 'models/gemini-embedding-001' });
 
-    // Process all chunks in parallel for maximum speed
-    const embeddings = await Promise.all(
-      texts.map(async (text) => {
+    console.log(`[Embeddings] Generating batch embeddings for ${texts.length} chunks...`);
+    
+    // Process chunks with retries and a small delay between them to avoid 429s
+    // Sequential processing is safer for Free tier RPM limits
+    const embeddings = [];
+    for (let i = 0; i < texts.length; i++) {
+      const text = texts[i];
+      const embedding = await withRetry(async () => {
         const truncatedText = text.substring(0, 10000);
         const result = await model.embedContent({
           content: { parts: [{ text: truncatedText }] },
@@ -284,8 +292,15 @@ export async function generateBatchEmbeddings(texts) {
         }
 
         return result.embedding.values;
-      })
-    );
+      }, { maxRetries: 3, initialDelay: 2000 });
+      
+      embeddings.push(embedding);
+      
+      // Small artificial delay if there are many chunks left
+      if (texts.length > 5 && i < texts.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+    }
 
     console.log(`[Embeddings] Successfully generated ${embeddings.length} vectors`);
     return embeddings;
@@ -662,5 +677,69 @@ Respond with ONLY the search query string. No quotes, no explanations, no prefix
   } catch (error) {
     console.error('[Gemini] Error generating web search query:', error.message);
     return originalQuery; // Fallback to original query
+  }
+}
+
+/**
+ * Parse a natural language search query into structured filters
+ * 
+ * @param {string} query - The user's natural language query
+ * @returns {Promise<Object>} Refined query and metadata filters
+ */
+export async function parseSearchIntent(query) {
+  try {
+    if (!genAI) return { refinedQuery: query };
+
+    console.log(`[Gemini] Parsing search intent for: "${query}"`);
+
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+    const now = new Date();
+    const dateContext = `Current date: ${now.toISOString()}. 
+    Relative date hints: 
+    - "last summer" means June-August of the previous year (if currently before June) or current year (if after August).
+    - "this year" means ${now.getFullYear()}-01-01 to now.
+    - "last month" means the previous calendar month.`;
+
+    const prompt = `You are a search intent analyzer for "BookSmart".
+    Your task is to convert a natural language search request into a structured JSON object for a database query.
+    
+    ${dateContext}
+    
+    Query: "${query}"
+    
+    Respond with a JSON object containing:
+    1. "refinedQuery": A keyword-optimized version of the query (remove stop words, remove time references).
+    2. "startDate": ISO 8601 date string (null if not specified).
+    3. "endDate": ISO 8601 date string (null if not specified).
+    4. "tags": Array of specific tags mentioned in the query (null if not specified).
+    
+    Example: "Find my bookmarks about job-postings in Riverside last summer"
+    Response: {
+      "refinedQuery": "job-postings Riverside",
+      "startDate": "2025-06-01T00:00:00Z",
+      "endDate": "2025-08-31T23:59:59Z",
+      "tags": null
+    }
+    
+    Return ONLY the JSON block.`;
+
+    const result = await model.generateContent(prompt);
+    const text = (await result.response).text();
+
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) return { refinedQuery: query };
+
+    const parsed = JSON.parse(jsonMatch[0]);
+    console.log(`[Gemini] Parsed intent:`, parsed);
+    
+    return {
+      refinedQuery: parsed.refinedQuery || query,
+      startDate: parsed.startDate || null,
+      endDate: parsed.endDate || null,
+      tags: parsed.tags || null
+    };
+  } catch (error) {
+    console.error('[Gemini] Error parsing search intent:', error.message);
+    return { refinedQuery: query };
   }
 }

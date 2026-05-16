@@ -39,7 +39,7 @@ let quotaBackoffUntil = null;
 /**
  * Process bookmark using metadata-only (fallback when content extraction fails)
  */
-async function processMetadataOnly(id, url, title, user_id) {
+async function processMetadataOnly(id, url, title, user_id, created_at) {
   try {
     console.log(`[Worker] Processing ${id} with metadata-only mode...`);
 
@@ -61,7 +61,8 @@ async function processMetadataOnly(id, url, title, user_id) {
       content: `Metadata-only bookmark. URL: ${url}`, // Minimal content
       embedding: embedding,
       tags: summary.tags || [],
-      favicon_url: getFaviconUrl(url)
+      favicon_url: getFaviconUrl(url),
+      created_at: created_at
     });
 
     // Step 4: Update Supabase with completion
@@ -109,7 +110,7 @@ function getFaviconUrl(url) {
  * @returns {Promise<boolean>} True if successful, false if failed
  */
 async function processBookmark(bookmark) {
-  const { id, url, title, user_id, retry_count, extracted_content, extraction_method } = bookmark;
+  const { id, url, title, user_id, retry_count, extracted_content, extraction_method, created_at } = bookmark;
 
   console.log(`\n[Worker] Processing bookmark ${id}: ${url}`);
 
@@ -158,7 +159,8 @@ async function processBookmark(bookmark) {
         content: extracted.content,
         tags: aiResult.tags || [],
         chunks: aiResult.chunks,
-        favicon_url: extracted.favicon || null
+        favicon_url: extracted.favicon || null,
+        created_at: created_at
       });
 
       console.log(`[Worker] Created ${qdrantPointIds.length} chunk points in Qdrant`);
@@ -176,7 +178,8 @@ async function processBookmark(bookmark) {
         content: extracted.content,
         embedding: aiResult.embedding,
         tags: aiResult.tags || [],
-        favicon_url: extracted.favicon || null
+        favicon_url: extracted.favicon || null,
+        created_at: created_at
       });
 
       qdrantPointIds = [qdrantPointId];
@@ -191,6 +194,14 @@ async function processBookmark(bookmark) {
       qdrant_point_id: qdrantPointIds[0], // Store first chunk ID for legacy compatibility
       processing_status: 'completed',
       extraction_method: hasValidExtractedContent ? extraction_method : 'readability',
+      cover_image: extracted.cover_image || null,
+      extracted_images: extracted.extracted_images || [],
+      author: extracted.author || null,
+      site_name: extracted.site_name || null,
+      favicon_url: extracted.favicon || null,
+      published_date: extracted.published_date || null,
+      reading_time: extracted.reading_time || null,
+      language: extracted.language || null,
       error_message: null
     });
 
@@ -253,7 +264,7 @@ async function processBookmark(bookmark) {
       // Max retries exceeded, try metadata-only fallback
       console.log(`[Worker] ⚠️  Max retries exceeded for ${id}, trying metadata-only fallback...`);
       try {
-        const fallbackSuccess = await processMetadataOnly(id, url, title, user_id);
+        const fallbackSuccess = await processMetadataOnly(id, url, title, user_id, created_at);
         return fallbackSuccess;
       } catch (fallbackError) {
         // Check if fallback also hit quota

@@ -1223,4 +1223,4 @@
   }
 });
 //# sourceMappingURL=browser-polyfill.js.map
-export default globalThis.browser;
+// End of polyfill

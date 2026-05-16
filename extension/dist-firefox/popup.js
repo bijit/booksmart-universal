@@ -28,6 +28,9 @@ const importFromEmptyBtn = document.getElementById('importFromEmptyBtn');
 const logoutBtn = document.getElementById('logoutBtnTop');
 const syncFoldersBtn = document.getElementById('syncFoldersBtn');
 const resultsTitle = document.getElementById('resultsTitle');
+const deepSearchIndicator = document.getElementById('deepSearchIndicator');
+
+let allRecentBookmarks = []; // Cache for instant local search
 
 const aiOverviewSection = document.getElementById('aiOverviewSection');
 const aiAnswer = document.getElementById('aiAnswer');
@@ -52,6 +55,11 @@ let selectedFilterTags = [];
 // Initialize popup
 document.addEventListener('DOMContentLoaded', async () => {
   console.log('BookSmart popup loaded');
+
+  // Handle favicon loading errors securely without inline onerror attributes
+  currentPageFavicon.addEventListener('error', function() {
+    this.style.display = 'none';
+  });
 
   const authData = await getAuthData();
   const authenticated = !!(authData[STORAGE_KEYS.AUTH_TOKEN] && authData[STORAGE_KEYS.USER]);
@@ -89,12 +97,17 @@ function setupEventListeners() {
       clearSearchBtn.classList.remove('hidden');
     } else {
       clearSearchBtn.classList.add('hidden');
+      deepSearchIndicator.classList.add('hidden');
     }
 
+    // 1. Instant Local Search
+    handleLocalSearch(value);
+
+    // 2. Debounced Deep Search
     clearTimeout(searchTimeout);
     searchTimeout = setTimeout(() => {
-      handleSearch(value);
-    }, 300);
+      handleDeepSearch(value);
+    }, 600);
   });
 
   clearSearchBtn.addEventListener('click', () => {
@@ -178,7 +191,8 @@ async function loadRecentBookmarks() {
     }
     
     const data = await bookmarks.list(params);
-    displayBookmarks(data.bookmarks || []);
+    allRecentBookmarks = data.bookmarks || [];
+    displayBookmarks(allRecentBookmarks);
     
     // Update tag filter row if not currently filtering (to show available tags)
     if (selectedFilterTags.length === 0) {
@@ -196,18 +210,37 @@ async function loadRecentBookmarks() {
   }
 }
 
-async function handleSearch(query) {
-  if (!query.trim()) {
-    loadRecentBookmarks();
+// Instant Local Search
+function handleLocalSearch(query) {
+  const trimmedQuery = query.trim().toLowerCase();
+  if (!trimmedQuery) {
+    displayBookmarks(allRecentBookmarks);
     return;
   }
 
-  showLoading();
+  const matches = allRecentBookmarks.filter(b => 
+    (b.title || '').toLowerCase().includes(trimmedQuery) ||
+    (b.description || '').toLowerCase().includes(trimmedQuery) ||
+    (b.notes || '').toLowerCase().includes(trimmedQuery) ||
+    (b.site_name || '').toLowerCase().includes(trimmedQuery) ||
+    (b.author || '').toLowerCase().includes(trimmedQuery) ||
+    (b.tags || []).some(t => t.toLowerCase().includes(trimmedQuery))
+  );
+
   resultsTitle.classList.remove('hidden');
   currentPageSection.classList.add('hidden');
+  displayBookmarks(matches, true);
+}
+
+// Deep Semantic Search
+async function handleDeepSearch(query) {
+  const trimmedQuery = query.trim();
+  if (!trimmedQuery) return;
+
+  deepSearchIndicator.classList.remove('hidden');
 
   try {
-    const options = { query };
+    const options = { query: trimmedQuery };
     if (selectedFilterTags.length > 0) {
       options.tags = selectedFilterTags;
     }
@@ -224,12 +257,12 @@ async function handleSearch(query) {
 
     displayBookmarks(data.results || [], true);
   } catch (error) {
-    console.error('Search error:', error);
+    console.error('Deep search error:', error);
     if (error.status === 401) {
       await handleLogout();
-    } else {
-      showError('Search failed');
     }
+  } finally {
+    deepSearchIndicator.classList.add('hidden');
   }
 }
 
@@ -358,20 +391,65 @@ function createBookmarkCard(bookmark) {
     `<span class="bookmark-tag">${escapeHtml(tag)}</span>`
   ).join('') || '';
 
+  const siteName = bookmark.site_name || domain;
+  const author = bookmark.author || '';
+  const notes = bookmark.notes || '';
+
   card.innerHTML = `
     <div class="bookmark-favicon">
-      <img src="https://www.google.com/s2/favicons?domain=${domain}&sz=32" alt="" onerror="this.style.display='none'">
+      <img src="${bookmark.favicon_url || `https://www.google.com/s2/favicons?domain=${domain}&sz=32`}" alt="" class="card-favicon">
     </div>
     <div class="bookmark-content">
       <div class="bookmark-title">${escapeHtml(bookmark.title || bookmark.url)}</div>
-      <div class="bookmark-url">${domain}</div>
+      <div class="bookmark-url">
+        <span class="bookmark-site">${escapeHtml(siteName)}</span>
+        ${author ? `<span class="bookmark-author">${escapeHtml(author)}</span>` : ''}
+      </div>
       ${tags ? `<div class="bookmark-tags">${tags}</div>` : ''}
       <div class="bookmark-meta">
         <span class="bookmark-time">${timeAgo}</span>
         ${statusText ? `<span class="bookmark-status ${status}">${statusText}</span>` : ''}
       </div>
+      <div class="bookmark-notes-section">
+        <div class="notes-label">Personal Notes</div>
+        <textarea class="notes-textarea" placeholder="Add some notes...">${escapeHtml(notes)}</textarea>
+        <div class="notes-status">Saved</div>
+      </div>
     </div>
   `;
+
+  // Handle fallback favicon loading securely
+  const faviconImg = card.querySelector('.card-favicon');
+  faviconImg.addEventListener('error', function() {
+    this.src = `https://www.google.com/s2/favicons?domain=${domain}&sz=32`;
+  });
+
+  // Prevent card click when clicking notes or metadata
+  const notesTextarea = card.querySelector('.notes-textarea');
+  const notesStatus = card.querySelector('.notes-status');
+  
+  notesTextarea.addEventListener('click', (e) => e.stopPropagation());
+  
+  let saveTimeout;
+  notesTextarea.addEventListener('input', (e) => {
+    e.stopPropagation();
+    const newNotes = e.target.value;
+    
+    clearTimeout(saveTimeout);
+    saveTimeout = setTimeout(async () => {
+      try {
+        await bookmarks.update(bookmark.id, { notes: newNotes });
+        notesStatus.classList.add('visible');
+        setTimeout(() => notesStatus.classList.remove('visible'), 2000);
+        
+        // Update local cache
+        const cached = allRecentBookmarks.find(b => b.id === bookmark.id);
+        if (cached) cached.notes = newNotes;
+      } catch (err) {
+        console.error('Failed to save notes:', err);
+      }
+    }, 1000);
+  });
 
   card.addEventListener('click', () => {
     browser.tabs.create({ url: bookmark.url });
@@ -467,11 +545,30 @@ async function handleImport() {
 
     const tree = await browser.bookmarks.getTree();
     const flattened = [];
-    const traverse = (node) => {
-      if (node.url) flattened.push({ url: node.url, title: node.title });
-      node.children?.forEach(traverse);
+    
+    const traverse = (node, currentPath = '') => {
+      if (node.url) {
+        // It's a bookmark, save it with its folder path
+        flattened.push({ 
+          url: node.url, 
+          title: node.title,
+          created_at: node.dateAdded ? new Date(node.dateAdded).toISOString() : new Date().toISOString(),
+          folder_path: currentPath || null,
+          folder_id: node.parentId || null
+        });
+      } else if (node.children) {
+        // It's a folder, build the path for its children
+        let newPath = currentPath;
+        // Skip empty titles and the root node (id '0')
+        if (node.title && node.id !== '0') {
+           newPath = currentPath ? `${currentPath}/${node.title}` : node.title;
+        }
+        node.children.forEach(child => traverse(child, newPath));
+      }
     };
-    tree.forEach(traverse);
+    
+    // Start traversal from the root
+    tree.forEach(child => traverse(child, ''));
 
     if (flattened.length === 0) return alert('No bookmarks found');
 

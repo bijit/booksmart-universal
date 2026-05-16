@@ -40,7 +40,8 @@ router.post('/register', async (req, res) => {
       options: {
         data: {
           name: name || email.split('@')[0]
-        }
+        },
+        emailRedirectTo: process.env.MANAGER_BASE_URL || undefined
       }
     });
 

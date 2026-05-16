@@ -41,8 +41,28 @@ function Login({ onLogin }) {
         throw new Error(data.error || 'Authentication failed')
       }
 
-      // Extract token from response (Railway returns session.access_token)
+      // Extract token from response
       const token = data.session?.access_token || data.token
+      
+      // If we're registering and there's no token, it means email confirmation is required
+      if (!isLogin && !token) {
+        setLoading(false)
+        setError('')
+        // Change the UI to show a success message
+        const formDiv = document.querySelector('form').parentElement;
+        formDiv.innerHTML = `
+          <div class="text-center py-6">
+            <div class="inline-flex items-center justify-center w-16 h-16 bg-green-100 dark:bg-green-900/30 rounded-full mb-4">
+              <svg class="w-8 h-8 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+            </div>
+            <h2 class="text-2xl font-bold mb-2">Check your email!</h2>
+            <p class="text-light-text-secondary dark:text-dark-text-secondary mb-6">We sent a verification link to <strong>${email}</strong>.</p>
+            <p class="text-sm">Please click the link to activate your account, then come back here to log in.</p>
+          </div>
+        `;
+        return;
+      }
+
       if (!token) {
         throw new Error('No auth token received from server')
       }

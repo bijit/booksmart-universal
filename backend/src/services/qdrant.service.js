@@ -70,6 +70,12 @@ async function ensurePayloadIndexes() {
       wait: true
     });
 
+    await qdrantClient.createPayloadIndex(COLLECTION_NAME, {
+      field_name: 'tags',
+      field_schema: 'keyword',
+      wait: true
+    });
+
 
     console.log('[Qdrant] Payload indexes verified/created');
   } catch (error) {
@@ -125,7 +131,7 @@ export async function createBookmark(userId, bookmarkData) {
         favicon_url: bookmarkData.favicon_url || null,
         folder_id: bookmarkData.folder_id || null,
         folder_path: bookmarkData.folder_path || null,
-        created_at: new Date().toISOString(),
+        created_at: bookmarkData.created_at || new Date().toISOString(),
         updated_at: new Date().toISOString()
       }
     };
@@ -172,6 +178,12 @@ export async function updateBookmark(pointId, bookmarkData) {
         favicon_url: bookmarkData.favicon_url !== undefined ? bookmarkData.favicon_url : existingPayload.favicon_url,
         folder_id: bookmarkData.folder_id !== undefined ? bookmarkData.folder_id : (existingPayload.folder_id || null),
         folder_path: bookmarkData.folder_path !== undefined ? bookmarkData.folder_path : (existingPayload.folder_path || null),
+        author: bookmarkData.author !== undefined ? bookmarkData.author : (existingPayload.author || null),
+        site_name: bookmarkData.site_name !== undefined ? bookmarkData.site_name : (existingPayload.site_name || null),
+        published_date: bookmarkData.published_date !== undefined ? bookmarkData.published_date : (existingPayload.published_date || null),
+        reading_time: bookmarkData.reading_time !== undefined ? bookmarkData.reading_time : (existingPayload.reading_time || null),
+        language: bookmarkData.language !== undefined ? bookmarkData.language : (existingPayload.language || null),
+        notes: bookmarkData.notes !== undefined ? bookmarkData.notes : (existingPayload.notes || null),
         updated_at: new Date().toISOString()
       }
     };
@@ -428,6 +440,12 @@ export async function createBookmarkChunks(userId, bookmarkData) {
         favicon_url: favicon_url || null,
         folder_id: folder_id || null,
         folder_path: folder_path || null,
+        author: bookmarkData.author || null,
+        site_name: bookmarkData.site_name || null,
+        published_date: bookmarkData.published_date || null,
+        reading_time: bookmarkData.reading_time || null,
+        language: bookmarkData.language || null,
+        notes: bookmarkData.notes || null,
 
         // Chunk-specific data
         chunk_index: chunk.index,
@@ -436,7 +454,7 @@ export async function createBookmarkChunks(userId, bookmarkData) {
         chunk_end: chunk.end,
         total_chunks: chunk.total_chunks,
         is_chunk: true, // Flag to identify chunk points vs legacy bookmark points
-        created_at: new Date().toISOString(),
+        created_at: bookmarkData.created_at || new Date().toISOString(),
         updated_at: new Date().toISOString()
       }
     }));
