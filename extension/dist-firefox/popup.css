@@ -945,6 +945,29 @@ input::placeholder {
   color: #2563EB;
 }
 
+.add-subfolder-btn {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  background: rgba(59, 130, 246, 0.12);
+  border: 1px solid #BFDBFE;
+  border-radius: 9999px;
+  color: #1D4ED8;
+  cursor: pointer;
+  font-size: 9px;
+  font-weight: 700;
+  font-family: inherit;
+  padding: 1px 5px;
+  line-height: 1;
+  transition: all 0.15s;
+  margin-left: 2px;
+}
+
+.add-subfolder-btn:hover {
+  background: #DBEAFE;
+  border-color: #93C5FD;
+}
+
 /* Related Content */
 .related-content {
 

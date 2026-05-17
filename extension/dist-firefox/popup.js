@@ -773,6 +773,7 @@ function initFolderPickerRefs() {
   selectedFolderChip = document.getElementById('selectedFolderChip');
   selectedFolderName = document.getElementById('selectedFolderName');
   clearFolderBtn     = document.getElementById('clearFolderBtn');
+  const addSubfolderBtn = document.getElementById('addSubfolderBtn');
 
   if (!folderSearchInput) return; // not on this popup view
 
@@ -823,6 +824,21 @@ function initFolderPickerRefs() {
     folderSearchInput.value = '';
     folderSearchInput.classList.remove('hidden');
     folderSearchInput.focus();
+  });
+
+  // Subfolder shortcut: pre-fill input with "CurrentFolder > " so user just types the name
+  addSubfolderBtn.addEventListener('click', () => {
+    const parentPath = selectedFolderPath;
+    // Reset the selection and show the input pre-filled
+    selectedFolderPath = null;
+    selectedFolderChip.classList.add('hidden');
+    folderSearchInput.classList.remove('hidden');
+    folderSearchInput.value = `${parentPath} > `;
+    folderSearchInput.focus();
+    // Position cursor at the end
+    folderSearchInput.setSelectionRange(folderSearchInput.value.length, folderSearchInput.value.length);
+    // Open dropdown — will show "Create folder '...'" once user types a name
+    showFolderDropdown(folderSearchInput.value);
   });
 }
 
