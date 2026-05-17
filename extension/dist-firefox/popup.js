@@ -992,12 +992,22 @@ async function handleSaveCurrentPage() {
   const allTags = Array.from(new Set([...libraryTags, ...discoveryTags]));
 
   try {
+    const title = currentPageTitle.value.trim() || currentTabData.title;
     await bookmarks.create({
       url: currentTabData.url,
-      title: currentPageTitle.value.trim() || currentTabData.title,
+      title,
       tags: allTags,
       folder_path: selectedFolderPath || null
     });
+
+    // Mirror the save back to Chrome's native bookmark manager
+    // (background.js will handle deduplication to avoid double-syncing)
+    browser.runtime.sendMessage({
+      action: 'mirrorToChrome',
+      url: currentTabData.url,
+      title,
+      folderPath: selectedFolderPath || null
+    }).catch(e => console.warn('[BookSmart] Could not mirror to Chrome:', e.message));
 
     updateSaveBtnToSaved();
     // Refresh the list to show the new bookmark

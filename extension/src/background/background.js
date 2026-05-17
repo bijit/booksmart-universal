@@ -37,12 +37,25 @@ browser.runtime.onInstalled.addListener((details) => {
   }
 });
 
+// ── Dedup guard ──────────────────────────────────────────────────────────────
+// When we mirror a BookSmart save back to Chrome, it fires onCreated, which
+// would create a duplicate in BookSmart. We track URLs we just mirrored and
+// skip them in the onCreated handler.
+const selfCreatedUrls = new Set();
+
 // Listen to new bookmarks being created
 browser.bookmarks.onCreated.addListener(async (id, bookmark) => {
   console.log('New bookmark created:', bookmark);
-  if (bookmark.url) {
-    await handleNewBookmark(bookmark);
+  if (!bookmark.url) return;
+
+  // Skip bookmarks that WE just created to avoid double-syncing
+  if (selfCreatedUrls.has(bookmark.url)) {
+    selfCreatedUrls.delete(bookmark.url);
+    console.log('[BookSmart] Skipping self-created bookmark (already in BookSmart):', bookmark.url);
+    return;
   }
+
+  await handleNewBookmark(bookmark);
 });
 
 // Listen to bookmarks being removed
@@ -296,9 +309,113 @@ browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
     });
     return true;
   }
+
+  if (message.action === 'mirrorToChrome') {
+    mirrorBookmarkToChrome(message.url, message.title, message.folderPath)
+      .then(() => sendResponse({ success: true }))
+      .catch(e => {
+        console.warn('[BookSmart] mirrorToChrome failed:', e.message);
+        sendResponse({ success: false, error: e.message });
+      });
+    return true; // keep channel open for async response
+  }
 });
 
-// Full folder sync
+// ── Chrome bookmark mirroring ─────────────────────────────────────────────────
+
+/**
+ * Walk Chrome's bookmark tree and find the folder node whose path matches
+ * the given "Parent > Child > Grandchild" path string.
+ * If any segment is missing it will be created, so the full path always exists.
+ *
+ * Returns the Chrome folder node id.
+ */
+async function findOrCreateChromeFolder(folderPath) {
+  if (!folderPath) return undefined;
+
+  const segments = folderPath.split('>').map(s => s.trim()).filter(Boolean);
+  if (!segments.length) return undefined;
+
+  // Start from Chrome's bookmark-bar and Other Bookmarks roots (ids '1' and '2')
+  const tree = await browser.bookmarks.getTree();
+  const roots = tree[0]?.children || [];
+
+  // Recursive search: find a child node with the given title under parentId
+  async function findOrCreate(parentId, title) {
+    const children = await browser.bookmarks.getChildren(parentId);
+    const existing = children.find(
+      c => !c.url && c.title.toLowerCase() === title.toLowerCase()
+    );
+    if (existing) return existing.id;
+    // Create the missing folder
+    const created = await browser.bookmarks.create({ parentId, title });
+    console.log(`[BookSmart] Created Chrome folder: "${title}" under ${parentId}`);
+    return created.id;
+  }
+
+  // Try to find the first segment under each root, then descend
+  let currentId = null;
+  for (const root of roots) {
+    if (!root.children) continue;
+    const firstMatch = root.children.find(
+      c => !c.url && c.title.toLowerCase() === segments[0].toLowerCase()
+    );
+    if (firstMatch) {
+      currentId = firstMatch.id;
+      break;
+    }
+  }
+
+  // If the top-level segment wasn't found, create it under Other Bookmarks (id '2')
+  if (!currentId) {
+    currentId = await findOrCreate('2', segments[0]);
+  }
+
+  // Descend through remaining segments
+  for (let i = 1; i < segments.length; i++) {
+    currentId = await findOrCreate(currentId, segments[i]);
+  }
+
+  return currentId;
+}
+
+/**
+ * Create a Chrome native bookmark for a URL that was saved via BookSmart.
+ * Registers the URL in selfCreatedUrls first to suppress the onCreated event.
+ */
+async function mirrorBookmarkToChrome(url, title, folderPath) {
+  try {
+    // Check if Chrome already has this bookmark to avoid duplicates
+    const existing = await browser.bookmarks.search({ url });
+    if (existing && existing.length > 0) {
+      console.log('[BookSmart] Chrome already has this bookmark, skipping mirror:', url);
+      return;
+    }
+
+    // Register as self-created BEFORE calling browser.bookmarks.create
+    // so the onCreated handler knows to skip it
+    selfCreatedUrls.add(url);
+
+    // Resolve the folder (create if needed)
+    const parentId = folderPath
+      ? await findOrCreateChromeFolder(folderPath)
+      : undefined; // undefined → Chrome places it in default location
+
+    const createParams = { title, url };
+    if (parentId) createParams.parentId = parentId;
+
+    await browser.bookmarks.create(createParams);
+    console.log('[BookSmart] Mirrored bookmark to Chrome:', url, folderPath || '(no folder)');
+
+    // Safety: clean up the guard entry after 5 seconds in case onCreated fires slowly
+    setTimeout(() => selfCreatedUrls.delete(url), 5000);
+  } catch (e) {
+    // If creation failed, remove the guard so we don't permanently suppress future saves
+    selfCreatedUrls.delete(url);
+    throw e;
+  }
+}
+
 async function handleFullFolderSync() {
   console.log('[BookSmart] Starting full folder hierarchy sync...');
   try {
