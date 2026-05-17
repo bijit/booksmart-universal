@@ -968,6 +968,48 @@ input::placeholder {
   border-color: #93C5FD;
 }
 
+.folder-info-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  padding: 6px 10px;
+  background: #F3F4F6;
+  border-radius: 6px;
+  font-size: 11px;
+  color: #4B5563;
+}
+
+.folder-info-row svg {
+  color: #6B7280;
+  flex-shrink: 0;
+}
+
+.saved-folder-path {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 500;
+}
+
+.see-in-folder-btn {
+  background: transparent;
+  border: 1px solid #D1D5DB;
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 10px;
+  color: #374151;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s;
+}
+
+.see-in-folder-btn:hover {
+  background: #E5E7EB;
+  border-color: #9CA3AF;
+}
+
 /* Related Content */
 .related-content {
 

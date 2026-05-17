@@ -676,6 +676,26 @@ async function initializeCurrentPageContext() {
 
     if (isBookmarked) {
       updateSaveBtnToSaved();
+      
+      const dbBookmark = data.bookmarks[0];
+      const folderPickerSection = document.getElementById('folderPickerSection');
+      const folderInfoRow = document.getElementById('folderInfoRow');
+      const savedFolderPath = document.getElementById('savedFolderPath');
+      const seeInFolderBtn = document.getElementById('seeInFolderBtn');
+      
+      if (folderPickerSection) folderPickerSection.classList.add('hidden');
+      
+      if (folderInfoRow && savedFolderPath && seeInFolderBtn) {
+        savedFolderPath.textContent = dbBookmark.folder_path || 'Other Bookmarks';
+        folderInfoRow.classList.remove('hidden');
+        
+        seeInFolderBtn.addEventListener('click', () => {
+          const url = dbBookmark.folder_id 
+            ? `chrome://bookmarks/?id=${dbBookmark.folder_id}`
+            : `chrome://bookmarks`;
+          browser.tabs.create({ url });
+        });
+      }
     } else {
       // Find related content to show "At your fingertips"
       findRelatedContent(tab.title);
