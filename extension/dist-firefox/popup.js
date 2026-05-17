@@ -44,9 +44,6 @@ const suggestedTagsContainer = document.getElementById('suggestedTagsContainer')
 const suggestedTagsList = document.getElementById('suggestedTagsList');
 const discoveryTagsContainer = document.getElementById('discoveryTagsContainer');
 const discoveryTagsList = document.getElementById('discoveryTagsList');
-const localAiHelp = document.getElementById('localAiHelp');
-const localAiHelpToggle = document.getElementById('localAiHelpToggle');
-const localAiHelpContent = document.getElementById('localAiHelpContent');
 const tagFilterContainer = document.getElementById('tagFilterContainer');
 const tagFilterList = document.getElementById('tagFilterList');
 const importConfirmModal = document.getElementById('importConfirmModal');
@@ -133,12 +130,6 @@ function setupEventListeners() {
   syncFoldersBtn.addEventListener('click', handleSyncFolders);
   logoutBtn.addEventListener('click', handleLogout);
   savePageBtn.addEventListener('click', handleSaveCurrentPage);
-
-  localAiHelpToggle.addEventListener('click', () => {
-    const isOpen = !localAiHelpContent.classList.contains('hidden');
-    localAiHelpContent.classList.toggle('hidden', isOpen);
-    localAiHelpToggle.classList.toggle('open', !isOpen);
-  });
 }
 
 // Authentication Handlers
@@ -647,6 +638,14 @@ function updateImportProgress(processed, total, percentage) {
 // Current Page Intelligence
 let currentTabData = null;
 
+// Folder Picker State
+let allFolderPaths = [];
+let selectedFolderPath = null;
+let folderDropdownVisible = false;
+
+// Folder Picker DOM refs (populated after DOMContentLoaded)
+let folderSearchInput, folderDropdown, folderDropdownList, folderCreateOption, folderCreateLabel, selectedFolderChip, selectedFolderName, clearFolderBtn;
+
 async function initializeCurrentPageContext() {
   try {
     const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
@@ -655,13 +654,24 @@ async function initializeCurrentPageContext() {
       return;
     }
 
-    currentTabData = tab;
-    currentPageTitle.textContent = tab.title;
-    currentPageUrl.textContent = new URL(tab.url).hostname;
-    currentPageFavicon.src = `https://www.google.com/s2/favicons?domain=${new URL(tab.url).hostname}&sz=32`;
+    // Clean up URL if it's a PDF opened via a Chrome extension (like Adobe Acrobat)
+    let cleanUrl = tab.url;
+    if (cleanUrl.startsWith('chrome-extension://') && cleanUrl.includes('/http')) {
+      const httpIndex = cleanUrl.indexOf('http');
+      cleanUrl = cleanUrl.substring(httpIndex);
+    }
+
+    currentTabData = { ...tab, url: cleanUrl };
+    currentPageTitle.value = tab.title;
+    currentPageUrl.textContent = new URL(cleanUrl).hostname;
+    currentPageFavicon.src = `https://www.google.com/s2/favicons?domain=${new URL(cleanUrl).hostname}&sz=32`;
+
+    // Initialise folder picker
+    initFolderPickerRefs();
+    loadFolderPaths();
 
     // Check if already bookmarked
-    const data = await bookmarks.list({ url: tab.url });
+    const data = await bookmarks.list({ url: cleanUrl });
     const isBookmarked = data.bookmarks && data.bookmarks.length > 0;
 
     if (isBookmarked) {
@@ -727,44 +737,13 @@ async function findRelatedContent(title) {
 
 async function analyzePageContent(tab) {
   try {
-    // 1. Try Local AI (Gemini Nano) first
-    const localTags = await tryLocalAiAnalysis(tab);
-    if (localTags && localTags.length > 0) {
-      displayDiscoveryTags(localTags, 'Local AI');
-      return;
-    }
-
-    // 2. Fallback to Cloud AI
-    console.log('Local AI not available, falling back to Cloud...');
-    localAiHelp.classList.remove('hidden');
-
+    // Use Cloud AI for tag suggestions
     const data = await bookmarks.analyze({ title: tab.title });
     if (data.tags && data.tags.length > 0) {
       displayDiscoveryTags(data.tags, 'Cloud AI');
     }
   } catch (error) {
     console.error('Analysis failed:', error);
-  }
-}
-
-async function tryLocalAiAnalysis(tab) {
-  try {
-    // Check if the experimental prompt API exists
-    if (!window.ai || !window.ai.languageModel) return null;
-
-    const capabilities = await window.ai.languageModel.capabilities();
-    if (capabilities.available === 'no') return null;
-
-    const session = await window.ai.languageModel.create();
-    const prompt = `Suggest 3 unique tags for this webpage title: "${tab.title}". Return only the tags separated by commas.`;
-
-    const response = await session.prompt(prompt);
-    session.destroy();
-
-    return response.split(',').map(t => t.trim()).filter(t => t.length > 0);
-  } catch (e) {
-    console.log('Local AI check failed:', e);
-    return null;
   }
 }
 
@@ -783,6 +762,221 @@ function displayDiscoveryTags(tags, source) {
   console.log(`[Discovery] Tags generated via ${source}`);
 }
 
+// ─── Folder Picker Logic ─────────────────────────────────────────────────────
+
+function initFolderPickerRefs() {
+  folderSearchInput  = document.getElementById('folderSearchInput');
+  folderDropdown     = document.getElementById('folderDropdown');
+  folderDropdownList = document.getElementById('folderDropdownList');
+  folderCreateOption = document.getElementById('folderCreateOption');
+  folderCreateLabel  = document.getElementById('folderCreateLabel');
+  selectedFolderChip = document.getElementById('selectedFolderChip');
+  selectedFolderName = document.getElementById('selectedFolderName');
+  clearFolderBtn     = document.getElementById('clearFolderBtn');
+
+  if (!folderSearchInput) return; // not on this popup view
+
+  folderSearchInput.addEventListener('focus', () => {
+    showFolderDropdown(folderSearchInput.value);
+  });
+
+  folderSearchInput.addEventListener('input', () => {
+    showFolderDropdown(folderSearchInput.value);
+  });
+
+  // Keyboard navigation
+  folderSearchInput.addEventListener('keydown', (e) => {
+    const items = folderDropdown.querySelectorAll('.folder-dropdown-item, .folder-create-option:not(.hidden)');
+    const active = folderDropdown.querySelector('.active');
+    let idx = Array.from(items).indexOf(active);
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      if (idx < items.length - 1) {
+        active?.classList.remove('active');
+        items[idx + 1].classList.add('active');
+        items[idx + 1].scrollIntoView({ block: 'nearest' });
+      }
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (idx > 0) {
+        active?.classList.remove('active');
+        items[idx - 1].classList.add('active');
+        items[idx - 1].scrollIntoView({ block: 'nearest' });
+      }
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (active) active.click();
+    } else if (e.key === 'Escape') {
+      hideFolderDropdown();
+    }
+  });
+
+  // Close dropdown when clicking outside
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.folder-input-wrapper')) hideFolderDropdown();
+  });
+
+  clearFolderBtn.addEventListener('click', () => {
+    selectedFolderPath = null;
+    selectedFolderChip.classList.add('hidden');
+    folderSearchInput.value = '';
+    folderSearchInput.classList.remove('hidden');
+    folderSearchInput.focus();
+  });
+}
+
+async function loadFolderPaths() {
+  try {
+    // ── Source 1: BookSmart backend (folders already in our DB) ───────────────
+    let dbFolders = [];
+    try {
+      const { auth_token: token } = await browser.storage.local.get(['auth_token']);
+      if (token) {
+        const API_URL = globalThis.API_BASE_URL;
+        const res = await fetch(`${API_URL}/bookmarks/folders`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          dbFolders = data.folders || [];
+        }
+      }
+    } catch (e) {
+      console.warn('[FolderPicker] Could not load folders from backend:', e.message);
+    }
+
+    // ── Source 2: Chrome's live bookmark tree ─────────────────────────────────
+    let chromeFolders = [];
+    try {
+      const tree = await browser.bookmarks.getTree();
+
+      // Recursively walk the tree; skip virtual root nodes (id 0/1/'root')
+      // and collect folder paths using the same "Parent > Child" format
+      // as background.js getFolderPath().
+      function walk(node, parentPath) {
+        // A node with children and no URL is a folder
+        if (node.children) {
+          const skipIds = new Set(['0', '1', 'root']);
+          const isVirtualRoot = skipIds.has(String(node.id)) || !node.title;
+
+          const myPath = isVirtualRoot
+            ? parentPath
+            : (parentPath ? `${parentPath} > ${node.title}` : node.title);
+
+          if (!isVirtualRoot && myPath) {
+            chromeFolders.push(myPath);
+          }
+
+          for (const child of node.children) {
+            walk(child, myPath);
+          }
+        }
+      }
+
+      for (const root of tree) {
+        walk(root, '');
+      }
+    } catch (e) {
+      console.warn('[FolderPicker] Could not read Chrome bookmark tree:', e.message);
+    }
+
+    // ── Merge, deduplicate, sort ───────────────────────────────────────────────
+    const merged = [...new Set([...dbFolders, ...chromeFolders])].sort();
+    allFolderPaths = merged;
+
+    console.log(`[FolderPicker] Loaded ${allFolderPaths.length} folders (${dbFolders.length} from DB, ${chromeFolders.length} from Chrome)`);
+  } catch (e) {
+    console.warn('[FolderPicker] Could not load folders:', e.message);
+  }
+}
+
+function showFolderDropdown(query = '') {
+  if (!folderDropdownList) return;
+  folderDropdown.classList.remove('hidden');
+  folderDropdownVisible = true;
+
+  const q = query.trim();
+  const ql = q.toLowerCase();
+
+  // ── Fuzzy scorer ──────────────────────────────────────────────────────────
+  // Split query into tokens; a folder matches if ALL tokens appear somewhere
+  // in the path (any segment, any order).  Higher score = better match.
+  const tokens = ql.split(/\s+/).filter(Boolean);
+
+  function score(path) {
+    const pl = path.toLowerCase();
+    if (!tokens.length) return 1; // empty query → everything matches
+
+    // All tokens must appear somewhere in the path
+    if (!tokens.every(t => pl.includes(t))) return 0;
+
+    let s = 1;
+    // Bonus: path starts with the raw query
+    if (pl.startsWith(ql)) s += 100;
+    // Bonus: path contains the full query as a contiguous substring
+    if (pl.includes(ql)) s += 50;
+    // Bonus: tokens appear in the same left-to-right order
+    let lastIdx = -1;
+    let inOrder = true;
+    for (const t of tokens) {
+      const idx = pl.indexOf(t, lastIdx + 1);
+      if (idx <= lastIdx) { inOrder = false; break; }
+      lastIdx = idx;
+    }
+    if (inOrder) s += 20;
+    // Bonus: last path segment matches well
+    const lastSegment = pl.split(/[/\\>]/).filter(Boolean).pop() || pl;
+    if (tokens.every(t => lastSegment.includes(t))) s += 10;
+
+    return s;
+  }
+  // ──────────────────────────────────────────────────────────────────────────
+
+  const scored = allFolderPaths
+    .map(path => ({ path, s: score(path) }))
+    .filter(x => x.s > 0)
+    .sort((a, b) => b.s - a.s);
+
+  folderDropdownList.innerHTML = '';
+
+  const folderIcon = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>`;
+
+  scored.forEach(({ path }) => {
+    const item = document.createElement('div');
+    item.className = 'folder-dropdown-item';
+    item.innerHTML = `${folderIcon}<span>${path}</span>`;
+    item.addEventListener('click', () => selectFolder(path));
+    folderDropdownList.appendChild(item);
+  });
+
+  // Show "Create" option only if the query has no exact match
+  const exactMatch = allFolderPaths.some(p => p.toLowerCase() === ql);
+  if (q && !exactMatch) {
+    folderCreateLabel.textContent = `Create folder "${q}"`;
+    folderCreateOption.classList.remove('hidden');
+    folderCreateOption.onclick = () => selectFolder(q);
+  } else {
+    folderCreateOption.classList.add('hidden');
+  }
+}
+
+function hideFolderDropdown() {
+  folderDropdown?.classList.add('hidden');
+  folderDropdownVisible = false;
+}
+
+function selectFolder(path) {
+  selectedFolderPath = path;
+  folderSearchInput.classList.add('hidden');
+  folderSearchInput.value = '';
+  selectedFolderName.textContent = path;
+  selectedFolderChip.classList.remove('hidden');
+  hideFolderDropdown();
+}
+
+// ─── Save Handler ─────────────────────────────────────────────────────────────
+
 async function handleSaveCurrentPage() {
   if (!currentTabData) return;
 
@@ -800,8 +994,9 @@ async function handleSaveCurrentPage() {
   try {
     await bookmarks.create({
       url: currentTabData.url,
-      title: currentTabData.title,
-      tags: allTags
+      title: currentPageTitle.value.trim() || currentTabData.title,
+      tags: allTags,
+      folder_path: selectedFolderPath || null
     });
 
     updateSaveBtnToSaved();

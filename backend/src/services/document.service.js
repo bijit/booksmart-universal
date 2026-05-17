@@ -132,7 +132,8 @@ export function isSupportedDocument(url) {
   const supportedExtensions = ['.pdf', '.docx'];
   try {
     const pathname = new URL(url).pathname.toLowerCase();
-    return supportedExtensions.some(ext => pathname.endsWith(ext));
+    // Check if it ends with .pdf/.docx OR if it clearly indicates a pdf in the path (like arXiv)
+    return supportedExtensions.some(ext => pathname.endsWith(ext)) || pathname.includes('/pdf/');
   } catch (e) {
     return false;
   }

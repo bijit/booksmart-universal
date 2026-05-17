@@ -64,7 +64,7 @@ gcloud run deploy $BACKEND_SERVICE_NAME \
     --region $REGION \
     --allow-unauthenticated \
     --port 3000 \
-    --memory 1Gi \
+    --memory 2Gi \
     --cpu 1 \
     --timeout 600 \
     --set-env-vars="NODE_ENV=production,SUPABASE_URL=$SUPABASE_URL,SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY,SUPABASE_SERVICE_ROLE_KEY=$SUPABASE_SERVICE_ROLE_KEY,QDRANT_URL=$QDRANT_URL,QDRANT_API_KEY=$QDRANT_API_KEY,GOOGLE_AI_API_KEY=$GOOGLE_AI_API_KEY,MANAGER_BASE_URL=$MANAGER_BASE_URL"
