@@ -49,6 +49,12 @@ const localAiHelpToggle = document.getElementById('localAiHelpToggle');
 const localAiHelpContent = document.getElementById('localAiHelpContent');
 const tagFilterContainer = document.getElementById('tagFilterContainer');
 const tagFilterList = document.getElementById('tagFilterList');
+const importConfirmModal = document.getElementById('importConfirmModal');
+const importDeleteBtn = document.getElementById('importDeleteBtn');
+const importAddBtn = document.getElementById('importAddBtn');
+const importCancelBtn = document.getElementById('importCancelBtn');
+const closeImportModal = document.getElementById('closeImportModal');
+const importModalText = document.getElementById('importModalText');
 
 let selectedFilterTags = [];
 
@@ -535,20 +541,11 @@ async function handleImport() {
     const data = await bookmarks.list({ limit: 1 });
     const existingCount = data.pagination?.total || 0;
 
-    if (existingCount > 0) {
-      if (confirm(`Delete all ${existingCount} existing bookmarks and re-import?`)) {
-        showImportProgress();
-        document.getElementById('importProgressText').textContent = 'Deleting existing bookmarks...';
-        await bookmarks.deleteAll();
-      }
-    }
-
     const tree = await browser.bookmarks.getTree();
     const flattened = [];
     
     const traverse = (node, currentPath = '') => {
       if (node.url) {
-        // It's a bookmark, save it with its folder path
         flattened.push({ 
           url: node.url, 
           title: node.title,
@@ -557,9 +554,7 @@ async function handleImport() {
           folder_id: node.parentId || null
         });
       } else if (node.children) {
-        // It's a folder, build the path for its children
         let newPath = currentPath;
-        // Skip empty titles and the root node (id '0')
         if (node.title && node.id !== '0') {
            newPath = currentPath ? `${currentPath}/${node.title}` : node.title;
         }
@@ -567,20 +562,51 @@ async function handleImport() {
       }
     };
     
-    // Start traversal from the root
     tree.forEach(child => traverse(child, ''));
 
     if (flattened.length === 0) return alert('No bookmarks found');
 
-    if (existingCount === 0 && !confirm(`Import ${flattened.length} bookmarks?`)) return;
+    if (existingCount > 0) {
+      // Show custom modal instead of scary confirm()
+      importModalText.innerHTML = `You have <strong>${existingCount}</strong> bookmarks in your library. <br><br>Would you like to <strong>Delete & Re-import</strong> everything, or simply <strong>Add</strong> these new ${flattened.length} bookmarks to your existing collection?`;
+      importConfirmModal.classList.remove('hidden');
 
-    showImportProgress();
-    const batchResult = await importJobs.batch(flattened);
-    await pollImportProgress(batchResult.jobId, flattened.length);
+      // Set up one-time listeners for this specific import session
+      const executeImport = async (shouldDelete) => {
+        importConfirmModal.classList.add('hidden');
+        showImportProgress();
+        
+        if (shouldDelete) {
+          document.getElementById('importProgressText').textContent = 'Deleting existing bookmarks...';
+          await bookmarks.deleteAll();
+        }
+
+        const batchResult = await importJobs.batch(flattened);
+        await pollImportProgress(batchResult.jobId, flattened.length);
+      };
+
+      // Clean up previous listeners if any (using replaceWith to reset)
+      const newDeleteBtn = importDeleteBtn.cloneNode(true);
+      const newAddBtn = importAddBtn.cloneNode(true);
+      importDeleteBtn.replaceWith(newDeleteBtn);
+      importAddBtn.replaceWith(newAddBtn);
+      
+      newDeleteBtn.addEventListener('click', () => executeImport(true));
+      newAddBtn.addEventListener('click', () => executeImport(false));
+
+    } else {
+      // No existing bookmarks, just confirm simple import
+      if (confirm(`Import ${flattened.length} bookmarks?`)) {
+        showImportProgress();
+        const batchResult = await importJobs.batch(flattened);
+        await pollImportProgress(batchResult.jobId, flattened.length);
+      }
+    }
   } catch (error) {
     console.error('Import error:', error);
     alert('Import failed: ' + error.message);
     hideImportProgress();
+    importConfirmModal.classList.add('hidden');
   }
 }
 

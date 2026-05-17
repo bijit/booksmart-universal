@@ -656,7 +656,7 @@ async function initializeCurrentPageContext() {
     }
 
     currentTabData = tab;
-    currentPageTitle.textContent = tab.title;
+    currentPageTitle.value = tab.title;
     currentPageUrl.textContent = new URL(tab.url).hostname;
     currentPageFavicon.src = `https://www.google.com/s2/favicons?domain=${new URL(tab.url).hostname}&sz=32`;
 
@@ -800,7 +800,7 @@ async function handleSaveCurrentPage() {
   try {
     await bookmarks.create({
       url: currentTabData.url,
-      title: currentTabData.title,
+      title: currentPageTitle.value.trim() || currentTabData.title,
       tags: allTags
     });
 

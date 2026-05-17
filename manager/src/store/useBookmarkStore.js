@@ -31,6 +31,7 @@ const useBookmarkStore = create((set, get) => {
     selectedFolder: null, // Full path string
     dateRange: { start: null, end: null },
     sortBy: 'date_added', // date_added, title, date_published
+    showOnlyProcessing: false,
 
 
     // View mode
@@ -263,19 +264,45 @@ const useBookmarkStore = create((set, get) => {
     // Sort
     setSortBy: (sortBy) => set({ sortBy }),
 
+    // Processing filter
+    setShowOnlyProcessing: (enabled) => set({ showOnlyProcessing: enabled, currentPage: 1 }),
+
     // View mode
     setViewMode: (mode) => set({ viewMode: mode }),
 
     // Get filtered bookmarks
     getFilteredBookmarks: () => {
-      const { bookmarks, sortBy, searchQuery } = get()
+      const { bookmarks, sortBy, searchQuery, showOnlyProcessing } = get()
 
       let filtered = [...bookmarks]
+
+      // Filter by processing status
+      if (showOnlyProcessing) {
+        // Show ONLY processing/pending items
+        filtered = filtered.filter(b => b.processing_status && b.processing_status !== 'completed')
+      } else {
+        // Show completed items AND recently-pending items (saved in the last hour)
+        // so fresh saves from the extension appear instantly at the top
+        const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000)
+        filtered = filtered.filter(b => {
+          if (!b.processing_status || b.processing_status === 'completed') return true
+          // Show recent pending/processing items so fresh saves appear instantly
+          return new Date(b.created_at) > oneHourAgo
+        })
+      }
 
       // If we are in search mode, the API has already sorted by relevance score.
       // We should only apply client-side sorting if we are NOT searching.
       if (!searchQuery) {
         filtered.sort((a, b) => {
+          // ALWAYS put pending/processing items at the top
+          const aPending = a.processing_status && a.processing_status !== 'completed';
+          const bPending = b.processing_status && b.processing_status !== 'completed';
+          
+          if (aPending && !bPending) return -1;
+          if (!aPending && bPending) return 1;
+
+          // Otherwise use chosen sort
           switch (sortBy) {
             case 'date_added':
               return new Date(b.created_at) - new Date(a.created_at)
@@ -383,7 +410,6 @@ const useBookmarkStore = create((set, get) => {
 
         // Build query parameters
         const params = new URLSearchParams({
-          status: 'completed',
           limit: pageSize,
           offset: offset
         })

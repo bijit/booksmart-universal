@@ -24,7 +24,15 @@ router.post('/', async (req, res) => {
     const userId = req.user.id;
 
     // Validate input
-    if (!query || typeof query !== 'string' || query.trim().length === 0) {
+    if (typeof query !== 'string') {
+      return res.status(400).json({
+        error: 'Bad Request',
+        message: 'Query is required and must be a string'
+      });
+    }
+
+    const isPureFilter = query.trim().length === 0 && (tags || folderPath);
+    if (!isPureFilter && query.trim().length === 0) {
       return res.status(400).json({
         error: 'Bad Request',
         message: 'Query is required and must be a non-empty string'
@@ -66,10 +74,11 @@ router.post('/', async (req, res) => {
     };
 
     // Validate limits
-    if (options.limit < 1 || options.limit > 100) {
+    const maxLimit = isPureFilter ? 10000 : 100;
+    if (options.limit < 1 || options.limit > maxLimit) {
       return res.status(400).json({
         error: 'Bad Request',
-        message: 'Limit must be between 1 and 100'
+        message: `Limit must be between 1 and ${maxLimit}`
       });
     }
 
@@ -84,7 +93,26 @@ router.post('/', async (req, res) => {
     let searchData;
     const type = searchType || 'hybrid';  // Default to hybrid
 
-    if (type === 'semantic') {
+    if (isPureFilter) {
+      const { getBookmarksByUser } = await import('../services/qdrant.service.js');
+      const results = await getBookmarksByUser(userId, {
+        limit: options.limit,
+        offset: options.offset,
+        tags: options.tags,
+        folderPath: options.folderPath
+      });
+      
+      // De-duplicate by bookmark_id to get unique bookmarks
+      const bookmarkMap = new Map();
+      for (const item of results) {
+        const id = item.bookmark_id || item.id;
+        if (!bookmarkMap.has(id)) {
+          bookmarkMap.set(id, item);
+        }
+      }
+      const uniqueResults = Array.from(bookmarkMap.values()).slice(0, options.limit);
+      searchData = { results: uniqueResults, answer: null };
+    } else if (type === 'semantic') {
       const results = await semanticSearch(userId, effectiveQuery, options);
       searchData = { results, answer: null };
     } else if (type === 'hybrid') {

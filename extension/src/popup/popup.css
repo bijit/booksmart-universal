@@ -783,6 +783,26 @@ input::placeholder {
   overflow: hidden;
   text-overflow: ellipsis;
   margin-bottom: 2px;
+  width: 100%;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  padding: 2px 4px;
+  margin-left: -4px;
+  transition: all 0.2s;
+  font-family: inherit;
+}
+
+.current-page-title:hover {
+  border-color: #E5E7EB;
+  background: #F9FAFB;
+}
+
+.current-page-title:focus {
+  outline: none;
+  border-color: #3B82F6;
+  background: #FFFFFF;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
 }
 
 .current-page-url {

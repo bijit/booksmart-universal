@@ -9,6 +9,7 @@
  */
 
 import { extractContent } from '../services/readability.service.js';
+import { extractDocumentContent, isSupportedDocument } from '../services/document.service.js';
 import { processContent, processContentWithChunking, summarizeFromMetadata, generateEmbedding } from '../services/gemini.service.js';
 import { createBookmark, createBookmarkChunks } from '../services/qdrant.service.js';
 import {
@@ -22,7 +23,7 @@ import { isQuotaError } from '../utils/errors.js';
 const POLL_INTERVAL_MS = 1000; // Check for new bookmarks every 1 second (faster batch processing)
 const MAX_RETRIES = 3;
 const BATCH_SIZE = 50; // Fetch up to 50 bookmarks per poll
-const QUOTA_BACKOFF_MS = 60 * 60 * 1000; // Back off for 1 hour when quota is hit
+const QUOTA_BACKOFF_MS = 5 * 60 * 1000; // Back off for 5 minutes when quota is hit
 
 // Parallel processing configuration (set ENABLE_PARALLEL_PROCESSING = false to use sequential)
 const ENABLE_PARALLEL_PROCESSING = true; // Toggle between parallel and sequential processing
@@ -131,11 +132,17 @@ async function processBookmark(bookmark) {
         favicon: getFaviconUrl(url) // Generate favicon URL using Google's service
       };
     } else {
-      console.log(`[Worker] Step 1/4: No local content, extracting with Readability...`);
-      extracted = await extractContent(url);
-      // If Readability didn't provide favicon, generate one
-      if (!extracted.favicon) {
-        extracted.favicon = getFaviconUrl(url);
+      // Step 2b: Automatic document vs webpage detection
+      if (isSupportedDocument(url)) {
+        console.log(`[Worker] Step 1/4: Detected supported document, extracting with DocumentService...`);
+        extracted = await extractDocumentContent(url);
+      } else {
+        console.log(`[Worker] Step 1/4: No local content, extracting with Readability...`);
+        extracted = await extractContent(url);
+        // If Readability didn't provide favicon, generate one
+        if (!extracted.favicon) {
+          extracted.favicon = getFaviconUrl(url);
+        }
       }
     }
 
@@ -193,7 +200,9 @@ async function processBookmark(bookmark) {
       tags: aiResult.tags || [],
       qdrant_point_id: qdrantPointIds[0], // Store first chunk ID for legacy compatibility
       processing_status: 'completed',
-      extraction_method: hasValidExtractedContent ? extraction_method : 'readability',
+      extraction_method: hasValidExtractedContent 
+        ? extraction_method 
+        : (extracted.method === 'pdf-parse' || extracted.method === 'mammoth' ? 'document-service' : 'readability'),
       cover_image: extracted.cover_image || null,
       extracted_images: extracted.extracted_images || [],
       author: extracted.author || null,
@@ -405,13 +414,13 @@ async function pollAndProcess() {
   isProcessing = true;
 
   try {
-    // Get all pending bookmarks across all users
-    // Note: This is simplified - in production you'd want pagination
+    // Get pending bookmarks - NEWEST FIRST so fresh saves from the extension
+    // get processed immediately instead of waiting behind bulk imports
     const { data: pendingBookmarks, error } = await supabaseAdmin
       .from('bookmarks')
       .select('*')
       .eq('processing_status', 'pending')
-      .order('created_at', { ascending: true })
+      .order('created_at', { ascending: false })
       .limit(BATCH_SIZE);
 
     if (error) {
@@ -444,6 +453,38 @@ async function pollAndProcess() {
 }
 
 /**
+ * Reset bookmarks stuck in 'processing' status back to 'pending'
+ * This handles orphans from previous crashes/restarts
+ */
+async function resetStaleJobs() {
+  try {
+    console.log('[Worker] Checking for stale "processing" jobs...');
+    
+    // Any bookmark stuck in 'processing' for more than 30 minutes is likely orphaned
+    const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000).toISOString();
+    
+    const { count, error } = await supabaseAdmin
+      .from('bookmarks')
+      .update({ 
+        processing_status: 'pending',
+        error_message: 'Stale job reset by worker' 
+      })
+      .eq('processing_status', 'processing')
+      .lt('updated_at', thirtyMinutesAgo);
+
+    if (error) throw error;
+    
+    if (count > 0) {
+      console.log(`[Worker] 🔄 Reset ${count} stale "processing" bookmarks back to "pending"`);
+    } else {
+      console.log('[Worker] No stale jobs found.');
+    }
+  } catch (error) {
+    console.error('[Worker] Error resetting stale jobs:', error.message);
+  }
+}
+
+/**
  * Start the background worker
  */
 export function startWorker() {
@@ -467,11 +508,16 @@ export function startWorker() {
 
   workerRunning = true;
 
-  // Start polling loop
-  setInterval(pollAndProcess, POLL_INTERVAL_MS);
+  // Run cleanup and start polling loop
+  (async () => {
+    await resetStaleJobs();
+    
+    // Start polling loop
+    setInterval(pollAndProcess, POLL_INTERVAL_MS);
 
-  // Run immediately on start
-  pollAndProcess();
+    // Run immediately on start
+    pollAndProcess();
+  })();
 }
 
 /**

@@ -29,10 +29,14 @@ function Dashboard({ darkMode, toggleDarkMode, onLogout }) {
     selectedTags,
     selectedFolder,
     sortBy,
+    showOnlyProcessing,
+    setShowOnlyProcessing,
     currentPage,
     totalPages,
     researchOnWeb
   } = useBookmarkStore()
+
+  const filteredBookmarks = getFilteredBookmarks()
 
   const [sidebarWidth, setSidebarWidth] = useState(280)
   const [layoutMode, setLayoutMode] = useState('gallery')
@@ -83,8 +87,6 @@ function Dashboard({ darkMode, toggleDarkMode, onLogout }) {
 
     return () => clearInterval(interval)
   }, [fetchBookmarks])
-
-  const filteredBookmarks = getFilteredBookmarks()
 
   return (
     <div className="flex flex-col min-h-screen">
@@ -215,6 +217,50 @@ function Dashboard({ darkMode, toggleDarkMode, onLogout }) {
               </div>
             )}
 
+            {/* Global Toolbar (Visible as long as there are bookmarks to filter) */}
+            {!loading && !error && (filteredBookmarks.length > 0 || searchQuery) && (
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
+                <h3 className="text-lg font-bold text-light-text-secondary dark:text-dark-text-secondary uppercase tracking-wider">
+                  {searchQuery ? 'Search Results' : 'All Bookmarks'}
+                </h3>
+                <div className="flex flex-wrap items-center gap-3">
+                  {/* Processing Filter Toggle */}
+                  <button
+                    onClick={() => setShowOnlyProcessing(!showOnlyProcessing)}
+                    className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-all text-sm font-bold ${
+                      showOnlyProcessing 
+                      ? 'bg-amber-100 dark:bg-amber-900/30 border-amber-500 text-amber-700 dark:text-amber-400 shadow-sm' 
+                      : 'bg-gray-100 dark:bg-gray-800 border-light-border dark:border-dark-border text-light-text-secondary dark:text-dark-text-secondary hover:bg-gray-200 dark:hover:bg-gray-700'
+                    }`}
+                    title={showOnlyProcessing ? "Show All Bookmarks" : "Show Only Processing"}
+                  >
+                    <div className={`w-2 h-2 rounded-full ${showOnlyProcessing ? 'bg-amber-500 animate-pulse' : 'bg-gray-400'}`}></div>
+                    <span>Processing</span>
+                  </button>
+
+                  {/* Layout Toggles (For cards & timeline view) */}
+                  {(viewMode === 'cards' || viewMode === 'timeline') && (
+                    <div className="flex items-center bg-gray-100 dark:bg-gray-800 rounded-lg p-1 border border-light-border dark:border-dark-border">
+                      <button
+                        onClick={() => setLayoutMode('gallery')}
+                        className={`p-1.5 rounded-md transition-colors ${layoutMode === 'gallery' ? 'bg-white dark:bg-gray-700 shadow-sm text-accent dark:text-accent-dark' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}
+                        title="Gallery View"
+                      >
+                        <LayoutGrid className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => setLayoutMode('pinterest')}
+                        className={`p-1.5 rounded-md transition-colors ${layoutMode === 'pinterest' ? 'bg-white dark:bg-gray-700 shadow-sm text-accent dark:text-accent-dark' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}
+                        title="Pinterest View"
+                      >
+                        <Columns className="w-4 h-4" />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* Empty State */}
             {!loading && !error && filteredBookmarks.length === 0 && (
               <EmptyState />
@@ -223,28 +269,6 @@ function Dashboard({ darkMode, toggleDarkMode, onLogout }) {
             {/* Cards View */}
             {filteredBookmarks.length > 0 && viewMode === 'cards' && (
               <>
-                <div className="flex items-center justify-between mb-6">
-                  <h3 className="text-lg font-bold text-light-text-secondary dark:text-dark-text-secondary uppercase tracking-wider">
-                    {searchQuery ? 'Search Results' : 'All Bookmarks'}
-                  </h3>
-                  <div className="flex items-center bg-gray-100 dark:bg-gray-800 rounded-lg p-1 border border-light-border dark:border-dark-border">
-                    <button
-                      onClick={() => setLayoutMode('gallery')}
-                      className={`p-1.5 rounded-md transition-colors ${layoutMode === 'gallery' ? 'bg-white dark:bg-gray-700 shadow-sm text-accent dark:text-accent-dark' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}
-                      title="Gallery View"
-                    >
-                      <LayoutGrid className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => setLayoutMode('pinterest')}
-                      className={`p-1.5 rounded-md transition-colors ${layoutMode === 'pinterest' ? 'bg-white dark:bg-gray-700 shadow-sm text-accent dark:text-accent-dark' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}
-                      title="Pinterest View"
-                    >
-                      <Columns className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-
                 {layoutMode === 'pinterest' ? (
                   <div className="columns-1 md:columns-2 lg:columns-3 gap-4 sm:gap-6 space-y-4 sm:space-y-6">
                     {filteredBookmarks.map(bookmark => (
@@ -288,15 +312,6 @@ function Dashboard({ darkMode, toggleDarkMode, onLogout }) {
                   />
                 )}
 
-                {/* Only show pagination if we are not showing the 'entire set' via tags/folders */}
-                {selectedTags.length === 0 && !selectedFolder && (
-                  <Pagination
-                    currentPage={currentPage}
-                    totalPages={totalPages}
-                    onPageChange={goToPage}
-                    loading={loading}
-                  />
-                )}
               </>
             )}
 
@@ -325,15 +340,6 @@ function Dashboard({ darkMode, toggleDarkMode, onLogout }) {
                   }}
                 />
 
-                {/* Only show pagination if we are not showing the 'entire set' via tags/folders */}
-                {selectedTags.length === 0 && !selectedFolder && (
-                  <Pagination
-                    currentPage={currentPage}
-                    totalPages={totalPages}
-                    onPageChange={goToPage}
-                    loading={loading}
-                  />
-                )}
               </>
             )}
 
@@ -375,23 +381,6 @@ function Dashboard({ darkMode, toggleDarkMode, onLogout }) {
                           <div className="flex-1 h-px bg-light-border dark:bg-dark-border min-w-0 mr-4"></div>
                         </h2>
 
-                        {/* Layout Toggle - only show on first group if multiple dates */}
-                        <div className="flex items-center bg-gray-100 dark:bg-gray-800 rounded-lg p-1 border border-light-border dark:border-dark-border">
-                          <button
-                            onClick={() => setLayoutMode('gallery')}
-                            className={`p-1.5 rounded-md transition-colors ${layoutMode === 'gallery' ? 'bg-white dark:bg-gray-700 shadow-sm text-accent dark:text-accent-dark' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}
-                            title="Gallery View"
-                          >
-                            <LayoutGrid className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => setLayoutMode('pinterest')}
-                            className={`p-1.5 rounded-md transition-colors ${layoutMode === 'pinterest' ? 'bg-white dark:bg-gray-700 shadow-sm text-accent dark:text-accent-dark' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}
-                            title="Pinterest View"
-                          >
-                            <Columns className="w-4 h-4" />
-                          </button>
-                        </div>
                       </div>
 
                       <div className={
@@ -408,12 +397,6 @@ function Dashboard({ darkMode, toggleDarkMode, onLogout }) {
                     </div>
                   ))}
                 </div>
-                <Pagination
-                  currentPage={currentPage}
-                  totalPages={totalPages}
-                  onPageChange={goToPage}
-                  loading={loading}
-                />
               </>
             )}
 
@@ -421,7 +404,20 @@ function Dashboard({ darkMode, toggleDarkMode, onLogout }) {
             {!loading && filteredBookmarks.length > 0 && viewMode === 'grouped' && (
               <TagCloudView bookmarks={filteredBookmarks} />
             )}
+
+            {/* Global Pagination */}
+            {!loading && !error && filteredBookmarks.length > 0 && selectedTags.length === 0 && !selectedFolder && (
+              <div className="mt-8 mb-4">
+                <Pagination
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  onPageChange={goToPage}
+                  loading={loading}
+                />
+              </div>
+            )}
           </div>
+
         </main>
       </div>
 

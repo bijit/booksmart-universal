@@ -59,7 +59,7 @@ function aggregateChunksByBookmark(chunks, limit = 10) {
         matching_chunks: [{
           chunk_index: chunk.chunk_index || 0,
           score: chunk.score,
-          chunk_text: (chunk.chunk_text || chunk.content || '').substring(0, 200) + '...'
+          chunk_text: (chunk.chunk_text || chunk.content || '').substring(0, 2000)
         }]
       });
     } else {
@@ -79,7 +79,7 @@ function aggregateChunksByBookmark(chunks, limit = 10) {
       bookmark.matching_chunks.push({
         chunk_index: chunk.chunk_index,
         score: chunk.score,
-        chunk_text: chunk.chunk_text.substring(0, 200) + '...'
+        chunk_text: chunk.chunk_text.substring(0, 2000)
       });
     }
   }

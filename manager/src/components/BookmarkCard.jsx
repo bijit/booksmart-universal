@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ExternalLink, Trash2, Edit2, Calendar, Clock, Sparkles, ChevronDown, ChevronUp, CheckCircle2 } from 'lucide-react'
+import { ExternalLink, Trash2, Edit2, Calendar, Clock, Sparkles, ChevronDown, ChevronUp, CheckCircle2, FileText } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 import useBookmarkStore from '../store/useBookmarkStore'
 import EditBookmarkModal from './EditBookmarkModal'
@@ -71,6 +71,15 @@ function BookmarkCard({ bookmark, layoutMode = 'gallery' }) {
     return 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-700'
   }
 
+  const getDocType = () => {
+    const url = bookmark.url?.toLowerCase() || ''
+    if (url.endsWith('.pdf') || bookmark.extraction_method === 'document-service' && bookmark.method === 'pdf-parse') return 'PDF'
+    if (url.endsWith('.docx') || bookmark.extraction_method === 'document-service' && bookmark.method === 'mammoth') return 'DOCX'
+    return null
+  }
+
+  const docType = getDocType()
+
   return (
     <div className={`card group relative flex flex-col overflow-hidden ${isDeleting ? 'opacity-50 pointer-events-none' : ''} ${
       layoutMode === 'gallery' ? 'h-[580px]' : ''
@@ -95,6 +104,26 @@ function BookmarkCard({ bookmark, layoutMode = 'gallery' }) {
               e.target.parentElement.style.display = 'none';
             }}
           />
+        </div>
+      )}
+
+      {/* Processing Status Badge */}
+      {bookmark.processing_status && bookmark.processing_status !== 'completed' && (
+        <div className="absolute top-2 left-2 z-10 flex items-center gap-1.5 px-2 py-1 rounded-full bg-yellow-500/90 text-white text-[10px] font-bold shadow-sm backdrop-blur-sm animate-pulse">
+          <Clock className="w-3 h-3" />
+          <span>{bookmark.processing_status === 'pending' ? 'PENDING' : 'PROCESSING...'}</span>
+        </div>
+      )}
+
+      {/* Document Type Badge */}
+      {docType && (
+        <div className={`absolute ${bookmark.processing_status && bookmark.processing_status !== 'completed' ? 'top-10' : 'top-2'} left-2 z-10 flex items-center gap-1.5 px-2 py-1 rounded-full text-[10px] font-bold shadow-sm backdrop-blur-sm border ${
+          docType === 'PDF' 
+            ? 'bg-red-500/90 text-white border-red-400' 
+            : 'bg-blue-500/90 text-white border-blue-400'
+        }`}>
+          <FileText className="w-3 h-3" />
+          <span>{docType}</span>
         </div>
       )}
       

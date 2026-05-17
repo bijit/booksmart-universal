@@ -1,4 +1,4 @@
-import { BookmarkPlus, Chrome } from 'lucide-react'
+import { BookmarkPlus, Globe } from 'lucide-react'
 
 function EmptyState() {
   return (
@@ -19,7 +19,7 @@ function EmptyState() {
 
         <div className="bg-light-card dark:bg-dark-card border border-light-border dark:border-dark-border rounded-lg p-6 text-left">
           <h3 className="font-semibold mb-3 flex items-center gap-2">
-            <Chrome className="w-5 h-5 text-accent dark:text-accent-dark" />
+            <Globe className="w-5 h-5 text-accent dark:text-accent-dark" />
             Getting Started
           </h3>
           <ol className="space-y-2 text-sm text-light-text-secondary dark:text-dark-text-secondary">
@@ -49,7 +49,7 @@ function EmptyState() {
             rel="noopener noreferrer"
             className="btn btn-primary inline-flex items-center gap-2"
           >
-            <Chrome className="w-5 h-5" />
+            <Globe className="w-5 h-5" />
             Download Chrome Extension
           </a>
         </div>

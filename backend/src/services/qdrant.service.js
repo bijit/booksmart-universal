@@ -303,7 +303,8 @@ export async function getBookmarksByUser(userId, options = {}) {
     const {
       limit = 50,
       offset = 0,
-      tags = null
+      tags = null,
+      folderPath = null
     } = options;
 
     // Build filter
@@ -321,6 +322,14 @@ export async function getBookmarksByUser(userId, options = {}) {
       filter.must.push({
         key: 'tags',
         match: { any: tags }
+      });
+    }
+
+    // Add folder filter if provided
+    if (folderPath) {
+      filter.must.push({
+        key: 'folder_path',
+        match: { value: folderPath }
       });
     }
 

@@ -41,7 +41,7 @@ export async function summarizeContent(content, url) {
     console.log(`[Gemini] Summarizing content (${content.length} chars)...`);
 
     // Use Gemini 1.5 Flash for fast summarization
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-flash-latest' });
 
     // Truncate content if too long (Gemini has token limits)
     const truncatedContent = content.substring(0, 8000);
@@ -197,7 +197,7 @@ export async function summarizeFromMetadata(url, title) {
   try {
     console.log(`[Gemini] Generating summary from metadata only for: ${url}`);
 
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-flash-latest' });
 
     const prompt = `You are a helpful assistant that creates summaries for bookmarks based on limited information.
 
@@ -385,7 +385,7 @@ export async function rerankResults(query, results) {
 
     console.log(`[Gemini] Reranking ${results.length} results for query: "${query}"`);
 
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-flash-latest' });
 
     // Prepare results for reranking (use titles and descriptions)
     const resultsForReranking = results.map((r, idx) => ({
@@ -456,16 +456,27 @@ export async function generateSearchAnswer(query, results) {
 
     console.log(`[Gemini] Generating RAG answer for query: "${query}" using ${results.length} sources`);
 
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-flash-latest' });
 
     // Prepare context from results
-    // We use the first few matches to keep context clean
-    const sources = results.slice(0, 5).map((r, i) => ({
-      id: r.id,
-      index: i + 1,
-      title: r.title || 'Untitled Source',
-      content: r.text || r.description || ''
-    }));
+    // We use the first few matches and prioritize specific matching chunks if available
+    const sources = results.slice(0, 5).map((r, i) => {
+      // If we have specific matching chunks (from Deep Search), use them
+      // Otherwise fallback to full content or description
+      let bestContent = '';
+      if (r.matching_chunks && r.matching_chunks.length > 0) {
+        bestContent = r.matching_chunks.map(c => c.chunk_text).join('\n---\n');
+      } else {
+        bestContent = r.content || r.text || r.description || '';
+      }
+
+      return {
+        id: r.id,
+        index: i + 1,
+        title: r.title || 'Untitled Source',
+        content: bestContent.substring(0, 2000) // Keep chunks concise
+      };
+    });
 
     const context = sources.map(s => `[Source ${s.index}]: ${s.title}\n${s.content}`).join('\n\n');
 
@@ -528,7 +539,7 @@ Respond with a JSON object:
  */
 export async function suggestTags(title, content = '') {
   try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-flash-latest' });
     
     const prompt = `You are a professional librarian for "BookSmart". 
 Suggest 3-5 concise, professional tags for this page.
@@ -564,7 +575,7 @@ export async function generateDeepSummary(content, title) {
   try {
     console.log(`[Gemini] Generating deep summary for: "${title}" (${content.length} chars)`);
 
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-flash-latest' });
 
     // Truncate to a reasonable limit for summarization (e.g., 30,000 characters)
     const truncatedContent = content.substring(0, 30000);
@@ -651,7 +662,7 @@ export async function generateWebSearchQuery(originalQuery, overview) {
       throw new Error('Gemini AI is not initialized');
     }
 
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-flash-latest' });
 
     const prompt = `You are a research assistant for "BookSmart". 
 A user has performed a search in their personal bookmarks and received an AI overview. 
@@ -692,7 +703,7 @@ export async function parseSearchIntent(query) {
 
     console.log(`[Gemini] Parsing search intent for: "${query}"`);
 
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-flash-latest' });
     const now = new Date();
     const dateContext = `Current date: ${now.toISOString()}. 
     Relative date hints: 
