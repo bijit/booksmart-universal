@@ -39,10 +39,10 @@ browser.runtime.onInstalled.addListener((details) => {
 });
 
 // ── Dedup guard ──────────────────────────────────────────────────────────────
-// When we mirror a BookSmart save back to Chrome, it fires onCreated, which
-// would create a duplicate in BookSmart. We track URLs we just mirrored and
-// skip them in the onCreated handler.
-const selfCreatedUrls = new Set();
+// When we mirror a BookSmart save/update back to Chrome, it fires Chrome events,
+// which would normally sync back to BookSmart. We track URLs we just modified
+// and skip them to prevent infinite loops.
+const selfModifiedUrls = new Set();
 
 // Listen to new bookmarks being created
 browser.bookmarks.onCreated.addListener(async (id, bookmark) => {
@@ -50,8 +50,8 @@ browser.bookmarks.onCreated.addListener(async (id, bookmark) => {
   if (!bookmark.url) return;
 
   // Skip bookmarks that WE just created to avoid double-syncing
-  if (selfCreatedUrls.has(bookmark.url)) {
-    selfCreatedUrls.delete(bookmark.url);
+  if (selfModifiedUrls.has(bookmark.url)) {
+    selfModifiedUrls.delete(bookmark.url);
     console.log('[BookSmart] Skipping self-created bookmark (already in BookSmart):', bookmark.url);
     return;
   }
@@ -72,6 +72,11 @@ browser.bookmarks.onMoved.addListener(async (id, moveInfo) => {
   console.log('Bookmark moved:', id, moveInfo);
   const [bookmark] = await browser.bookmarks.get(id);
   if (bookmark && bookmark.url) {
+    if (selfModifiedUrls.has(bookmark.url)) {
+      selfModifiedUrls.delete(bookmark.url);
+      console.log('[BookSmart] Skipping self-moved bookmark:', bookmark.url);
+      return;
+    }
     await handleBookmarkUpdate(bookmark);
   }
 });
@@ -81,6 +86,11 @@ browser.bookmarks.onChanged.addListener(async (id, changeInfo) => {
   console.log('Bookmark changed:', id, changeInfo);
   const [bookmark] = await browser.bookmarks.get(id);
   if (bookmark && bookmark.url) {
+    if (selfModifiedUrls.has(bookmark.url)) {
+      selfModifiedUrls.delete(bookmark.url);
+      console.log('[BookSmart] Skipping self-renamed bookmark:', bookmark.url);
+      return;
+    }
     await handleBookmarkUpdate(bookmark);
   }
 });
@@ -320,6 +330,16 @@ browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
       });
     return true; // keep channel open for async response
   }
+
+  if (message.action === 'updateChromeBookmark') {
+    updateMirroredChromeBookmark(message.url, message.title, message.folderPath)
+      .then(() => sendResponse({ success: true }))
+      .catch(e => {
+        console.warn('[BookSmart] updateChromeBookmark failed:', e.message);
+        sendResponse({ success: false, error: e.message });
+      });
+    return true;
+  }
 });
 
 // ── Chrome bookmark mirroring ─────────────────────────────────────────────────
@@ -382,7 +402,7 @@ async function findOrCreateChromeFolder(folderPath) {
 
 /**
  * Create a Chrome native bookmark for a URL that was saved via BookSmart.
- * Registers the URL in selfCreatedUrls first to suppress the onCreated event.
+ * Registers the URL in selfModifiedUrls first to suppress the onCreated event.
  */
 async function mirrorBookmarkToChrome(url, title, folderPath) {
   try {
@@ -393,9 +413,7 @@ async function mirrorBookmarkToChrome(url, title, folderPath) {
       return;
     }
 
-    // Register as self-created BEFORE calling browser.bookmarks.create
-    // so the onCreated handler knows to skip it
-    selfCreatedUrls.add(url);
+    selfModifiedUrls.add(url);
 
     // Resolve the folder (create if needed)
     const parentId = folderPath
@@ -408,11 +426,39 @@ async function mirrorBookmarkToChrome(url, title, folderPath) {
     await browser.bookmarks.create(createParams);
     console.log('[BookSmart] Mirrored bookmark to Chrome:', url, folderPath || '(no folder)');
 
-    // Safety: clean up the guard entry after 5 seconds in case onCreated fires slowly
-    setTimeout(() => selfCreatedUrls.delete(url), 5000);
+    setTimeout(() => selfModifiedUrls.delete(url), 5000);
   } catch (e) {
-    // If creation failed, remove the guard so we don't permanently suppress future saves
-    selfCreatedUrls.delete(url);
+    selfModifiedUrls.delete(url);
+    throw e;
+  }
+}
+
+/**
+ * Update an existing Chrome bookmark (title and folder) based on BookSmart edits.
+ */
+async function updateMirroredChromeBookmark(url, title, folderPath) {
+  try {
+    const existing = await browser.bookmarks.search({ url });
+    if (!existing || existing.length === 0) return;
+
+    selfModifiedUrls.add(url);
+
+    const parentId = folderPath ? await findOrCreateChromeFolder(folderPath) : undefined;
+
+    // Update all matching Chrome bookmarks
+    for (const bookmark of existing) {
+      if (title && bookmark.title !== title) {
+        await browser.bookmarks.update(bookmark.id, { title });
+      }
+      if (parentId && bookmark.parentId !== parentId) {
+        await browser.bookmarks.move(bookmark.id, { parentId });
+      }
+    }
+
+    console.log('[BookSmart] Updated Chrome bookmark:', url);
+    setTimeout(() => selfModifiedUrls.delete(url), 5000);
+  } catch (e) {
+    selfModifiedUrls.delete(url);
     throw e;
   }
 }

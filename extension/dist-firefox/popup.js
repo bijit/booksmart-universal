@@ -642,6 +642,7 @@ let currentTabData = null;
 let allFolderPaths = [];
 let selectedFolderPath = null;
 let folderDropdownVisible = false;
+let existingBookmarkId = null;
 
 // Folder Picker DOM refs (populated after DOMContentLoaded)
 let folderSearchInput, folderDropdown, folderDropdownList, folderCreateOption, folderCreateLabel, selectedFolderChip, selectedFolderName, clearFolderBtn;
@@ -675,15 +676,25 @@ async function initializeCurrentPageContext() {
     const isBookmarked = data.bookmarks && data.bookmarks.length > 0;
 
     if (isBookmarked) {
-      updateSaveBtnToSaved();
-      
       const dbBookmark = data.bookmarks[0];
-      const folderPickerSection = document.getElementById('folderPickerSection');
+      existingBookmarkId = dbBookmark.id;
+
+      // Pre-fill fields for editing
+      if (dbBookmark.title) currentPageTitle.value = dbBookmark.title;
+      if (dbBookmark.folder_path) selectFolder(dbBookmark.folder_path);
+
+      // Change button text
+      savePageBtn.innerHTML = `
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 20h9"></path><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+        </svg>
+        Update Bookmark
+      `;
+
+      // Still show the folder info row as a handy link to the bookmark manager
       const folderInfoRow = document.getElementById('folderInfoRow');
       const savedFolderPath = document.getElementById('savedFolderPath');
       const seeInFolderBtn = document.getElementById('seeInFolderBtn');
-      
-      if (folderPickerSection) folderPickerSection.classList.add('hidden');
       
       if (folderInfoRow && savedFolderPath && seeInFolderBtn) {
         savedFolderPath.textContent = dbBookmark.folder_path || 'Other Bookmarks';
@@ -1029,23 +1040,44 @@ async function handleSaveCurrentPage() {
 
   try {
     const title = currentPageTitle.value.trim() || currentTabData.title;
-    await bookmarks.create({
-      url: currentTabData.url,
-      title,
-      tags: allTags,
-      folder_path: selectedFolderPath || null
-    });
+    
+    if (existingBookmarkId) {
+      // Update existing bookmark
+      await bookmarks.update(existingBookmarkId, {
+        title,
+        tags: allTags,
+        folder_path: selectedFolderPath || null
+      });
 
-    // Mirror the save back to Chrome's native bookmark manager
-    // (background.js will handle deduplication to avoid double-syncing)
-    browser.runtime.sendMessage({
-      action: 'mirrorToChrome',
-      url: currentTabData.url,
-      title,
-      folderPath: selectedFolderPath || null
-    }).catch(e => console.warn('[BookSmart] Could not mirror to Chrome:', e.message));
+      // Mirror update to Chrome
+      browser.runtime.sendMessage({
+        action: 'updateChromeBookmark',
+        url: currentTabData.url,
+        title,
+        folderPath: selectedFolderPath || null
+      }).catch(e => console.warn('[BookSmart] Could not mirror update to Chrome:', e.message));
 
-    updateSaveBtnToSaved();
+      updateSaveBtnToSaved('Updated!');
+    } else {
+      // Create new bookmark
+      await bookmarks.create({
+        url: currentTabData.url,
+        title,
+        tags: allTags,
+        folder_path: selectedFolderPath || null
+      });
+
+      // Mirror the save back to Chrome's native bookmark manager
+      browser.runtime.sendMessage({
+        action: 'mirrorToChrome',
+        url: currentTabData.url,
+        title,
+        folderPath: selectedFolderPath || null
+      }).catch(e => console.warn('[BookSmart] Could not mirror to Chrome:', e.message));
+
+      updateSaveBtnToSaved('Saved to Library');
+    }
+
     // Refresh the list to show the new bookmark
     loadRecentBookmarks();
   } catch (error) {
@@ -1055,12 +1087,12 @@ async function handleSaveCurrentPage() {
   }
 }
 
-function updateSaveBtnToSaved() {
+function updateSaveBtnToSaved(text = 'Saved to Library') {
   savePageBtn.disabled = true;
   savePageBtn.className = 'btn btn-secondary btn-sm';
   savePageBtn.innerHTML = `
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
-    Saved to Library
+    ${text}
   `;
   relatedContent.classList.add('hidden');
 }
