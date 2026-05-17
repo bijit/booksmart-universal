@@ -11,7 +11,7 @@ import {
   generateSearchAnswer 
 } from './gemini.service.js';
 import { searchBookmarks as searchQdrant, searchChunks } from './qdrant.service.js';
-import { createSearchHistory } from './supabase.service.js';
+import { createSearchHistory, searchBookmarksByText } from './supabase.service.js';
 import { scoreBM25, enhancedTextMatch } from '../utils/text-matching.js';
 
 // Configuration: Enable chunked search (set to false to use legacy non-chunked search)
@@ -222,8 +222,48 @@ export async function hybridSearch(userId, query, options = {}) {
       deepSearch = false // Default to fast search
     } = options;
 
-    const semanticResults = await semanticSearch(userId, query, { limit: limit * 2, offset, tags, startDate, endDate, scoreThreshold, folderPath });
-    const resultsWithBM25 = scoreBM25(query, semanticResults);
+    // Run Semantic Search (AI Vector) and Metadata Search (Database Exact Match) in parallel
+    const [semanticResults, metadataResults] = await Promise.all([
+      semanticSearch(userId, query, { limit: limit * 2, offset, tags, startDate, endDate, scoreThreshold, folderPath }),
+      searchBookmarksByText(userId, query, limit * 2)
+    ]);
+
+    // Merge results. Use Map to deduplicate by ID.
+    const mergedResultsMap = new Map();
+    
+    // Add semantic results first
+    semanticResults.forEach(res => {
+      mergedResultsMap.set(res.id || res.bookmark_id, res);
+    });
+    
+    // Inject metadata results (from notes, title, description in DB)
+    metadataResults.forEach(dbRes => {
+      const id = dbRes.id;
+      if (!mergedResultsMap.has(id)) {
+        // Format DB result to look like a Qdrant semantic result so it flows through the pipeline
+        mergedResultsMap.set(id, {
+          id: id,
+          bookmark_id: id,
+          url: dbRes.url,
+          title: dbRes.title,
+          description: dbRes.description,
+          notes: dbRes.notes,
+          content: dbRes.extracted_content,
+          tags: dbRes.tags || [],
+          favicon_url: dbRes.favicon_url,
+          created_at: dbRes.created_at,
+          // Give it a tiny baseline semantic score so it doesn't get zeroed out completely
+          score: 0.1, 
+          is_metadata_match: true // Flag to show it came from DB
+        });
+      } else {
+        // Ensure notes are populated for the text-matcher if Qdrant missed them
+        mergedResultsMap.get(id).notes = dbRes.notes || mergedResultsMap.get(id).notes;
+      }
+    });
+
+    const combinedResults = Array.from(mergedResultsMap.values());
+    const resultsWithBM25 = scoreBM25(query, combinedResults);
 
     const scoredResults = resultsWithBM25.map(result => {
       const semanticScore = result.score; // Vector similarity score (0-1)

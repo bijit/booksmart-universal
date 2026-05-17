@@ -611,3 +611,42 @@ export async function getUserUniqueFolderPaths(userId) {
   }
 }
 
+/**
+ * Perform a raw text search on the metadata fields (notes, title, description)
+ * Used as a parallel search path to ensure personal notes are always discoverable.
+ *
+ * @param {string} userId - User ID
+ * @param {string} query - Search query
+ * @param {number} limit - Max results
+ * @returns {Promise<Array>} List of matching bookmarks
+ */
+export async function searchBookmarksByText(userId, query, limit = 20) {
+  try {
+    // Basic safety: if query is too short, avoid massive database scans
+    if (!query || query.trim().length < 2) return [];
+    
+    // Create an ILIKE query for each word to make it slightly more fuzzy than an exact phrase match
+    // E.g., if query is "banana project", it will look for "%banana project%"
+    // For a more advanced text search, we could use Postgres Full Text Search (to_tsquery).
+    const safeQuery = query.trim().replace(/[%_]/g, '\\$&'); // escape ILIKE special chars
+    
+    const { data, error } = await supabaseAdmin
+      .from('bookmarks')
+      .select('*')
+      .eq('user_id', userId)
+      .or(`notes.ilike.%${safeQuery}%,title.ilike.%${safeQuery}%,description.ilike.%${safeQuery}%`)
+      .limit(limit);
+
+    if (error) {
+      throw error;
+    }
+
+    return data || [];
+
+  } catch (error) {
+    console.error('Error in Supabase text search:', error);
+    // Don't throw, just return empty array so it doesn't break the hybrid search pipeline
+    return [];
+  }
+}
+
