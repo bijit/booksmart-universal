@@ -33,6 +33,7 @@ function Dashboard({ darkMode, toggleDarkMode, onLogout }) {
     setShowOnlyProcessing,
     currentPage,
     totalPages,
+    totalBookmarks,
     researchOnWeb
   } = useBookmarkStore()
 
