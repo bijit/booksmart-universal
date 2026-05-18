@@ -285,6 +285,9 @@ export async function getUserBookmarkCount(userId, options = {}) {
 
     if (status) {
       query = query.eq('processing_status', status);
+    } else {
+      // Exclude failed bookmarks by default to keep pagination consistent with client views
+      query = query.neq('processing_status', 'failed');
     }
 
     if (url) {
@@ -348,6 +351,9 @@ export async function getUserBookmarkRecords(userId, options = {}) {
 
     if (status) {
       query = query.eq('processing_status', status);
+    } else {
+      // Exclude failed bookmarks by default to keep pagination consistent with client views
+      query = query.neq('processing_status', 'failed');
     }
 
     if (folder_path) {

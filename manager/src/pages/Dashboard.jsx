@@ -9,7 +9,7 @@ import ImportBookmarks from '../components/ImportBookmarks'
 import Pagination from '../components/Pagination'
 import { Virtuoso, VirtuosoGrid } from 'react-virtuoso'
 import useBookmarkStore from '../store/useBookmarkStore'
-import { Sparkles, LayoutGrid, Columns, Globe, ExternalLink } from 'lucide-react'
+import { Sparkles, LayoutGrid, Columns, Globe, ExternalLink, Inbox } from 'lucide-react'
 
 function Dashboard({ darkMode, toggleDarkMode, onLogout }) {
   const [showImport, setShowImport] = useState(false)
@@ -263,7 +263,21 @@ function Dashboard({ darkMode, toggleDarkMode, onLogout }) {
 
             {/* Empty State */}
             {!loading && !error && filteredBookmarks.length === 0 && (
-              <EmptyState />
+              totalBookmarks === 0 ? (
+                <EmptyState />
+              ) : (
+                <div className="flex flex-col items-center justify-center min-h-[40vh] text-center px-4">
+                  <div className="p-4 bg-gray-100 dark:bg-gray-800 rounded-full mb-4">
+                    <Inbox className="w-12 h-12 text-gray-400 dark:text-gray-500" />
+                  </div>
+                  <h3 className="text-xl font-semibold mb-2 text-light-text dark:text-dark-text">No bookmarks found</h3>
+                  <p className="text-light-text-secondary dark:text-dark-text-secondary max-w-sm">
+                    {searchQuery 
+                      ? `We couldn't find anything matching "${searchQuery}". Try adjusting your keywords.`
+                      : "No bookmarks match your selected tags, folders, or page filter."}
+                  </p>
+                </div>
+              )
             )}
 
             {/* Cards View */}
@@ -406,7 +420,7 @@ function Dashboard({ darkMode, toggleDarkMode, onLogout }) {
             )}
 
             {/* Global Pagination */}
-            {!loading && !error && filteredBookmarks.length > 0 && selectedTags.length === 0 && !selectedFolder && (
+            {!loading && !error && totalPages > 1 && selectedTags.length === 0 && !selectedFolder && (
               <div className="mt-8 mb-4">
                 <Pagination
                   currentPage={currentPage}
