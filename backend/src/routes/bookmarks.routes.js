@@ -506,11 +506,18 @@ router.post('/:id/summarize', async (req, res) => {
       content = qdrantData?.content;
     }
 
-    if (!content || content.length < 200) {
-      return res.status(400).json({
-        error: 'Bad Request',
-        message: 'Bookmark does not have enough content for a deep summary'
-      });
+    // If it's a metadata-only bookmark or content is missing, fall back to using title and description
+    let isMetadataOnly = false;
+    if (!content || content.length < 200 || content.startsWith('Metadata-only bookmark.')) {
+      if (bookmark.description && bookmark.description.length >= 20) {
+        content = `Title: ${bookmark.title || 'Untitled'}\nDescription: ${bookmark.description}\nURL: ${bookmark.url}`;
+        isMetadataOnly = true;
+      } else {
+        return res.status(400).json({
+          error: 'Bad Request',
+          message: 'Bookmark does not have enough content or description for a deep summary'
+        });
+      }
     }
 
     // 5. Generate deep summary using Gemini
