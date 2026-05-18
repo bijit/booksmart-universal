@@ -111,7 +111,7 @@ function getFaviconUrl(url) {
  * @returns {Promise<boolean>} True if successful, false if failed
  */
 async function processBookmark(bookmark) {
-  const { id, url, title, user_id, retry_count, extracted_content, extraction_method, created_at } = bookmark;
+  const { id, url, title, user_id, retry_count, extracted_content, extraction_method, created_at, folder_path, folder_id } = bookmark;
 
   console.log(`\n[Worker] Processing bookmark ${id}: ${url}`);
 
@@ -167,6 +167,8 @@ async function processBookmark(bookmark) {
         tags: aiResult.tags || [],
         chunks: aiResult.chunks,
         favicon_url: extracted.favicon || null,
+        folder_path: folder_path || null,
+        folder_id: folder_id || null,
         created_at: created_at
       });
 
@@ -186,6 +188,8 @@ async function processBookmark(bookmark) {
         embedding: aiResult.embedding,
         tags: aiResult.tags || [],
         favicon_url: extracted.favicon || null,
+        folder_path: folder_path || null,
+        folder_id: folder_id || null,
         created_at: created_at
       });
 
