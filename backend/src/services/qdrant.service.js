@@ -131,6 +131,8 @@ export async function createBookmark(userId, bookmarkData) {
         favicon_url: bookmarkData.favicon_url || null,
         folder_id: bookmarkData.folder_id || null,
         folder_path: bookmarkData.folder_path || null,
+        cover_image: bookmarkData.cover_image || null,
+        extracted_images: bookmarkData.extracted_images || [],
         created_at: bookmarkData.created_at || new Date().toISOString(),
         updated_at: new Date().toISOString()
       }
@@ -425,7 +427,7 @@ export async function countUserBookmarks(userId) {
  */
 export async function createBookmarkChunks(userId, bookmarkData) {
   try {
-    const { bookmark_id, url, title, description, content, tags, chunks, favicon_url, folder_id, folder_path } = bookmarkData;
+    const { bookmark_id, url, title, description, content, tags, chunks, favicon_url, folder_id, folder_path, cover_image, extracted_images } = bookmarkData;
 
 
     if (!chunks || chunks.length === 0) {
@@ -449,6 +451,8 @@ export async function createBookmarkChunks(userId, bookmarkData) {
         favicon_url: favicon_url || null,
         folder_id: folder_id || null,
         folder_path: folder_path || null,
+        cover_image: cover_image || null,
+        extracted_images: extracted_images || [],
         author: bookmarkData.author || null,
         site_name: bookmarkData.site_name || null,
         published_date: bookmarkData.published_date || null,

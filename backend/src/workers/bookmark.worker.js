@@ -169,6 +169,8 @@ async function processBookmark(bookmark) {
         favicon_url: extracted.favicon || null,
         folder_path: folder_path || null,
         folder_id: folder_id || null,
+        cover_image: extracted.cover_image || null,
+        extracted_images: extracted.extracted_images || [],
         created_at: created_at
       });
 
@@ -190,6 +192,8 @@ async function processBookmark(bookmark) {
         favicon_url: extracted.favicon || null,
         folder_path: folder_path || null,
         folder_id: folder_id || null,
+        cover_image: extracted.cover_image || null,
+        extracted_images: extracted.extracted_images || [],
         created_at: created_at
       });
 

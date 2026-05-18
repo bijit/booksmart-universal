@@ -47,6 +47,8 @@ function aggregateChunksByBookmark(chunks, limit = 10) {
         content: chunk.content,
         tags: chunk.tags,
         favicon_url: chunk.favicon_url,
+        cover_image: chunk.cover_image,
+        extracted_images: chunk.extracted_images,
         created_at: chunk.created_at,
         updated_at: chunk.updated_at,
         // Keep track of best matching chunk (or the bookmark itself if legacy)
@@ -96,6 +98,8 @@ function aggregateChunksByBookmark(chunks, limit = 10) {
       content: bookmark.content,
       tags: bookmark.tags,
       favicon_url: bookmark.favicon_url,
+      cover_image: bookmark.cover_image,
+      extracted_images: bookmark.extracted_images,
       created_at: bookmark.created_at,
       updated_at: bookmark.updated_at,
       score: bookmark.best_chunk.score,
