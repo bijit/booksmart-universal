@@ -284,7 +284,7 @@ export async function searchBookmarks(userId, queryEmbedding, options = {}) {
     });
 
     return searchResults.map(result => ({
-      id: result.id,
+      id: result.payload?.bookmark_id || result.id,
       score: result.score,
       ...result.payload
     }));
@@ -343,7 +343,7 @@ export async function getBookmarksByUser(userId, options = {}) {
     });
 
     return scrollResults.points.map(point => ({
-      id: point.id,
+      id: point.payload?.bookmark_id || point.id,
       ...point.payload
     }));
 
