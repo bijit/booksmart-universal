@@ -46,6 +46,9 @@ cp src/popup/popup.js dist/
 # Fix imports in popup.js (from ../ to ./)
 sed -i '' "s|'../|'./|g" dist/popup.js
 
+# Copy bookmarks override page
+cp src/bookmarks/bookmarks.html dist/
+
 echo "Creating Firefox specific distribution..."
 rm -rf dist-firefox
 cp -r dist dist-firefox
