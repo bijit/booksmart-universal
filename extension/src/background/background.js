@@ -43,6 +43,42 @@ browser.runtime.onInstalled.addListener((details) => {
 // and skip them to prevent infinite loops.
 const selfModifiedUrls = new Set();
 
+/**
+ * Get or create the dedicated "BookSmart Inbox" folder natively
+ */
+async function getOrCreateInboxFolder() {
+  try {
+    const results = await browser.bookmarks.search({ title: 'BookSmart Inbox' });
+    const folder = results.find(item => !item.url);
+    if (folder) {
+      return folder.id;
+    }
+
+    const tree = await browser.bookmarks.getTree();
+    const root = tree[0];
+    let parentId = '1'; // Default parent (Bookmarks Bar)
+    
+    if (root && root.children) {
+      const bookmarksBar = root.children.find(child => child.title.toLowerCase().includes('bar') || child.id === '1');
+      if (bookmarksBar) {
+        parentId = bookmarksBar.id;
+      } else if (root.children[0]) {
+        parentId = root.children[0].id;
+      }
+    }
+
+    const newFolder = await browser.bookmarks.create({
+      parentId: parentId,
+      title: 'BookSmart Inbox'
+    });
+    console.log('[BookSmart] Created dedicated "BookSmart Inbox" folder:', newFolder);
+    return newFolder.id;
+  } catch (error) {
+    console.error('[BookSmart] Error creating "BookSmart Inbox" folder:', error);
+    return null;
+  }
+}
+
 // Listen to new bookmarks being created
 browser.bookmarks.onCreated.addListener(async (id, bookmark) => {
   console.log('New bookmark created:', bookmark);
@@ -55,7 +91,23 @@ browser.bookmarks.onCreated.addListener(async (id, bookmark) => {
     return;
   }
 
-  await handleNewBookmark(bookmark);
+  let finalBookmark = bookmark;
+  try {
+    const { autoInboxRoute } = await browser.storage.local.get('autoInboxRoute');
+    if (autoInboxRoute) {
+      const inboxFolderId = await getOrCreateInboxFolder();
+      if (inboxFolderId && bookmark.parentId !== inboxFolderId) {
+        console.log(`[BookSmart] Auto-routing native bookmark to Inbox folder...`);
+        selfModifiedUrls.add(bookmark.url);
+        const movedBookmark = await browser.bookmarks.move(bookmark.id, { parentId: inboxFolderId });
+        finalBookmark = { ...bookmark, ...movedBookmark };
+      }
+    }
+  } catch (err) {
+    console.error('[BookSmart] Error in auto-inbox routing:', err);
+  }
+
+  await handleNewBookmark(finalBookmark);
 });
 
 // Listen to bookmarks being removed

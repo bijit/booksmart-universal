@@ -130,6 +130,20 @@ function setupEventListeners() {
   syncFoldersBtn.addEventListener('click', handleSyncFolders);
   logoutBtn.addEventListener('click', handleLogout);
   savePageBtn.addEventListener('click', handleSaveCurrentPage);
+
+  // Initialize the auto-inbox toggle preference
+  const autoInboxToggle = document.getElementById('autoInboxToggle');
+  if (autoInboxToggle) {
+    browser.storage.local.get(['autoInboxRoute']).then((result) => {
+      autoInboxToggle.checked = !!result.autoInboxRoute;
+    }).catch(err => console.error('Error getting autoInboxRoute pref:', err));
+
+    autoInboxToggle.addEventListener('change', (e) => {
+      browser.storage.local.set({ autoInboxRoute: e.target.checked })
+        .then(() => console.log('[BookSmart] Auto-inbox preference updated:', e.target.checked))
+        .catch(err => console.error('Error saving autoInboxRoute pref:', err));
+    });
+  }
 }
 
 // Authentication Handlers
