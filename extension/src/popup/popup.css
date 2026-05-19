@@ -1210,14 +1210,12 @@ input::placeholder {
   justify-content: center;
 }
 
-/* Sticky Footer Settings */
-.footer-settings {
-  padding: 10px 16px;
-  background: #F9FAFB;
-  border-top: 1px solid #E5E7EB;
+/* Header Settings Toggle */
+.header-settings {
+  padding: 4px 0 0;
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
 }
 
 .settings-content {

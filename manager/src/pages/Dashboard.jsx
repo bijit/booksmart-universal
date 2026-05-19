@@ -218,8 +218,8 @@ function Dashboard({ darkMode, toggleDarkMode, onLogout }) {
               </div>
             )}
 
-            {/* Global Toolbar (Visible as long as there are bookmarks to filter) */}
-            {!loading && !error && (filteredBookmarks.length > 0 || searchQuery) && (
+            {/* Global Toolbar (Visible as long as there are bookmarks to filter, active search, or processing filter) */}
+            {!loading && !error && (filteredBookmarks.length > 0 || searchQuery || showOnlyProcessing) && (
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
                 <h3 className="text-lg font-bold text-light-text-secondary dark:text-dark-text-secondary uppercase tracking-wider">
                   {searchQuery ? 'Search Results' : 'All Bookmarks'}
@@ -273,10 +273,20 @@ function Dashboard({ darkMode, toggleDarkMode, onLogout }) {
                   </div>
                   <h3 className="text-xl font-semibold mb-2 text-light-text dark:text-dark-text">No bookmarks found</h3>
                   <p className="text-light-text-secondary dark:text-dark-text-secondary max-w-sm">
-                    {searchQuery 
-                      ? `We couldn't find anything matching "${searchQuery}". Try adjusting your keywords.`
-                      : "No bookmarks match your selected tags, folders, or page filter."}
+                    {showOnlyProcessing
+                      ? "No bookmarks are currently in the queue or being processed."
+                      : searchQuery 
+                        ? `We couldn't find anything matching "${searchQuery}". Try adjusting your keywords.`
+                        : "No bookmarks match your selected tags, folders, or page filter."}
                   </p>
+                  {showOnlyProcessing && (
+                    <button
+                      onClick={() => setShowOnlyProcessing(false)}
+                      className="mt-4 px-4 py-2 bg-accent text-white rounded-lg hover:bg-accent/90 transition-colors text-sm font-semibold shadow-sm"
+                    >
+                      Back to Dashboard
+                    </button>
+                  )}
                 </div>
               )
             )}
