@@ -691,3 +691,130 @@ export async function deleteAllUserPoints(userId) {
     throw new Error(`Failed to delete all user points: ${error.message}`);
   }
 }
+
+/**
+ * Update folder paths for a list of bookmarks in Qdrant (both parent points and chunk points)
+ */
+export async function updateQdrantFolderPaths(userId, updatedBookmarks) {
+  try {
+    for (const item of updatedBookmarks) {
+      // 1. Update parent point (if has qdrant_point_id)
+      if (item.qdrant_point_id) {
+        try {
+          await qdrantClient.setPayload(COLLECTION_NAME, {
+            payload: {
+              folder_path: item.newPath,
+              updated_at: new Date().toISOString()
+            },
+            points: [item.qdrant_point_id]
+          });
+        } catch (err) {
+          console.error(`Error updating parent point payload in Qdrant:`, err);
+        }
+      }
+
+      // 2. Find and update chunk points
+      try {
+        const scrollResult = await qdrantClient.scroll(COLLECTION_NAME, {
+          filter: {
+            must: [
+              { key: 'bookmark_id', match: { value: item.id } }
+            ]
+          },
+          with_payload: true,
+          with_vector: false
+        });
+
+        if (scrollResult.points && scrollResult.points.length > 0) {
+          const chunkIds = scrollResult.points
+            .filter(chunk => chunk.payload && chunk.payload.is_chunk === true)
+            .map(chunk => chunk.id);
+
+          if (chunkIds.length > 0) {
+            await qdrantClient.setPayload(COLLECTION_NAME, {
+              payload: {
+                folder_path: item.newPath,
+                updated_at: new Date().toISOString()
+              },
+              points: chunkIds
+            });
+          }
+        }
+      } catch (err) {
+        console.error(`Error updating chunk points payload in Qdrant:`, err);
+      }
+    }
+  } catch (error) {
+    console.error('Error updating folder paths in Qdrant:', error);
+    throw error;
+  }
+}
+
+/**
+ * Delete a list of bookmarks and their chunks from Qdrant
+ */
+export async function deleteQdrantBookmarks(userId, bookmarks) {
+  try {
+    for (const item of bookmarks) {
+      // Delete parent point
+      if (item.qdrant_point_id) {
+        try {
+          await qdrantClient.delete(COLLECTION_NAME, {
+            wait: true,
+            points: [item.qdrant_point_id]
+          });
+        } catch (err) {
+          console.error(`Error deleting parent point in Qdrant:`, err);
+        }
+      }
+
+      // Delete chunks
+      try {
+        const scrollResult = await qdrantClient.scroll(COLLECTION_NAME, {
+          filter: {
+            must: [
+              { key: 'bookmark_id', match: { value: item.id } }
+            ]
+          },
+          with_payload: true,
+          with_vector: false
+        });
+
+        if (scrollResult.points && scrollResult.points.length > 0) {
+          const chunkIds = scrollResult.points
+            .filter(chunk => chunk.payload && chunk.payload.is_chunk === true)
+            .map(chunk => chunk.id);
+
+          if (chunkIds.length > 0) {
+            await qdrantClient.delete(COLLECTION_NAME, {
+              wait: true,
+              points: chunkIds
+            });
+          }
+        }
+      } catch (err) {
+        console.error(`Error deleting chunks in Qdrant:`, err);
+      }
+    }
+  } catch (error) {
+    console.error('Error deleting bookmarks from Qdrant:', error);
+    throw error;
+  }
+}
+
+/**
+ * Dissolve a folder path (set folder_path to null) for a list of bookmarks in Qdrant
+ */
+export async function dissolveQdrantFolder(userId, bookmarks) {
+  try {
+    const dissolvedUpdates = bookmarks.map(b => ({
+      id: b.id,
+      qdrant_point_id: b.qdrant_point_id,
+      newPath: null
+    }));
+    await updateQdrantFolderPaths(userId, dissolvedUpdates);
+  } catch (error) {
+    console.error('Error dissolving folder in Qdrant:', error);
+    throw error;
+  }
+}

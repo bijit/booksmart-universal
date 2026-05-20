@@ -101,7 +101,7 @@ function Dashboard({ darkMode, toggleDarkMode, onLogout }) {
       <div className="flex flex-1">
         {/* Sidebar - Hidden on mobile */}
         <div
-          className="hidden lg:flex sticky top-16 h-[calc(100vh-64px)] relative flex-shrink-0"
+          className="hidden lg:flex sticky top-16 h-[calc(100vh-64px)] z-30 flex-shrink-0"
           style={{ width: `${sidebarWidth}px` }}
         >
           <Sidebar />

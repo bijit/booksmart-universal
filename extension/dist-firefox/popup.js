@@ -44,16 +44,12 @@ const suggestedTagsContainer = document.getElementById('suggestedTagsContainer')
 const suggestedTagsList = document.getElementById('suggestedTagsList');
 const discoveryTagsContainer = document.getElementById('discoveryTagsContainer');
 const discoveryTagsList = document.getElementById('discoveryTagsList');
-const tagFilterContainer = document.getElementById('tagFilterContainer');
-const tagFilterList = document.getElementById('tagFilterList');
 const importConfirmModal = document.getElementById('importConfirmModal');
 const importDeleteBtn = document.getElementById('importDeleteBtn');
 const importAddBtn = document.getElementById('importAddBtn');
 const importCancelBtn = document.getElementById('importCancelBtn');
 const closeImportModal = document.getElementById('closeImportModal');
 const importModalText = document.getElementById('importModalText');
-
-let selectedFilterTags = [];
 
 // Initialize popup
 document.addEventListener('DOMContentLoaded', async () => {
@@ -116,8 +112,6 @@ function setupEventListeners() {
   clearSearchBtn.addEventListener('click', () => {
     searchInput.value = '';
     clearSearchBtn.classList.add('hidden');
-    selectedFilterTags = [];
-    renderTagFilterRow([]); // Reset pills
     loadRecentBookmarks();
   });
 
@@ -130,6 +124,20 @@ function setupEventListeners() {
   syncFoldersBtn.addEventListener('click', handleSyncFolders);
   logoutBtn.addEventListener('click', handleLogout);
   savePageBtn.addEventListener('click', handleSaveCurrentPage);
+
+  // Initialize the auto-inbox toggle preference
+  const autoInboxToggle = document.getElementById('autoInboxToggle');
+  if (autoInboxToggle) {
+    browser.storage.local.get(['autoInboxRoute']).then((result) => {
+      autoInboxToggle.checked = !!result.autoInboxRoute;
+    }).catch(err => console.error('Error getting autoInboxRoute pref:', err));
+
+    autoInboxToggle.addEventListener('change', (e) => {
+      browser.storage.local.set({ autoInboxRoute: e.target.checked })
+        .then(() => console.log('[BookSmart] Auto-inbox preference updated:', e.target.checked))
+        .catch(err => console.error('Error saving autoInboxRoute pref:', err));
+    });
+  }
 }
 
 // Authentication Handlers
@@ -183,20 +191,9 @@ async function loadRecentBookmarks() {
 
   try {
     const params = { limit: 100, status: 'completed' };
-    if (selectedFilterTags.length > 0) {
-      params.tags = selectedFilterTags;
-    }
-    
     const data = await bookmarks.list(params);
     allRecentBookmarks = data.bookmarks || [];
     displayBookmarks(allRecentBookmarks);
-    
-    // Update tag filter row if not currently filtering (to show available tags)
-    if (selectedFilterTags.length === 0) {
-      renderTagFilterRow(data.bookmarks || []);
-    } else {
-      renderTagFilterRow(); // Just re-render active states
-    }
   } catch (error) {
     console.error('Error loading bookmarks:', error);
     if (error.status === 401) {
@@ -238,10 +235,6 @@ async function handleDeepSearch(query) {
 
   try {
     const options = { query: trimmedQuery };
-    if (selectedFilterTags.length > 0) {
-      options.tags = selectedFilterTags;
-    }
-    
     const data = await search.query(options);
 
     // Handle AI Answer
@@ -260,60 +253,6 @@ async function handleDeepSearch(query) {
     }
   } finally {
     deepSearchIndicator.classList.add('hidden');
-  }
-}
-
-// Tag Filtering UI
-let availableTags = [];
-
-function renderTagFilterRow(bookmarks = null) {
-  if (bookmarks) {
-    // Extract top tags from bookmarks
-    const counts = {};
-    bookmarks.forEach(b => {
-      b.tags?.forEach(tag => {
-        counts[tag] = (counts[tag] || 0) + 1;
-      });
-    });
-    availableTags = Object.entries(counts)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 15)
-      .map(entry => entry[0]);
-  }
-
-  if (availableTags.length === 0 && selectedFilterTags.length === 0) {
-    tagFilterContainer.classList.add('hidden');
-    return;
-  }
-
-  tagFilterContainer.classList.remove('hidden');
-  tagFilterList.innerHTML = '';
-
-  // Combine available and selected (ensure selected are always visible)
-  const tagsToShow = [...new Set([...selectedFilterTags, ...availableTags])];
-
-  tagsToShow.forEach(tag => {
-    const pill = document.createElement('div');
-    pill.className = `tag-pill ${selectedFilterTags.includes(tag) ? 'active' : ''}`;
-    pill.textContent = tag;
-    pill.addEventListener('click', () => toggleFilterTag(tag));
-    tagFilterList.appendChild(pill);
-  });
-}
-
-function toggleFilterTag(tag) {
-  if (selectedFilterTags.includes(tag)) {
-    selectedFilterTags = selectedFilterTags.filter(t => t !== tag);
-  } else {
-    selectedFilterTags.push(tag);
-  }
-  
-  renderTagFilterRow();
-  
-  if (searchInput.value.trim()) {
-    handleSearch(searchInput.value);
-  } else {
-    loadRecentBookmarks();
   }
 }
 
@@ -547,7 +486,7 @@ async function handleImport() {
       } else if (node.children) {
         let newPath = currentPath;
         if (node.title && node.id !== '0') {
-           newPath = currentPath ? `${currentPath}/${node.title}` : node.title;
+           newPath = currentPath ? `${currentPath} > ${node.title}` : node.title;
         }
         node.children.forEach(child => traverse(child, newPath));
       }

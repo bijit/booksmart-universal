@@ -485,6 +485,90 @@ const useBookmarkStore = create((set, get) => {
       }
     },
 
+    // Rename a folder
+    renameFolder: async (oldPath, newPath) => {
+      try {
+        const token = localStorage.getItem('authToken')
+        const response = await fetch(`${API_BASE_URL}/bookmarks/folders/rename`, {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ oldPath, newPath })
+        })
+
+        if (response.ok) {
+          const state = get()
+          await state.fetchFolders()
+          await state.fetchBookmarks(state.currentPage)
+          return { success: true }
+        } else {
+          const errData = await response.json()
+          return { success: false, error: errData.error || 'Failed to rename folder' }
+        }
+      } catch (error) {
+        console.error('Error renaming folder:', error)
+        return { success: false, error: error.message }
+      }
+    },
+
+    // Move a folder
+    moveFolder: async (folderPath, newParentPath) => {
+      try {
+        const token = localStorage.getItem('authToken')
+        const response = await fetch(`${API_BASE_URL}/bookmarks/folders/move`, {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ folderPath, newParentPath })
+        })
+
+        if (response.ok) {
+          const state = get()
+          await state.fetchFolders()
+          await state.fetchBookmarks(state.currentPage)
+          return { success: true }
+        } else {
+          const errData = await response.json()
+          return { success: false, error: errData.error || 'Failed to move folder' }
+        }
+      } catch (error) {
+        console.error('Error moving folder:', error)
+        return { success: false, error: error.message }
+      }
+    },
+
+    // Delete a folder
+    deleteFolder: async (folderPath, deleteBookmarks) => {
+      try {
+        const token = localStorage.getItem('authToken')
+        const response = await fetch(`${API_BASE_URL}/bookmarks/folders`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ folderPath, deleteBookmarks })
+        })
+
+        if (response.ok) {
+          const state = get()
+          await state.fetchFolders()
+          await state.fetchBookmarks(1) // Reset to page 1
+          return { success: true }
+        } else {
+          const errData = await response.json()
+          return { success: false, error: errData.error || 'Failed to delete folder' }
+        }
+      } catch (error) {
+        console.error('Error deleting folder:', error)
+        return { success: false, error: error.message }
+      }
+    },
+
     // Go to specific page
     goToPage: async (page) => {
       const state = get()

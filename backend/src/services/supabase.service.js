@@ -656,3 +656,109 @@ export async function searchBookmarksByText(userId, query, limit = 20) {
   }
 }
 
+/**
+ * Rename a folder path in the database (affects all bookmarks inside the folder and its subfolders)
+ */
+export async function renameFolderInDb(userId, oldPath, newPath) {
+  try {
+    // Select bookmarks that are in oldPath or any subfolder under oldPath
+    // OldPath should be exactly matched or start with "oldPath > "
+    const { data: bookmarks, error } = await supabaseAdmin
+      .from('bookmarks')
+      .select('id, folder_path, qdrant_point_id')
+      .eq('user_id', userId)
+      .or(`folder_path.eq."${oldPath}",folder_path.like."${oldPath} > %"`);
+
+    if (error) {
+      throw error;
+    }
+
+    if (!bookmarks || bookmarks.length === 0) {
+      return [];
+    }
+
+    const updatedBookmarks = [];
+
+    for (const bookmark of bookmarks) {
+      let updatedPath = bookmark.folder_path;
+      if (bookmark.folder_path === oldPath) {
+        updatedPath = newPath;
+      } else if (bookmark.folder_path.startsWith(oldPath + ' > ')) {
+        updatedPath = newPath + bookmark.folder_path.substring(oldPath.length);
+      }
+
+      const { error: updateError } = await supabaseAdmin
+        .from('bookmarks')
+        .update({ folder_path: updatedPath })
+        .eq('id', bookmark.id);
+
+      if (updateError) {
+        throw updateError;
+      }
+
+      updatedBookmarks.push({
+        id: bookmark.id,
+        qdrant_point_id: bookmark.qdrant_point_id,
+        newPath: updatedPath
+      });
+    }
+
+    return updatedBookmarks;
+
+  } catch (error) {
+    console.error('Error renaming folder in database:', error);
+    throw error;
+  }
+}
+
+/**
+ * Delete a folder path in the database (either dissolving or deleting bookmarks inside)
+ */
+export async function deleteFolderInDb(userId, folderPath, deleteBookmarks) {
+  try {
+    const { data: bookmarks, error } = await supabaseAdmin
+      .from('bookmarks')
+      .select('id, qdrant_point_id')
+      .eq('user_id', userId)
+      .or(`folder_path.eq."${folderPath}",folder_path.like."${folderPath} > %"`);
+
+    if (error) {
+      throw error;
+    }
+
+    if (!bookmarks || bookmarks.length === 0) {
+      return [];
+    }
+
+    if (deleteBookmarks) {
+      for (const bookmark of bookmarks) {
+        const { error: deleteError } = await supabaseAdmin
+          .from('bookmarks')
+          .delete()
+          .eq('id', bookmark.id);
+
+        if (deleteError) {
+          throw deleteError;
+        }
+      }
+    } else {
+      for (const bookmark of bookmarks) {
+        const { error: updateError } = await supabaseAdmin
+          .from('bookmarks')
+          .update({ folder_path: null })
+          .eq('id', bookmark.id);
+
+        if (updateError) {
+          throw updateError;
+        }
+      }
+    }
+
+    return bookmarks;
+
+  } catch (error) {
+    console.error('Error deleting folder in database:', error);
+    throw error;
+  }
+}
+

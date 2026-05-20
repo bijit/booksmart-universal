@@ -1209,3 +1209,77 @@ input::placeholder {
 .btn-text.w-full {
   justify-content: center;
 }
+
+/* Header Settings Toggle */
+.header-settings {
+  padding: 4px 0 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+.settings-content {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+}
+
+.toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 32px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+.toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #D1D5DB;
+  transition: .2s;
+  border-radius: 34px;
+}
+
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 14px;
+  width: 14px;
+  left: 2px;
+  bottom: 2px;
+  background-color: white;
+  transition: .2s;
+  border-radius: 50%;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.15);
+}
+
+input:checked + .slider {
+  background-color: #3B82F6;
+}
+
+input:checked + .slider:before {
+  transform: translateX(14px);
+}
+
+.toggle-label {
+  font-size: 11px;
+  color: #4B5563;
+  line-height: 1.3;
+  user-select: none;
+}
+
+.toggle-label strong {
+  color: #111827;
+  font-weight: 600;
+}

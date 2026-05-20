@@ -14,13 +14,18 @@ import {
   updateBookmarkRecord,
   deleteBookmarkRecord,
   deleteAllUserBookmarks,
-  getUserUniqueFolderPaths
+  getUserUniqueFolderPaths,
+  renameFolderInDb,
+  deleteFolderInDb
 } from '../services/supabase.service.js';
 
 import {
   getBookmarkById,
   deleteBookmark as deleteQdrantBookmark,
-  deleteAllUserPoints
+  deleteAllUserPoints,
+  updateQdrantFolderPaths,
+  deleteQdrantBookmarks,
+  dissolveQdrantFolder
 } from '../services/qdrant.service.js';
 
 const router = Router();
@@ -273,6 +278,146 @@ router.get('/folders', async (req, res) => {
     });
   }
 });
+
+/**
+ * PUT /api/bookmarks/folders/rename
+ * Rename a folder (and all its subfolders)
+ */
+router.put('/folders/rename', async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { oldPath, newPath } = req.body;
+
+    if (!oldPath || !newPath) {
+      return res.status(400).json({ error: 'Missing oldPath or newPath parameter' });
+    }
+
+    console.log(`[Folders] User ${userId} renaming folder: "${oldPath}" ➔ "${newPath}"`);
+    const updated = await renameFolderInDb(userId, oldPath, newPath);
+
+    // Update Qdrant payloads in background/parallel
+    if (updated.length > 0) {
+      try {
+        await updateQdrantFolderPaths(userId, updated);
+      } catch (qErr) {
+        console.error('Failed to sync renamed folders to Qdrant:', qErr);
+      }
+    }
+
+    res.json({
+      message: 'Folder renamed successfully',
+      updatedCount: updated.length
+    });
+  } catch (error) {
+    console.error('Rename folder error:', error);
+    res.status(500).json({
+      error: 'Internal Server Error',
+      message: 'Failed to rename folder'
+    });
+  }
+});
+
+/**
+ * PUT /api/bookmarks/folders/move
+ * Move a folder (and its subfolders) under a new parent folder
+ */
+router.put('/folders/move', async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { folderPath, newParentPath } = req.body;
+
+    if (!folderPath) {
+      return res.status(400).json({ error: 'Missing folderPath parameter' });
+    }
+
+    // Get folder name (last part of folderPath)
+    const pathParts = folderPath.split(' > ');
+    const folderName = pathParts[pathParts.length - 1];
+
+    // Compute the new path
+    const computedNewPath = !newParentPath 
+      ? folderName 
+      : `${newParentPath} > ${folderName}`;
+
+    console.log(`[Folders] User ${userId} moving folder: "${folderPath}" under parent: "${newParentPath || 'Root'}" (computed new path: "${computedNewPath}")`);
+    
+    if (folderPath === computedNewPath) {
+      return res.status(400).json({ error: 'Cannot move folder into itself or parent path is unchanged' });
+    }
+
+    // A folder cannot be moved under its own subfolders
+    if (computedNewPath.startsWith(folderPath + ' > ')) {
+      return res.status(400).json({ error: 'Cannot move a folder under its own subfolders' });
+    }
+
+    const updated = await renameFolderInDb(userId, folderPath, computedNewPath);
+
+    if (updated.length > 0) {
+      try {
+        await updateQdrantFolderPaths(userId, updated);
+      } catch (qErr) {
+        console.error('Failed to sync moved folders to Qdrant:', qErr);
+      }
+    }
+
+    res.json({
+      message: 'Folder moved successfully',
+      updatedCount: updated.length
+    });
+  } catch (error) {
+    console.error('Move folder error:', error);
+    res.status(500).json({
+      error: 'Internal Server Error',
+      message: 'Failed to move folder'
+    });
+  }
+});
+
+/**
+ * DELETE /api/bookmarks/folders
+ * Delete a folder (either dissolving or deleting bookmarks inside)
+ */
+router.delete('/folders', async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const folderPath = req.body.folderPath || req.query.folderPath;
+    const deleteBookmarks = req.body.deleteBookmarks === true || 
+                            req.body.deleteBookmarks === 'true' || 
+                            req.query.deleteBookmarks === 'true';
+
+    if (!folderPath) {
+      return res.status(400).json({ error: 'Missing folderPath parameter' });
+    }
+
+    console.log(`[Folders] User ${userId} deleting folder: "${folderPath}" (deleteBookmarks: ${deleteBookmarks})`);
+    
+    const affectedBookmarks = await deleteFolderInDb(userId, folderPath, deleteBookmarks);
+
+    if (affectedBookmarks.length > 0) {
+      try {
+        if (deleteBookmarks) {
+          await deleteQdrantBookmarks(userId, affectedBookmarks);
+        } else {
+          await dissolveQdrantFolder(userId, affectedBookmarks);
+        }
+      } catch (qErr) {
+        console.error('Failed to sync folder deletion/dissolution to Qdrant:', qErr);
+      }
+    }
+
+    res.json({
+      message: deleteBookmarks ? 'Folder and bookmarks deleted' : 'Folder dissolved successfully',
+      affectedCount: affectedBookmarks.length
+    });
+  } catch (error) {
+    console.error('Delete folder error:', error);
+    res.status(500).json({
+      error: 'Internal Server Error',
+      message: 'Failed to delete folder'
+    });
+  }
+});
+
 
 
 /**
