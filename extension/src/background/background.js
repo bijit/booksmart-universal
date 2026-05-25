@@ -391,6 +391,15 @@ browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
       });
     return true;
   }
+
+  if (message.action === 'createInboxFolder') {
+    getOrCreateInboxFolder().then(folderId => {
+      sendResponse({ success: true, folderId });
+    }).catch(error => {
+      sendResponse({ success: false, error: error.message });
+    });
+    return true;
+  }
 });
 
 // ── Chrome bookmark mirroring ─────────────────────────────────────────────────

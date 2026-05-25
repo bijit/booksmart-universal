@@ -57,7 +57,7 @@ async function getOrCreateInboxFolder() {
 
     const tree = await browser.bookmarks.getTree();
     const root = tree[0];
-    let parentId = '1'.// Default parent (Bookmarks Bar)
+    let parentId = '1'; // Default parent (Bookmarks Bar)
     
     if (root && root.children) {
       const bookmarksBar = root.children.find(child => child.title.toLowerCase().includes('bar') || child.id === '1');
@@ -390,6 +390,15 @@ browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
         console.warn('[BookSmart] updateChromeBookmark failed:', e.message);
         sendResponse({ success: false, error: e.message });
       });
+    return true;
+  }
+
+  if (message.action === 'createInboxFolder') {
+    getOrCreateInboxFolder().then(folderId => {
+      sendResponse({ success: true, folderId });
+    }).catch(error => {
+      sendResponse({ success: false, error: error.message });
+    });
     return true;
   }
 });

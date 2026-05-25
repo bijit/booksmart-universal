@@ -133,8 +133,16 @@ function setupEventListeners() {
     }).catch(err => console.error('Error getting autoInboxRoute pref:', err));
 
     autoInboxToggle.addEventListener('change', (e) => {
-      browser.storage.local.set({ autoInboxRoute: e.target.checked })
-        .then(() => console.log('[BookSmart] Auto-inbox preference updated:', e.target.checked))
+      const isChecked = e.target.checked;
+      browser.storage.local.set({ autoInboxRoute: isChecked })
+        .then(() => {
+          console.log('[BookSmart] Auto-inbox preference updated:', isChecked);
+          if (isChecked) {
+            browser.runtime.sendMessage({ action: 'createInboxFolder' })
+              .then(res => console.log('[BookSmart] Inbox folder check/creation triggered:', res))
+              .catch(err => console.error('[BookSmart] Error sending createInboxFolder message:', err));
+          }
+        })
         .catch(err => console.error('Error saving autoInboxRoute pref:', err));
     });
   }

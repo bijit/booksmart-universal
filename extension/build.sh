@@ -28,7 +28,7 @@ cp src/lib/*.js dist/lib/
 # Copy background script
 cp src/background/background.js dist/
 # Fix imports in background.js (from ../ to ./)
-sed -i '' "s|'../|'./|g" dist/background.js
+sed -i '' "s|'\.\./|'\./|g" dist/background.js
 # Prepend polyfill import to background.js if it's a module
 # For V3, we often need to include the polyfill at the top
 echo "import './lib/browser-polyfill.js';" > dist/background.js.tmp
@@ -44,7 +44,7 @@ cp src/popup/popup.html dist/
 cp src/popup/popup.css dist/
 cp src/popup/popup.js dist/
 # Fix imports in popup.js (from ../ to ./)
-sed -i '' "s|'../|'./|g" dist/popup.js
+sed -i '' "s|'\.\./|'\./|g" dist/popup.js
 
 # Copy bookmarks override page
 cp src/bookmarks/bookmarks.html dist/
