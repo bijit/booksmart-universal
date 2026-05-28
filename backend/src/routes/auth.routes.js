@@ -177,7 +177,7 @@ router.post('/refresh', async (req, res) => {
 });
 
 /**
- * GET /api/auth/me
+ * POST /api/auth/me
  * Get current user info (protected route - requires authentication)
  */
 router.get('/me', requireAuth, async (req, res) => {
@@ -196,6 +196,52 @@ router.get('/me', requireAuth, async (req, res) => {
     return res.status(500).json({
       error: 'Internal Server Error',
       message: 'Failed to get user info'
+    });
+  }
+});
+
+/**
+ * POST /api/auth/oauth-callback
+ * Exchange a raw provider session for Supabase access tokens
+ */
+router.post('/oauth-callback', async (req, res) => {
+  try {
+    const { access_token, refresh_token } = req.body;
+
+    if (!access_token) {
+      return res.status(400).json({
+        error: 'Bad Request',
+        message: 'Access token is required'
+      });
+    }
+
+    // Set the session on the server-side supabase client
+    const { data: { user }, error } = await supabase.auth.getUser(access_token);
+
+    if (error || !user) {
+      return res.status(401).json({
+        error: 'Authentication Failed',
+        message: 'Invalid access token'
+      });
+    }
+
+    res.json({
+      message: 'OAuth authentication successful',
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.user_metadata?.name || user.email.split('@')[0]
+      },
+      session: {
+        access_token,
+        refresh_token: refresh_token || null
+      }
+    });
+  } catch (error) {
+    console.error('OAuth callback error:', error);
+    res.status(500).json({
+      error: 'Internal Server Error',
+      message: 'OAuth callback exchange failed'
     });
   }
 });

@@ -598,13 +598,27 @@ async function handleFullFolderSync() {
 setInterval(async () => {
   try {
     const authData = await getAuthData();
+    const token = authData[STORAGE_KEYS.AUTH_TOKEN];
     const refreshToken = authData[STORAGE_KEYS.REFRESH_TOKEN];
-    const expiresAt = authData[STORAGE_KEYS.TOKEN_EXPIRES_AT] || 0;
+    let expiresAt = authData[STORAGE_KEYS.TOKEN_EXPIRES_AT] || 0;
 
     if (!refreshToken) return;
 
-    if (expiresAt - Date.now() < 3600000) { // < 1 hour
-      console.log('Token expiring soon, refreshing...');
+    // Fallback: If expiresAt is missing but we have a token, parse the expiration directly from JWT payload
+    if (!expiresAt && token) {
+      try {
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        if (payload.exp) {
+          expiresAt = payload.exp * 1000;
+        }
+      } catch (e) {
+        console.error('Failed to parse token expiration:', e);
+      }
+    }
+
+    // Refresh if within 45 minutes of expiry (or if no expiration was found to be safe)
+    if (!expiresAt || expiresAt - Date.now() < 2700000) { 
+      console.log('Token expiring soon, refreshing in background service worker...');
       const data = await auth.refresh(refreshToken);
       await saveAuthData(data);
       console.log('Token refreshed successfully');

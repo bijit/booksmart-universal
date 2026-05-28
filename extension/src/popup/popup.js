@@ -880,8 +880,78 @@ async function loadFolderPaths() {
     allFolderPaths = merged;
 
     console.log(`[FolderPicker] Loaded ${allFolderPaths.length} folders (${dbFolders.length} from DB, ${chromeFolders.length} from Chrome)`);
+    
+    // Generate pre-save folder recommendations based on tab title
+    if (currentTabData && currentTabData.title && allFolderPaths.length > 0) {
+      generateFolderRecommendations(currentTabData.title);
+    }
   } catch (e) {
     console.warn('[FolderPicker] Could not load folders:', e.message);
+  }
+}
+
+/**
+ * Generate Suggested Folders using token similarity matching
+ */
+function generateFolderRecommendations(pageTitle) {
+  const container = document.getElementById('suggestedFoldersContainer');
+  const list = document.getElementById('suggestedFoldersList');
+  if (!container || !list) return;
+
+  const pageTokens = pageTitle.toLowerCase().split(/[\s\-\_\.\,\:\/\\\|]+/).filter(t => t.length > 2);
+  if (pageTokens.length === 0) {
+    container.classList.add('hidden');
+    return;
+  }
+
+  const scoredFolders = allFolderPaths.map(path => {
+    // Score based on token overlap between folder path and page title
+    const pathLower = path.toLowerCase();
+    const pathSegments = pathLower.split(' > ');
+    const leafSegment = pathSegments[pathSegments.length - 1];
+    
+    let score = 0;
+    
+    pageTokens.forEach(token => {
+      // High match score if matches leaf folder segment name
+      if (leafSegment.includes(token)) {
+        score += 15;
+      }
+      // Lower match score if matches intermediate parent folders
+      if (pathLower.includes(token)) {
+        score += 5;
+      }
+    });
+
+    return { path, score };
+  });
+
+  // Filter out zero scores and sort by highest similarity
+  const recommendations = scoredFolders
+    .filter(x => x.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 3);
+
+  if (recommendations.length > 0) {
+    list.innerHTML = '';
+    recommendations.forEach(({ path }) => {
+      const pill = document.createElement('div');
+      pill.className = 'suggested-folder-pill';
+      
+      const folderIcon = `<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>`;
+      // Show only last segment to keep layout clean, hover tooltip reveals full path
+      const segments = path.split(' > ');
+      const displayTitle = segments[segments.length - 1];
+      
+      pill.innerHTML = `${folderIcon}<span title="${path}">${displayTitle}</span>`;
+      pill.addEventListener('click', () => {
+        selectFolder(path);
+      });
+      list.appendChild(pill);
+    });
+    container.classList.remove('hidden');
+  } else {
+    container.classList.add('hidden');
   }
 }
 

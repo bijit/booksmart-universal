@@ -1283,3 +1283,56 @@ input:checked + .slider:before {
   color: #111827;
   font-weight: 600;
 }
+
+/* Suggested Folders Container */
+.suggested-folders-container {
+  margin-top: 8px;
+  margin-bottom: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.suggested-folders-title {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #6B7280;
+  font-weight: 600;
+  padding-left: 2px;
+}
+
+.suggested-folders-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+.suggested-folder-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  background: #EFF6FF;
+  border: 1px solid #BFDBFE;
+  border-radius: 100px;
+  font-size: 11px;
+  font-weight: 500;
+  color: #1D4ED8;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  max-width: 100%;
+}
+
+.suggested-folder-pill:hover {
+  background: #DBEAFE;
+  border-color: #93C5FD;
+  transform: translateY(-0.5px);
+}
+
+.suggested-folder-pill span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

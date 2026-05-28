@@ -42,6 +42,31 @@ app.use('/api/preferences', lazyRoute('./routes/preferences.routes.js'));
 app.use('/api/import', lazyRoute('./routes/import.routes.js'));
 app.use('/api/debug', lazyRoute('./routes/debug.routes.js'));
 
+// OAuth direct trigger endpoint (must handle redirect directly outside standard API response constraints)
+app.get('/auth/google', async (req, res) => {
+  try {
+    const { supabase } = await import('./config/supabase.js');
+    const redirectUrl = process.env.MANAGER_BASE_URL || 'http://localhost:5173';
+    
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: `${redirectUrl}/login`
+      }
+    });
+
+    if (error) throw error;
+    if (data && data.url) {
+      res.redirect(data.url);
+    } else {
+      res.status(500).send('OAuth URL generation failed');
+    }
+  } catch (error) {
+    console.error('OAuth redirect error:', error);
+    res.status(500).send(`OAuth Initiation Failed: ${error.message}`);
+  }
+});
+
 // Health check endpoint (Directly in index.js for maximum reliability)
 app.get('/api/health', (req, res) => {
   res.json({
