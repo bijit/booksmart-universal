@@ -11,7 +11,7 @@
 import { extractContent } from '../services/readability.service.js';
 import { extractDocumentContent, isSupportedDocument } from '../services/document.service.js';
 import { processContent, processContentWithChunking, summarizeFromMetadata, generateEmbedding } from '../services/gemini.service.js';
-import { createBookmark, createBookmarkChunks } from '../services/qdrant.service.js';
+import { createBookmark, createBookmarkChunks, deleteBookmark, deleteBookmarkChunks } from '../services/qdrant.service.js';
 import {
   getUserBookmarkRecords,
   updateBookmarkRecord,
@@ -87,6 +87,93 @@ async function processMetadataOnly(id, url, title, user_id, created_at) {
 }
 
 /**
+ * Fast-path bookmark processing (Phase 1 of Two-Phase Bulk Ingestion)
+ * Generates metadata-only embeddings and stores in Qdrant and Supabase.
+ * Makes the bookmark immediately searchable and completed in the UI.
+ *
+ * @param {Object} bookmark - The bookmark record from Supabase
+ * @returns {Promise<boolean>} True if successful, false if failed
+ */
+async function processBookmarkFast(bookmark) {
+  const { id, url, title, user_id, folder_path, folder_id, created_at } = bookmark;
+  console.log(`[Worker] [Phase 1] Fast processing bookmark ${id}: ${url}`);
+
+  try {
+    // Step 1: Update status to "processing" first to lock it
+    await updateBookmarkRecord(id, {
+      processing_status: 'processing'
+    });
+
+    // Step 2: Use provided title or extract domain name if empty
+    const cleanTitle = title || new URL(url).hostname || 'Untitled Bookmark';
+    const inferredDescription = `Saved bookmark: ${cleanTitle}`;
+    
+    // Split folder path to extract tags automatically if folder exists
+    let tags = [];
+    if (folder_path) {
+      tags = folder_path.split(' > ').map(t => t.toLowerCase().trim()).slice(0, 5);
+    }
+    if (tags.length === 0) {
+      tags = ['imported'];
+    }
+
+    // Step 3: Generate embedding from metadata (URL + title + folder path)
+    // We only call generateEmbedding (high rate limit), NO Gemini summary generation!
+    console.log(`[Worker] [Phase 1] Generating embedding from metadata...`);
+    const metadataText = `${url}\n${cleanTitle}\n${folder_path || ''}`;
+    const embedding = await generateEmbedding(metadataText);
+
+    // Step 4: Store point in Qdrant
+    console.log(`[Worker] [Phase 1] Storing in vector database...`);
+    const qdrantPointId = await createBookmark(user_id, {
+      url: url,
+      title: cleanTitle,
+      description: inferredDescription,
+      content: `Metadata-only bookmark. URL: ${url}`,
+      embedding: embedding,
+      tags: tags,
+      favicon_url: getFaviconUrl(url),
+      folder_id: folder_id || null,
+      folder_path: folder_path || null,
+      created_at: created_at
+    });
+
+    // Step 5: Update Supabase with completion
+    await updateBookmarkRecord(id, {
+      title: cleanTitle,
+      description: inferredDescription,
+      tags: tags,
+      qdrant_point_id: qdrantPointId,
+      processing_status: 'completed',
+      extraction_method: 'metadata', // Mark as metadata phase
+      favicon_url: getFaviconUrl(url),
+      error_message: null
+    });
+
+    console.log(`[Worker] ✅ [Phase 1] Fast processed bookmark ${id}`);
+    return true;
+  } catch (error) {
+    console.error(`[Worker] ❌ [Phase 1] Fast processing failed for ${id}:`, error.message);
+    
+    // Check if it's a quota error
+    if (isQuotaError(error)) {
+      await updateBookmarkRecord(id, {
+        processing_status: 'pending',
+        error_message: 'Quota exceeded in Phase 1 - will retry'
+      });
+      throw new Error('QUOTA_EXHAUSTED');
+    }
+
+    // Revert to pending on other errors to let sequential retry handle it
+    await updateBookmarkRecord(id, {
+      processing_status: 'pending',
+      error_message: `Phase 1 failed: ${error.message}`
+    });
+    return false;
+  }
+}
+
+/**
  * Generate favicon URL from page URL using Google's favicon service
  * Same API that the Chrome extension uses for displaying favicons
  *
@@ -129,7 +216,9 @@ async function processBookmark(bookmark) {
       console.log(`[Worker] Step 1/4: Using locally extracted content (${extracted_content.length} chars via ${extraction_method})`);
       extracted = {
         content: extracted_content,
-        favicon: getFaviconUrl(url) // Generate favicon URL using Google's service
+        favicon: getFaviconUrl(url), // Generate favicon URL using Google's service
+        cover_image: bookmark.cover_image || null,
+        extracted_images: bookmark.extracted_images || []
       };
     } else {
       // Step 2b: Automatic document vs webpage detection
@@ -333,7 +422,10 @@ async function processBookmarksInParallel(bookmarks) {
 
     // Process all bookmarks in this batch concurrently
     const results = await Promise.allSettled(
-      batch.map(bookmark => processBookmark(bookmark))
+      batch.map(bookmark => {
+        const hasExtracted = bookmark.extracted_content && bookmark.extracted_content.length > 500;
+        return hasExtracted ? processBookmark(bookmark) : processBookmarkFast(bookmark);
+      })
     );
 
     // Analyze results
@@ -378,7 +470,8 @@ async function processBookmarksSequentially(bookmarks) {
 
   for (const bookmark of bookmarks) {
     try {
-      const result = await processBookmark(bookmark);
+      const hasExtracted = bookmark.extracted_content && bookmark.extracted_content.length > 500;
+      const result = await (hasExtracted ? processBookmark(bookmark) : processBookmarkFast(bookmark));
       if (result) {
         successful++;
       } else {
@@ -460,6 +553,164 @@ async function pollAndProcess() {
   }
 }
 
+let isLazyScraping = false;
+const LAZY_SCRAPE_INTERVAL_MS = 15000; // Check every 15 seconds
+
+/**
+ * Poll for completed metadata-only bookmarks and lazy-scrape their full content
+ */
+async function pollAndLazyScrape() {
+  if (isLazyScraping) {
+    return;
+  }
+
+  // Check if quota is exhausted and we're still in backoff period
+  if (quotaExhausted && quotaBackoffUntil && Date.now() < quotaBackoffUntil) {
+    return;
+  }
+
+  isLazyScraping = true;
+
+  try {
+    // Find one bookmark at a time that has been fast-processed (metadata method)
+    const { data: bookmarks, error } = await supabaseAdmin
+      .from('bookmarks')
+      .select('*')
+      .eq('processing_status', 'completed')
+      .eq('extraction_method', 'metadata')
+      .order('created_at', { ascending: true }) // Process oldest first
+      .limit(1);
+
+    if (error) {
+      console.error('[Worker] Error fetching bookmarks for lazy scraping:', error);
+      return;
+    }
+
+    if (bookmarks && bookmarks.length > 0) {
+      const bookmark = bookmarks[0];
+      console.log(`\n[Worker] [Phase 2] Lazy scraping bookmark ${bookmark.id}: ${bookmark.url}`);
+      
+      // Update method to 'scraping' to lock it
+      await updateBookmarkRecord(bookmark.id, {
+        extraction_method: 'scraping'
+      });
+
+      try {
+        // Step 1: Extract page content
+        let extracted;
+        if (isSupportedDocument(bookmark.url)) {
+          console.log(`[Worker] [Phase 2] Extracting document: ${bookmark.url}`);
+          extracted = await extractDocumentContent(bookmark.url);
+        } else {
+          console.log(`[Worker] [Phase 2] Extracting webpage content: ${bookmark.url}`);
+          extracted = await extractContent(bookmark.url);
+          if (!extracted.favicon) {
+            extracted.favicon = getFaviconUrl(bookmark.url);
+          }
+        }
+
+        // Step 2: Summarize and embed with Gemini
+        console.log(`[Worker] [Phase 2] Summarizing and embedding with Gemini...`);
+        let aiResult;
+        let qdrantPointIds;
+
+        if (ENABLE_CHUNKING) {
+          aiResult = await processContentWithChunking(extracted.content, bookmark.url, bookmark.title);
+          
+          // Delete old metadata-only point in Qdrant (prevent duplicates)
+          if (bookmark.qdrant_point_id) {
+            await deleteBookmark(bookmark.qdrant_point_id);
+          }
+          await deleteBookmarkChunks(bookmark.id);
+
+          // Store new chunks in Qdrant
+          qdrantPointIds = await createBookmarkChunks(bookmark.user_id, {
+            bookmark_id: bookmark.id,
+            url: bookmark.url,
+            title: aiResult.title,
+            description: aiResult.description,
+            content: extracted.content,
+            tags: aiResult.tags || [],
+            chunks: aiResult.chunks,
+            favicon_url: extracted.favicon || null,
+            folder_path: bookmark.folder_path || null,
+            folder_id: bookmark.folder_id || null,
+            cover_image: extracted.cover_image || null,
+            extracted_images: extracted.extracted_images || [],
+            created_at: bookmark.created_at
+          });
+        } else {
+          aiResult = await processContent(extracted.content, bookmark.url);
+
+          if (bookmark.qdrant_point_id) {
+            await deleteBookmark(bookmark.qdrant_point_id);
+          }
+
+          const qdrantPointId = await createBookmark(bookmark.user_id, {
+            url: bookmark.url,
+            title: aiResult.title,
+            description: aiResult.description,
+            content: extracted.content,
+            embedding: aiResult.embedding,
+            tags: aiResult.tags || [],
+            favicon_url: extracted.favicon || null,
+            folder_path: bookmark.folder_path || null,
+            folder_id: bookmark.folder_id || null,
+            cover_image: extracted.cover_image || null,
+            extracted_images: extracted.extracted_images || [],
+            created_at: bookmark.created_at
+          });
+
+          qdrantPointIds = [qdrantPointId];
+        }
+
+        // Step 3: Update Supabase with completion
+        await updateBookmarkRecord(bookmark.id, {
+          title: aiResult.title,
+          description: aiResult.description,
+          tags: aiResult.tags || [],
+          qdrant_point_id: qdrantPointIds[0],
+          extraction_method: extracted.method === 'pdf-parse' || extracted.method === 'mammoth' ? 'document-service' : 'readability',
+          cover_image: extracted.cover_image || null,
+          extracted_images: extracted.extracted_images || [],
+          author: extracted.author || null,
+          site_name: extracted.site_name || null,
+          favicon_url: extracted.favicon || null,
+          published_date: extracted.published_date || null,
+          reading_time: extracted.reading_time || null,
+          language: extracted.language || null,
+          error_message: null
+        });
+
+        console.log(`[Worker] ✅ [Phase 2] Successfully lazy-scraped bookmark ${bookmark.id}`);
+      } catch (scrapeError) {
+        console.error(`[Worker] ❌ [Phase 2] Lazy scraping failed for ${bookmark.id}:`, scrapeError.message);
+
+        if (isQuotaError(scrapeError)) {
+          // If Gemini API quota limit is hit, revert to 'metadata' to retry later, and wait
+          await updateBookmarkRecord(bookmark.id, {
+            extraction_method: 'metadata'
+          });
+          // Set backoff
+          quotaExhausted = true;
+          quotaBackoffUntil = Date.now() + QUOTA_BACKOFF_MS;
+          throw scrapeError;
+        }
+
+        // If it's a permanent page access/scraping error, keep it completed but set method to 'metadata-failed'
+        await updateBookmarkRecord(bookmark.id, {
+          extraction_method: 'metadata-failed',
+          error_message: `Lazy scrape failed: ${scrapeError.message}`
+        });
+      }
+    }
+  } catch (error) {
+    console.error('[Worker] Error in lazy scrape cycle:', error);
+  } finally {
+    isLazyScraping = false;
+  }
+}
+
 /**
  * Reset bookmarks stuck in 'processing' status back to 'pending'
  * This handles orphans from previous crashes/restarts
@@ -522,9 +773,11 @@ export function startWorker() {
     
     // Start polling loop
     setInterval(pollAndProcess, POLL_INTERVAL_MS);
+    setInterval(pollAndLazyScrape, LAZY_SCRAPE_INTERVAL_MS);
 
     // Run immediately on start
     pollAndProcess();
+    pollAndLazyScrape();
   })();
 }
 

@@ -12,6 +12,7 @@ const registerScreen = document.getElementById('registerScreen');
 const mainScreen = document.getElementById('mainScreen');
 const loginForm = document.getElementById('loginForm');
 const loginError = document.getElementById('loginError');
+const googleLoginBtn = document.getElementById('googleLoginBtn');
 const registerForm = document.getElementById('registerForm');
 const registerError = document.getElementById('registerError');
 const registerLink = document.getElementById('registerLink');
@@ -79,6 +80,13 @@ function setupEventListeners() {
   loginForm.addEventListener('submit', handleLogin);
   registerForm.addEventListener('submit', handleRegister);
 
+  if (googleLoginBtn) {
+    googleLoginBtn.addEventListener('click', () => {
+      // Open the manager app to handle Google OAuth
+      browser.tabs.create({ url: `${MANAGER_URL}/login` });
+    });
+  }
+
   registerLink.addEventListener('click', (e) => {
     e.preventDefault();
     showRegisterScreen();
@@ -119,6 +127,17 @@ function setupEventListeners() {
   importBtn.addEventListener('click', handleImport);
   if (importFromEmptyBtn) {
     importFromEmptyBtn.addEventListener('click', handleImport);
+  }
+
+  if (importCancelBtn) {
+    importCancelBtn.addEventListener('click', () => {
+      importConfirmModal.classList.add('hidden');
+    });
+  }
+  if (closeImportModal) {
+    closeImportModal.addEventListener('click', () => {
+      importConfirmModal.classList.add('hidden');
+    });
   }
 
   syncFoldersBtn.addEventListener('click', handleSyncFolders);
@@ -648,9 +667,10 @@ async function initializeCurrentPageContext() {
         folderInfoRow.classList.remove('hidden');
         
         seeInFolderBtn.addEventListener('click', () => {
-          const url = dbBookmark.folder_id 
-            ? `chrome://bookmarks/?id=${dbBookmark.folder_id}`
-            : `chrome://bookmarks`;
+          const folderQuery = dbBookmark.folder_path 
+            ? `?folder=${encodeURIComponent(dbBookmark.folder_path)}`
+            : '';
+          const url = `chrome://bookmarks/${folderQuery}`;
           browser.tabs.create({ url });
         });
       }
@@ -1036,7 +1056,72 @@ function selectFolder(path) {
   folderSearchInput.value = '';
   selectedFolderName.textContent = path;
   selectedFolderChip.classList.remove('hidden');
+  
+  if (existingBookmarkId) {
+    selectedFolderChip.classList.add('existing-bookmark');
+  } else {
+    selectedFolderChip.classList.remove('existing-bookmark');
+  }
+  
   hideFolderDropdown();
+}
+
+// Extract content from active tab
+async function extractContentFromActiveTab(expectedUrl) {
+  try {
+    const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
+    if (!tab || !tab.id || !tab.url) return null;
+
+    // Safety check: Prevent background syncs (e.g. from mobile) from extracting the wrong page
+    if (expectedUrl) {
+      try {
+        const tabUrl = new URL(tab.url);
+        const targetUrl = new URL(expectedUrl);
+        // Compare hostname and pathname to be safe (ignoring query params/hashes which might differ slightly)
+        if (tabUrl.hostname !== targetUrl.hostname || tabUrl.pathname !== targetUrl.pathname) {
+          console.log(`[BookSmart] URL mismatch detected. Skipping local extraction.`);
+          return null;
+        }
+      } catch (e) {
+        // Fallback to basic string match if URL parsing fails
+        if (!tab.url.includes(expectedUrl) && !expectedUrl.includes(tab.url)) {
+          console.log(`[BookSmart] String URL mismatch detected. Skipping local extraction.`);
+          return null;
+        }
+      }
+    }
+
+    console.log(`[BookSmart] Extracting content from tab: ${tab.title}`);
+
+    await browser.scripting.executeScript({
+      target: { tabId: tab.id },
+      files: ['lib/Readability.js']
+    });
+
+    await browser.scripting.executeScript({
+      target: { tabId: tab.id },
+      files: ['content-extractor.js']
+    });
+
+    const extractionResults = await browser.scripting.executeScript({
+      target: { tabId: tab.id },
+      func: function () {
+        if (typeof extractPageContent === 'function') {
+          return extractPageContent();
+        } else {
+          return { success: false, error: 'extractPageContent not defined' };
+        }
+      }
+    });
+
+    if (extractionResults && extractionResults[0] && extractionResults[0].result) {
+      return extractionResults[0].result;
+    }
+    return null;
+  } catch (error) {
+    console.error('[BookSmart] Error extracting content from tab:', error);
+    return null;
+  }
 }
 
 // ─── Save Handler ─────────────────────────────────────────────────────────────
@@ -1058,13 +1143,32 @@ async function handleSaveCurrentPage() {
   try {
     const title = currentPageTitle.value.trim() || currentTabData.title;
     
+    // Extract content from current tab!
+    const extracted = await extractContentFromActiveTab(currentTabData.url);
+
+    const bookmarkData = {
+      url: currentTabData.url,
+      title,
+      tags: allTags,
+      folder_path: selectedFolderPath || null
+    };
+
+    if (extracted && extracted.success) {
+      bookmarkData.extractedContent = extracted.content;
+      bookmarkData.extractedTitle = extracted.title;
+      bookmarkData.extractedExcerpt = extracted.excerpt;
+      bookmarkData.extractedMethod = extracted.method;
+      bookmarkData.extractedLength = extracted.length;
+
+      if (extracted.coverImage) bookmarkData.cover_image = extracted.coverImage;
+      if (extracted.extractedImages && extracted.extractedImages.length > 0) bookmarkData.extracted_images = extracted.extractedImages;
+
+      console.log(`[BookSmart] Popup including extracted content (${extracted.length} chars)`);
+    }
+
     if (existingBookmarkId) {
       // Update existing bookmark
-      await bookmarks.update(existingBookmarkId, {
-        title,
-        tags: allTags,
-        folder_path: selectedFolderPath || null
-      });
+      await bookmarks.update(existingBookmarkId, bookmarkData);
 
       // Mirror update to Chrome
       browser.runtime.sendMessage({
@@ -1077,12 +1181,7 @@ async function handleSaveCurrentPage() {
       updateSaveBtnToSaved('Updated!');
     } else {
       // Create new bookmark
-      await bookmarks.create({
-        url: currentTabData.url,
-        title,
-        tags: allTags,
-        folder_path: selectedFolderPath || null
-      });
+      await bookmarks.create(bookmarkData);
 
       // Mirror the save back to Chrome's native bookmark manager
       browser.runtime.sendMessage({

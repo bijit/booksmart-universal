@@ -220,7 +220,8 @@
 
     // Instantly replace URL so the back-button state works perfectly
     setTimeout(() => {
-      window.location.replace(TARGET_URL);
+      const params = window.location.search || '';
+      window.location.replace(TARGET_URL + params);
     }, 100);
   </script>
 </body>

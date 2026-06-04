@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Upload, X, CheckCircle, AlertCircle } from 'lucide-react'
 import { API_BASE_URL } from '../config'
+import { authenticatedFetch as fetch } from '../utils/auth'
 
 function ImportBookmarks({ onClose, onImportComplete }) {
   const [importing, setImporting] = useState(false)

@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { Folder, ChevronRight, ChevronDown, FolderOpen, Pencil, Move, Trash2, X } from 'lucide-react';
+import { Folder, ChevronRight, ChevronDown, FolderOpen, Pencil, Move, Trash2, X, Search } from 'lucide-react';
 import useBookmarkStore from '../store/useBookmarkStore';
 
 /**
@@ -22,6 +22,7 @@ function FolderExplorer() {
   } = useBookmarkStore();
 
   const [expandedFolders, setExpandedFolders] = useState(new Set(['root']));
+  const [folderSearch, setFolderSearch] = useState('');
 
   // Modal States
   const [renameTarget, setRenameTarget] = useState(null);
@@ -43,11 +44,36 @@ function FolderExplorer() {
     fetchFolders();
   }, [fetchFolders]);
 
+  // Filter folder paths based on search query
+  const filteredFolders = useMemo(() => {
+    if (!folderSearch.trim()) return allFolders;
+    const query = folderSearch.trim().toLowerCase();
+    
+    // Find all matching folders (match anywhere in the full folder path)
+    const matches = allFolders.filter(path => {
+      if (!path) return false;
+      return path.toLowerCase().includes(query);
+    });
+
+    // Include all parent paths
+    const results = new Set();
+    matches.forEach(path => {
+      const parts = path.split(' > ');
+      let currentPath = '';
+      parts.forEach(part => {
+        currentPath = currentPath ? `${currentPath} > ${part}` : part;
+        results.add(currentPath);
+      });
+    });
+
+    return Array.from(results);
+  }, [allFolders, folderSearch]);
+
   // Build tree structure from flat folder paths
   const folderTree = useMemo(() => {
     const root = { name: 'Root Bookmarks', path: null, children: {} };
     
-    allFolders.forEach(folderPath => {
+    filteredFolders.forEach(folderPath => {
       if (!folderPath) return;
       
       const parts = folderPath.split(' > ');
@@ -68,7 +94,7 @@ function FolderExplorer() {
     });
     
     return root;
-  }, [allFolders]);
+  }, [filteredFolders]);
 
   const toggleExpand = (path, e) => {
     e.stopPropagation();
@@ -178,7 +204,7 @@ function FolderExplorer() {
 
   const renderNode = (node, depth = 0) => {
     const nodeKey = node.path || 'root';
-    const isExpanded = expandedFolders.has(nodeKey);
+    const isExpanded = folderSearch.trim() ? true : expandedFolders.has(nodeKey);
     const hasChildren = Object.keys(node.children).length > 0;
     const isSelected = selectedFolder === node.path;
 
@@ -264,6 +290,27 @@ function FolderExplorer() {
 
   return (
     <div className="flex flex-col gap-1 relative">
+      {/* Folder Search input */}
+      <div className="relative mb-3 group">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-light-text-secondary group-focus-within:text-accent transition-colors" />
+        <input
+          type="text"
+          placeholder="Filter folders..."
+          value={folderSearch}
+          onChange={(e) => setFolderSearch(e.target.value)}
+          className="w-full pl-9 pr-8 py-1.5 text-xs bg-light-bg/50 dark:bg-dark-bg/50 border border-light-border dark:border-dark-border rounded-xl focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent transition-all"
+        />
+        {folderSearch && (
+          <button 
+            type="button"
+            onClick={() => setFolderSearch('')}
+            className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 text-light-text-secondary hover:text-accent bg-light-bg dark:bg-dark-bg rounded-md shadow-sm"
+          >
+            <X className="w-3 h-3" />
+          </button>
+        )}
+      </div>
+
       {/* Root "All Bookmarks" */}
       <div 
         className={`flex items-center justify-between py-1.5 px-2 rounded-md cursor-pointer text-xs transition-all ${

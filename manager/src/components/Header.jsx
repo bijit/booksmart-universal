@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef } from 'react'
-import { Search, Moon, Sun, LogOut, Grid, List, Clock, Layers, Upload, X, Sparkles } from 'lucide-react'
+import { Search, Moon, Sun, LogOut, Grid, List, Clock, Layers, Upload, X, Sparkles, Zap, Brain } from 'lucide-react'
 import useBookmarkStore from '../store/useBookmarkStore'
 
 function Header({ darkMode, toggleDarkMode, onLogout, onOpenImport }) {
-  const { searchQuery, setSearchQuery, viewMode, setViewMode, deepSearchEnabled, setDeepSearchEnabled } = useBookmarkStore()
+  const { searchQuery, setSearchQuery, viewMode, setViewMode, deepSearchEnabled, setDeepSearchEnabled, searchMode, setSearchMode } = useBookmarkStore()
   const [searchFocused, setSearchFocused] = useState(false)
   const [localSearchQuery, setLocalSearchQuery] = useState(searchQuery)
   const searchTimeoutRef = useRef(null)
@@ -63,20 +63,56 @@ function Header({ darkMode, toggleDarkMode, onLogout, onOpenImport }) {
                 )}
               </div>
               
-              <button
-                onClick={() => setDeepSearchEnabled(!deepSearchEnabled)}
-                className={`p-2.5 rounded-xl transition-all duration-300 flex items-center gap-2 group ${
-                  deepSearchEnabled 
-                    ? 'bg-accent text-white shadow-lg shadow-accent/20' 
-                    : 'bg-light-bg dark:bg-dark-bg text-light-text-secondary dark:text-dark-text-secondary hover:bg-accent/10 hover:text-accent'
-                }`}
-                title={deepSearchEnabled ? "Deep Search Enabled (High Quality)" : "Deep Search Disabled (Snappy)"}
-              >
-                <Sparkles className={`w-5 h-5 ${deepSearchEnabled ? 'animate-pulse' : 'group-hover:scale-110 transition-transform'}`} />
-                <span className={`hidden lg:inline text-xs font-bold uppercase tracking-widest ${deepSearchEnabled ? 'block' : 'hidden group-hover:block'}`}>
-                  Deep
-                </span>
-              </button>
+              {/* Unified 3-state Search Mode Segmented Control */}
+              <div className="flex items-center bg-light-bg dark:bg-dark-bg rounded-xl p-1 border border-light-border dark:border-dark-border gap-0.5 shadow-sm">
+                <button
+                  type="button"
+                  onClick={() => setSearchMode('instant')}
+                  className={`px-3 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                    searchMode === 'instant'
+                      ? 'bg-amber-500 text-white shadow-sm'
+                      : 'text-light-text-secondary dark:text-dark-text-secondary hover:bg-black/5 dark:hover:bg-white/5'
+                  }`}
+                  title="Instant keyword search (Fast local filter)"
+                >
+                  <Zap className="w-4 h-4" />
+                  <span className="hidden sm:inline">Instant</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchMode('semantic');
+                    setDeepSearchEnabled(false);
+                  }}
+                  className={`px-3 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                    searchMode === 'semantic' && !deepSearchEnabled
+                      ? 'bg-indigo-600 dark:bg-indigo-500 text-white shadow-sm'
+                      : 'text-light-text-secondary dark:text-dark-text-secondary hover:bg-black/5 dark:hover:bg-white/5'
+                  }`}
+                  title="Semantic search (AI concept matching)"
+                >
+                  <Brain className="w-4 h-4" />
+                  <span className="hidden sm:inline">Semantic</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchMode('semantic');
+                    setDeepSearchEnabled(true);
+                  }}
+                  className={`px-3 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                    searchMode === 'semantic' && deepSearchEnabled
+                      ? 'bg-accent text-white shadow-sm'
+                      : 'text-light-text-secondary dark:text-dark-text-secondary hover:bg-black/5 dark:hover:bg-white/5'
+                  }`}
+                  title="AI Overview search (Summarizes matching concepts)"
+                >
+                  <Sparkles className={`w-4 h-4 ${deepSearchEnabled && searchMode === 'semantic' ? 'animate-pulse' : ''}`} />
+                  <span className="hidden sm:inline">AI Overview</span>
+                </button>
+              </div>
             </div>
           </div>
 

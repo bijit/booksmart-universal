@@ -112,6 +112,10 @@ router.post('/', async (req, res) => {
       }
       const uniqueResults = Array.from(bookmarkMap.values()).slice(0, options.limit);
       searchData = { results: uniqueResults, answer: null };
+    } else if (type === 'text') {
+      const { searchBookmarksByText } = await import('../services/supabase.service.js');
+      const results = await searchBookmarksByText(userId, effectiveQuery, options.limit);
+      searchData = { results, answer: null };
     } else if (type === 'semantic') {
       const results = await semanticSearch(userId, effectiveQuery, options);
       searchData = { results, answer: null };
@@ -120,7 +124,7 @@ router.post('/', async (req, res) => {
     } else {
       return res.status(400).json({
         error: 'Bad Request',
-        message: 'Search type must be "semantic" or "hybrid"'
+        message: 'Search type must be "text", "semantic" or "hybrid"'
       });
     }
 

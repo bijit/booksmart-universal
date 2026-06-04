@@ -73,6 +73,9 @@ function Login({ onLogin }) {
 
       // Store token and user info
       localStorage.setItem('userEmail', userEmail)
+      if (data.session?.refresh_token) {
+        localStorage.setItem('refreshToken', data.session.refresh_token)
+      }
       onLogin(token, userName)
     } catch (err) {
       setError(err.message)

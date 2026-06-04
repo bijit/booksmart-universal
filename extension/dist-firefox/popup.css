@@ -925,6 +925,26 @@ input::placeholder {
   width: fit-content;
 }
 
+.selected-folder-chip.existing-bookmark {
+  background: #F3E8FF;
+  border: 1px solid #D8B4FE;
+  color: #6B21A8;
+}
+
+.selected-folder-chip.existing-bookmark .add-subfolder-btn {
+  background: rgba(147, 51, 234, 0.12);
+  border: 1px solid #D8B4FE;
+  color: #6B21A8;
+}
+
+.selected-folder-chip.existing-bookmark .clear-folder-btn {
+  color: #D8B4FE;
+}
+
+.selected-folder-chip.existing-bookmark .clear-folder-btn:hover {
+  color: #7E22CE;
+}
+
 .selected-folder-chip svg {
   opacity: 0.7;
 }

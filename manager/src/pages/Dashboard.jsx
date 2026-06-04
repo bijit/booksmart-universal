@@ -19,6 +19,7 @@ function Dashboard({ darkMode, toggleDarkMode, onLogout }) {
     error,
     fetchBookmarks,
     performSearch,
+    performTextSearch,
     goToPage,
     getFilteredBookmarks,
     viewMode,
@@ -28,13 +29,15 @@ function Dashboard({ darkMode, toggleDarkMode, onLogout }) {
     dateRange,
     selectedTags,
     selectedFolder,
+    setSelectedFolder,
     sortBy,
     showOnlyProcessing,
     setShowOnlyProcessing,
     currentPage,
     totalPages,
     totalBookmarks,
-    researchOnWeb
+    researchOnWeb,
+    searchMode
   } = useBookmarkStore()
 
   const filteredBookmarks = getFilteredBookmarks()
@@ -44,11 +47,25 @@ function Dashboard({ darkMode, toggleDarkMode, onLogout }) {
   const [isResizing, setIsResizing] = useState(false)
   const sidebarRef = useRef(null)
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const folder = params.get('folder')
+    if (folder) {
+      setSelectedFolder(folder)
+      // Clean query params so reloading doesn't pin the view
+      window.history.replaceState({}, document.title, window.location.pathname)
+    }
+  }, [setSelectedFolder])
+
   const loadMoreResults = useCallback(() => {
     if (!loading && !isDeepSearching && hasMoreResults && searchQuery) {
-      performSearch(searchQuery, true)
+      if (searchMode === 'semantic') {
+        performSearch(searchQuery, true)
+      } else {
+        performTextSearch(searchQuery, true)
+      }
     }
-  }, [loading, isDeepSearching, hasMoreResults, searchQuery, performSearch])
+  }, [loading, isDeepSearching, hasMoreResults, searchQuery, searchMode, performSearch, performTextSearch])
 
   const startResizing = useCallback((e) => {
     setIsResizing(true)

@@ -15,10 +15,11 @@ export const STORAGE_KEYS = {
  */
 export async function saveAuthData(data) {
   try {
+    const current = await browser.storage.local.get([STORAGE_KEYS.USER]);
     const storageData = {
       [STORAGE_KEYS.AUTH_TOKEN]: data.session.access_token,
       [STORAGE_KEYS.REFRESH_TOKEN]: data.session.refresh_token,
-      [STORAGE_KEYS.USER]: data.user,
+      [STORAGE_KEYS.USER]: data.user || current[STORAGE_KEYS.USER] || null,
       [STORAGE_KEYS.TOKEN_EXPIRES_AT]: data.session.expires_at
     };
     await browser.storage.local.set(storageData);
@@ -67,6 +68,21 @@ export async function clearAuthData() {
     return false;
   }
 }
+
+/**
+ * Clear all data from local storage (including auth and any other stored items)
+ */
+export async function clearAllData() {
+  try {
+    await browser.storage.local.clear();
+    console.log('[Storage] All local storage cleared');
+    return true;
+  } catch (error) {
+    console.error('[Storage] Error clearing all data:', error);
+    return false;
+  }
+}
+
 
 /**
  * Check if user is authenticated

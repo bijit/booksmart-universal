@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { API_BASE_URL } from '../config'
-import { isAuthError, handleAuthError } from '../utils/auth'
+import { isAuthError, handleAuthError, authenticatedFetch as fetch } from '../utils/auth'
 
 const useBookmarkStore = create((set, get) => {
   let searchTimeout = null;
@@ -48,6 +48,16 @@ const useBookmarkStore = create((set, get) => {
 
     // Set deep search toggle
     setDeepSearchEnabled: (enabled) => set({ deepSearchEnabled: enabled }),
+    
+    // Search mode: 'semantic' or 'instant'
+    searchMode: 'semantic',
+    setSearchMode: (mode) => {
+      set({ searchMode: mode })
+      const query = get().searchQuery
+      if (query.trim()) {
+        get().setSearchQuery(query)
+      }
+    },
 
     // Search
     setSearchQuery: async (query) => {
@@ -79,11 +89,15 @@ const useBookmarkStore = create((set, get) => {
         // Show local results immediately
         set({ bookmarks: localMatches, totalBookmarks: localMatches.length })
 
-        // 2. Trigger Deep Semantic Search (Debounced)
+        // 2. Trigger Database Keyword Search or Semantic Search
         if (searchTimeout) clearTimeout(searchTimeout)
         searchTimeout = setTimeout(async () => {
-          await get().performSearch(trimmedQuery)
-        }, 600) // 600ms debounce
+          if (state.searchMode === 'semantic') {
+            await get().performSearch(trimmedQuery)
+          } else {
+            await get().performTextSearch(trimmedQuery)
+          }
+        }, 400) // Lower debounce for text search (400ms)
       } else {
         // If search is cleared, cancel pending search and restore from cache
         if (searchTimeout) clearTimeout(searchTimeout)
@@ -167,6 +181,67 @@ const useBookmarkStore = create((set, get) => {
           return
         }
         set({ error: error.message, isDeepSearching: false })
+      }
+    },
+
+    // Perform exact text keyword search using the database
+    performTextSearch: async (query, append = false) => {
+      const state = get()
+      const offset = append ? state.searchOffset : 0
+
+      set({ loading: true, error: null })
+      if (!append) set({ aiAnswer: null })
+
+      try {
+        const { selectedTags, selectedFolder, pageSize } = get()
+        const token = localStorage.getItem('authToken')
+        const response = await fetch(`${API_BASE_URL}/search`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            query,
+            searchType: 'text',
+            limit: pageSize,
+            offset: offset,
+            tags: selectedTags.length > 0 ? selectedTags : null,
+            folderPath: selectedFolder
+          })
+        })
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => null)
+          const errorMessage = errorData?.message || errorData?.error || 'Search failed'
+          throw new Error(errorMessage)
+        }
+
+        const data = await response.json()
+        const results = data.results || []
+
+        // If we are appending, merge with existing bookmarks
+        const currentBookmarks = append ? state.bookmarks : []
+        const newBookmarks = [...currentBookmarks, ...results]
+        const uniqueBookmarks = Array.from(new Map(newBookmarks.map(b => [b.id, b])).values())
+
+        set({
+          bookmarks: uniqueBookmarks,
+          loading: false,
+          isDeepSearching: false,
+          error: null,
+          currentPage: 1,
+          totalPages: 0, // 0 indicates search mode
+          totalBookmarks: uniqueBookmarks.length,
+          searchOffset: offset + results.length,
+          hasMoreResults: results.length === pageSize
+        })
+      } catch (error) {
+        if (isAuthError(error)) {
+          handleAuthError()
+          return
+        }
+        set({ error: error.message, loading: false })
       }
     },
 

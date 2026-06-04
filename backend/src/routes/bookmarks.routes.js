@@ -482,9 +482,20 @@ router.put('/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const userId = req.user.id;
-    const { title, tags, folder_id, folder_path, browser } = req.body;
-
-
+    const { 
+      title, 
+      tags, 
+      folder_id, 
+      folder_path, 
+      browser,
+      extractedContent,
+      extractedTitle,
+      extractedExcerpt,
+      extractedMethod,
+      extractedLength,
+      cover_image,
+      extracted_images
+    } = req.body;
 
     // Get bookmark to check ownership
     const bookmark = await getBookmarkRecord(id);
@@ -514,6 +525,19 @@ router.put('/:id', async (req, res) => {
     }
     if (folder_path !== undefined) {
       supabaseUpdates.folder_path = folder_path;
+    }
+
+    // Allow updating content & images if provided (e.g. from popup update)
+    if (extractedContent && extractedContent.length > 500) {
+      supabaseUpdates.extracted_content = extractedContent;
+      supabaseUpdates.extraction_method = extractedMethod || 'readability';
+      supabaseUpdates.processing_status = 'pending'; // Put back in queue to re-process with images
+    }
+    if (cover_image !== undefined) {
+      supabaseUpdates.cover_image = cover_image;
+    }
+    if (extracted_images !== undefined) {
+      supabaseUpdates.extracted_images = extracted_images;
     }
 
 

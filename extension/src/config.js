@@ -10,4 +10,4 @@ globalThis.API_BASE_URL = 'https://booksmart-backend-920600341451.us-central1.ru
 // For ES modules (popup.js)
 export const API_BASE_URL = globalThis.API_BASE_URL;
 export const MANAGER_URL = 'https://booksmart-manager-920600341451.us-central1.run.app';
-
+globalThis.MANAGER_URL = MANAGER_URL;

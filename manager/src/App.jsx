@@ -2,6 +2,41 @@ import { useState, useEffect } from 'react'
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import Dashboard from './pages/Dashboard'
 import Login from './pages/Login'
+import { refreshSession } from './utils/auth'
+
+// ── Extension auth bridge ─────────────────────────────────────────────────────
+// Set this to the BookSmart extension ID shown in chrome://extensions
+// (looks like "abcdefghijklmnopqrstuvwxyz123456")
+// It is also stored in localStorage so you can update it from the browser console:
+//   localStorage.setItem('booksmartExtensionId', 'YOUR_ID_HERE')
+const EXTENSION_ID = localStorage.getItem('booksmartExtensionId') || '';
+
+/**
+ * Pushes auth tokens directly into the extension via chrome.runtime.sendMessage.
+ * Requires externally_connectable in the manifest (already configured).
+ */
+function sendTokensToExtension(token, refreshToken, email, name) {
+  if (!EXTENSION_ID) {
+    console.warn('[BookSmart] Extension ID not set – skipping push sync. Set it with: localStorage.setItem("booksmartExtensionId", "YOUR_ID")');
+    return;
+  }
+  if (typeof chrome === 'undefined' || !chrome.runtime?.sendMessage) return;
+  try {
+    chrome.runtime.sendMessage(
+      EXTENSION_ID,
+      { type: 'BOOKSMART_AUTH_SYNC', token, refreshToken, email, name },
+      (response) => {
+        if (chrome.runtime.lastError) {
+          console.warn('[BookSmart] Extension push sync failed:', chrome.runtime.lastError.message);
+        } else {
+          console.log('[BookSmart] Extension push sync OK:', response);
+        }
+      }
+    );
+  } catch (e) {
+    console.warn('[BookSmart] sendMessage threw:', e);
+  }
+}
 
 function App() {
   const [darkMode, setDarkMode] = useState(() => {
@@ -28,15 +63,21 @@ function App() {
         }
 
         // Parse user details
+        let oauthEmail = null, oauthName = null;
         try {
           const payload = JSON.parse(atob(accessToken.split('.')[1]))
           if (payload.email) {
-            localStorage.setItem('userEmail', payload.email)
-            localStorage.setItem('userName', payload.user_metadata?.name || payload.email.split('@')[0])
+            oauthEmail = payload.email;
+            oauthName = payload.user_metadata?.name || payload.email.split('@')[0];
+            localStorage.setItem('userEmail', oauthEmail)
+            localStorage.setItem('userName', oauthName)
           }
         } catch (e) {
           console.error('Failed to parse OAuth session payload:', e)
         }
+
+        // Push tokens directly into the extension (primary auth sync path)
+        sendTokensToExtension(accessToken, refreshToken, oauthEmail, oauthName);
 
         // Clean url fragment
         window.history.replaceState({}, document.title, window.location.pathname)
@@ -53,17 +94,25 @@ function App() {
       localStorage.setItem('authToken', tokenFromUrl)
 
       // Try to extract email from JWT token payload
+      let urlEmail = null, urlName = null;
       try {
         const payload = JSON.parse(atob(tokenFromUrl.split('.')[1]))
         if (payload.email) {
-          localStorage.setItem('userEmail', payload.email)
+          urlEmail = payload.email;
+          localStorage.setItem('userEmail', urlEmail)
           if (!localStorage.getItem('userName')) {
-            localStorage.setItem('userName', payload.email.split('@')[0])
+            urlName = urlEmail.split('@')[0];
+            localStorage.setItem('userName', urlName)
+          } else {
+            urlName = localStorage.getItem('userName');
           }
         }
       } catch (e) {
         console.error('Failed to parse token:', e)
       }
+
+      // Push tokens to extension
+      sendTokensToExtension(tokenFromUrl, null, urlEmail, urlName);
 
       // Clean up URL
       window.history.replaceState({}, document.title, window.location.pathname)
@@ -93,25 +142,11 @@ function App() {
         // Refresh token if it expires in less than 30 minutes
         if (timeToExpiry < 30 * 60 * 1000) {
           console.log('[Auth] Token expiring soon. Initiating background refresh...');
-          const response = await fetch(`${API_BASE_URL.replace('/api', '')}/api/auth/refresh`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ refresh_token: refreshToken })
-          })
-
-          if (response.ok) {
-            const data = await response.json()
-            if (data.session?.access_token) {
-              localStorage.setItem('authToken', data.session.access_token)
-              if (data.session.refresh_token) {
-                localStorage.setItem('refreshToken', data.session.refresh_token)
-              }
-              console.log('[Auth] Token successfully refreshed in background.')
-            }
+          const newToken = await refreshSession()
+          if (newToken) {
+            console.log('[Auth] Token successfully refreshed in background.')
           } else {
-            console.warn('[Auth] Background refresh failed, status:', response.status)
+            console.warn('[Auth] Background refresh failed.')
           }
         }
       } catch (err) {
@@ -123,7 +158,16 @@ function App() {
     checkAndRefreshToken()
     const refreshInterval = setInterval(checkAndRefreshToken, 5 * 60 * 1000)
 
-    return () => clearInterval(refreshInterval)
+    const handleFocus = () => {
+      console.log('[Auth] Window focused, checking session freshness...');
+      checkAndRefreshToken();
+    };
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      clearInterval(refreshInterval);
+      window.removeEventListener('focus', handleFocus);
+    }
   }, [isAuthenticated])
 
   // Apply dark mode class to document
@@ -145,6 +189,11 @@ function App() {
     if (userName) {
       localStorage.setItem('userName', userName)
     }
+    const email = localStorage.getItem('userEmail') || null;
+    const name = userName || localStorage.getItem('userName') || null;
+    const refreshToken = localStorage.getItem('refreshToken') || null;
+    // Push tokens to extension
+    sendTokensToExtension(token, refreshToken, email, name);
     setIsAuthenticated(true)
   }
 
