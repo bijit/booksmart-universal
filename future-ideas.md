@@ -28,3 +28,12 @@ Sometimes users remember *when* or *how* they found something, rather than what 
 *   **User Query:** *"What was that long article about economics I was reading the same week I bookmarked the Tesla earnings report?"*
 *   **User Query:** *"How has the sentiment around 'remote work' changed in the articles I've saved between 2021 and 2025?"*
 *   **How it works:** Combining vector search with strict metadata filtering (timestamps, reading duration, source domains) allows hybrid queries that rely heavily on the user's personal timeline.
+
+## 6. Premium Vertical Search Profiles (Category-Specific RAG)
+Allow premium users to filter and search their library using custom domain schemas. The system dynamically adjusts its parsing models, metadata tags, and UI rendering depending on the nature of the bookmarked page:
+*   **✈️ Wanderlust Planner (Travel & Destinations):** Extracts cities/countries, prices, hotel details, and best-visit seasons. Renders bookmark cards with interactive maps, location summaries, and seasonal guidelines.
+*   **🍽️ Epicurean's Journal (Dining & Gastronomy):** Extracts cuisine styles, dietary tags (vegan, gluten-free), reservation links, and ingredients. Displays pricing tiers, reservations call-to-actions, and interactive recipe checklists.
+*   **🛒 Smart Shopper (Tech Specs & Product Deals):** Extracts model specs, pricing lists, coupon codes, and shipping rules. Enables query filters like *"laptop with 32GB RAM under $1000"* and highlights active price drops.
+*   **🎓 Scholar's Desk (Academic & Research):** Extracts author details, publication years, methodologies, and hypotheses. Renders abstract digests on cards and supports exporting citations to APA, MLA, or BibTeX format.
+*   **💻 Dev Stack (Code & Documentation):** Extracts code syntax blocks, APIs, and frameworks used. Renders syntax-highlighted boxes on cards with one-click clipboard copying.
+*   **Implementation Strategy:** Gemini categorizes bookmarks on ingestion. Category keys are written as metadata tags in Qdrant for fast query filtering, and the React frontend renders customized cards dynamically.
