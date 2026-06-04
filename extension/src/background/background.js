@@ -96,6 +96,13 @@ browser.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
         const { token, refreshToken, email, name } = results[0].result;
         const currentAuth = await getAuthData();
         const currentToken = currentAuth[STORAGE_KEYS.AUTH_TOKEN];
+        const currentEmail = currentAuth[STORAGE_KEYS.USER]?.email;
+
+        // Skip automatic sync if users differ to prevent session hijacking
+        if (currentEmail && email && currentEmail !== email) {
+          console.log(`[BookSmart] Skipping tab->extension sync: tab user (${email}) differs from extension user (${currentEmail}).`);
+          return;
+        }
 
         const tabExpiry = getTokenExpiry(token);
         const currentExpiry = getTokenExpiry(currentToken);
@@ -109,16 +116,19 @@ browser.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
           });
           updateBadgeCount();
         } else if (currentExpiry > tabExpiry) {
-          console.log('[BookSmart] Extension has a newer token. Syncing extension -> tab.');
-          await browser.scripting.executeScript({
-            target: { tabId },
-            func: (extToken, extRefreshToken) => {
-              if (extToken) localStorage.setItem('authToken', extToken);
-              if (extRefreshToken) localStorage.setItem('refreshToken', extRefreshToken);
-              window.dispatchEvent(new Event('storage'));
-            },
-            args: [currentToken, currentAuth[STORAGE_KEYS.REFRESH_TOKEN]]
-          });
+          // Only push down to tab if the emails match or tab is empty
+          if (!email || email === currentEmail) {
+            console.log('[BookSmart] Extension has a newer token. Syncing extension -> tab.');
+            await browser.scripting.executeScript({
+              target: { tabId },
+              func: (extToken, extRefreshToken) => {
+                if (extToken) localStorage.setItem('authToken', extToken);
+                if (extRefreshToken) localStorage.setItem('refreshToken', extRefreshToken);
+                window.dispatchEvent(new Event('storage'));
+              },
+              args: [currentToken, currentAuth[STORAGE_KEYS.REFRESH_TOKEN]]
+            });
+          }
         }
       }
     } catch (e) {
@@ -711,16 +721,26 @@ async function syncTokenToManagerTabs(token, refreshToken) {
     const tabs = await browser.tabs.query({});
     const managerTabs = tabs.filter(t => t.url && t.url.includes(globalThis.MANAGER_URL));
 
+    // Get current extension user email
+    const currentAuth = await getAuthData();
+    const extEmail = currentAuth[STORAGE_KEYS.USER]?.email;
+
     for (const tab of managerTabs) {
       console.log(`[BookSmart] Syncing new token to active manager tab ${tab.id}`);
       await browser.scripting.executeScript({
         target: { tabId: tab.id },
-        func: (t, rt) => {
-          if (t) localStorage.setItem('authToken', t);
-          if (rt) localStorage.setItem('refreshToken', rt);
-          window.dispatchEvent(new Event('storage'));
+        func: (t, rt, expectedEmail) => {
+          const tabEmail = localStorage.getItem('userEmail');
+          // Only sync if the tab has no logged-in email, or if it matches the extension email
+          if (!tabEmail || tabEmail === expectedEmail) {
+            if (t) localStorage.setItem('authToken', t);
+            if (rt) localStorage.setItem('refreshToken', rt);
+            window.dispatchEvent(new Event('storage'));
+          } else {
+            console.log(`[BookSmart] Refusing to overwrite tab credentials: tab user (${tabEmail}) differs from extension user (${expectedEmail})`);
+          }
         },
-        args: [token, refreshToken]
+        args: [token, refreshToken, extEmail]
       });
     }
   } catch (e) {
