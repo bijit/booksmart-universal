@@ -37,3 +37,8 @@ Allow premium users to filter and search their library using custom domain schem
 *   **🎓 Scholar's Desk (Academic & Research):** Extracts author details, publication years, methodologies, and hypotheses. Renders abstract digests on cards and supports exporting citations to APA, MLA, or BibTeX format.
 *   **💻 Dev Stack (Code & Documentation):** Extracts code syntax blocks, APIs, and frameworks used. Renders syntax-highlighted boxes on cards with one-click clipboard copying.
 *   **Implementation Strategy:** Gemini categorizes bookmarks on ingestion. Category keys are written as metadata tags in Qdrant for fast query filtering, and the React frontend renders customized cards dynamically.
+
+## 7. Frontend Technological Alignment
+To ensure instant load times (<100ms) for the Chrome extension popup while delivering a premium, highly animated search and navigation dashboard:
+*   **Chrome Extension Popup:** Utilize **Svelte** (or lightweight vanilla JS). Svelte compiles down to minimal, zero-dependency JavaScript, eliminating framework runtime overhead and guaranteeing instant popup renders.
+*   **Web Manager Dashboard:** Stick to **React/Next.js** paired with **Framer Motion** for physics-based, fluid micro-animations (e.g. card expansions, timeline transitions) and Tailwind CSS/Shadcn for design system consistency. This keeps the application SEO-friendly and extremely responsive.
