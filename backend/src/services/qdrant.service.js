@@ -578,40 +578,22 @@ export async function searchChunks(userId, queryEmbedding, options = {}) {
  */
 export async function deleteBookmarkChunks(bookmarkId) {
   try {
-    // Find all chunks for this bookmark
-    const scrollResults = await qdrantClient.scroll(COLLECTION_NAME, {
+    console.log(`[Qdrant] Deleting chunks for bookmark ${bookmarkId}...`);
+
+    // Delete all chunks for this bookmark using filter directly
+    await qdrantClient.delete(COLLECTION_NAME, {
+      wait: true,
       filter: {
         must: [
           {
             key: 'bookmark_id',
             match: { value: bookmarkId }
-          },
-          {
-            key: 'is_chunk',
-            match: { value: true }
           }
         ]
-      },
-      limit: 100,
-      with_payload: false,
-      with_vector: false
+      }
     });
 
-    if (scrollResults.points.length === 0) {
-      console.log(`[Qdrant] No chunks found for bookmark ${bookmarkId}`);
-      return true;
-    }
-
-    // Delete all chunks
-    const chunkIds = scrollResults.points.map(p => p.id);
-
-    await qdrantClient.delete(COLLECTION_NAME, {
-      wait: true,
-      points: chunkIds
-    });
-
-    console.log(`[Qdrant] Deleted ${chunkIds.length} chunks for bookmark ${bookmarkId}`);
-
+    console.log(`[Qdrant] Deleted chunks for bookmark ${bookmarkId}`);
     return true;
 
   } catch (error) {
@@ -770,28 +752,14 @@ export async function deleteQdrantBookmarks(userId, bookmarks) {
 
       // Delete chunks
       try {
-        const scrollResult = await qdrantClient.scroll(COLLECTION_NAME, {
+        await qdrantClient.delete(COLLECTION_NAME, {
+          wait: true,
           filter: {
             must: [
               { key: 'bookmark_id', match: { value: item.id } }
             ]
-          },
-          with_payload: true,
-          with_vector: false
-        });
-
-        if (scrollResult.points && scrollResult.points.length > 0) {
-          const chunkIds = scrollResult.points
-            .filter(chunk => chunk.payload && chunk.payload.is_chunk === true)
-            .map(chunk => chunk.id);
-
-          if (chunkIds.length > 0) {
-            await qdrantClient.delete(COLLECTION_NAME, {
-              wait: true,
-              points: chunkIds
-            });
           }
-        }
+        });
       } catch (err) {
         console.error(`Error deleting chunks in Qdrant:`, err);
       }

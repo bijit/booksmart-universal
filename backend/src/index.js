@@ -13,6 +13,7 @@ const __dirname = dirname(__filename);
 
 // Create Express app
 const app = express();
+app.set('trust proxy', 1);
 const PORT = process.env.PORT || 3000;
 
 // Rate limiting (Allow 300 requests per 15 minutes per IP)

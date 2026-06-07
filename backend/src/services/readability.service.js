@@ -9,6 +9,7 @@
 import axios from 'axios';
 import { JSDOM } from 'jsdom';
 import { Readability } from '@mozilla/readability';
+import https from 'https';
 
 /**
  * Extract content from a URL using Readability
@@ -28,7 +29,8 @@ export async function extractContent(url) {
         'Accept-Language': 'en-US,en;q=0.5',
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
       },
-      timeout: 30000 // 30 second timeout
+      timeout: 30000, // 30 second timeout
+      httpsAgent: new https.Agent({ rejectUnauthorized: false })
     });
 
     const html = response.data;

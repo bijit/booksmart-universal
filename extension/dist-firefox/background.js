@@ -4,7 +4,7 @@ import './lib/browser-polyfill.js';
 
 import './config.js';
 import { bookmarks, auth } from './utils/api.js';
-import { getAuthData, saveAuthData, STORAGE_KEYS } from './utils/storage.js';
+import { getAuthData, saveAuthData, clearAuthData, STORAGE_KEYS } from './utils/storage.js';
 import { showNotification } from './utils/notifications.js';
 
 // 👉 TEMP: clear all extension‑local storage on every reload (debug helper)
@@ -45,6 +45,19 @@ browser.runtime.onInstalled.addListener((details) => {
 // The manager web app calls chrome.runtime.sendMessage() right after login.
 // This fires reliably with no race conditions against replaceState().
 browser.runtime.onMessageExternal.addListener(async (message, sender, sendResponse) => {
+  if (message?.type === 'BOOKSMART_AUTH_LOGOUT') {
+    try {
+      await clearAuthData();
+      console.log('[BookSmart] Auth cleared from manager via onMessageExternal (Logout) ✅');
+      updateBadgeCount();
+      sendResponse({ ok: true });
+    } catch (e) {
+      console.error('[BookSmart] onMessageExternal logout failed:', e);
+      sendResponse({ ok: false, error: e.message });
+    }
+    return;
+  }
+
   if (message?.type !== 'BOOKSMART_AUTH_SYNC') return;
 
   const { token, refreshToken, email, name } = message;

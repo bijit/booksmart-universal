@@ -180,6 +180,18 @@ function App() {
     localStorage.setItem('darkMode', JSON.stringify(darkMode))
   }, [darkMode])
 
+  // Listen for changes in localStorage from other tabs/windows to prevent cross-account contamination
+  useEffect(() => {
+    const handleStorageChange = (e) => {
+      if (e.key === 'authToken') {
+        console.log('[Auth] Detected auth token change in another tab/window. Reloading page...');
+        window.location.reload();
+      }
+    };
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, [])
+
   const toggleDarkMode = () => {
     setDarkMode(prev => !prev)
   }
@@ -202,8 +214,27 @@ function App() {
     localStorage.removeItem('refreshToken')
     localStorage.removeItem('userName')
     localStorage.removeItem('userEmail')
+    
+    // Clear credentials in extension
+    if (EXTENSION_ID && typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
+      try {
+        chrome.runtime.sendMessage(
+          EXTENSION_ID,
+          { type: 'BOOKSMART_AUTH_LOGOUT' },
+          (response) => {
+            if (chrome.runtime.lastError) {
+              console.warn('[BookSmart] Extension logout sync failed:', chrome.runtime.lastError.message);
+            }
+          }
+        );
+      } catch (e) {
+        console.warn('[BookSmart] sendMessage logout threw:', e);
+      }
+    }
+
     setIsAuthenticated(false)
   }
+
 
   return (
     <Router>

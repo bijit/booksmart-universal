@@ -548,7 +548,11 @@ async function handleImport() {
       importDeleteBtn.replaceWith(newDeleteBtn);
       importAddBtn.replaceWith(newAddBtn);
       
-      newDeleteBtn.addEventListener('click', () => executeImport(true));
+      newDeleteBtn.addEventListener('click', () => {
+        if (confirm("Are you absolutely sure you want to delete all existing bookmarks? This action is permanent and cannot be undone.")) {
+          executeImport(true);
+        }
+      });
       newAddBtn.addEventListener('click', () => executeImport(false));
 
     } else {

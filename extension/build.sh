@@ -52,8 +52,17 @@ cp src/bookmarks/bookmarks.html dist/
 echo "Creating Firefox specific distribution..."
 rm -rf dist-firefox
 cp -r dist dist-firefox
-# Replace service_worker with scripts array for Firefox MV3 compatibility
-sed -i '' 's/"service_worker": "background.js"/"scripts": ["background.js"]/g' dist-firefox/manifest.json
+
+# Configure background page for Firefox MV3 compatibility (supports ES modules)
+node -e "
+const fs = require('fs');
+const manifest = JSON.parse(fs.readFileSync('dist-firefox/manifest.json', 'utf8'));
+manifest.background = { page: 'background.html' };
+fs.writeFileSync('dist-firefox/manifest.json', JSON.stringify(manifest, null, 2));
+"
+
+# Create background.html for Firefox to load background.js as a module
+echo '<!DOCTYPE html><html><head><meta charset="utf-8"><script type="module" src="background.js"></script></head></html>' > dist-firefox/background.html
 
 echo "Build complete!"
 echo ""
