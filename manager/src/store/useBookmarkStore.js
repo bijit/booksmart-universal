@@ -4,6 +4,7 @@ import { isAuthError, handleAuthError, authenticatedFetch as fetch } from '../ut
 
 const useBookmarkStore = create((set, get) => {
   let searchTimeout = null;
+  let preferencesTimeout = null;
 
   return {
     // Bookmarks data
@@ -36,6 +37,11 @@ const useBookmarkStore = create((set, get) => {
 
     // View mode
     viewMode: 'cards', // cards, list, timeline
+
+    // User Preferences
+    preferences: null,
+    sidebarWidth: 280,
+    layoutMode: 'gallery',
 
     // Set bookmarks
     setBookmarks: (bookmarks) => set({ bookmarks }),
@@ -337,13 +343,96 @@ const useBookmarkStore = create((set, get) => {
 
 
     // Sort
-    setSortBy: (sortBy) => set({ sortBy }),
+    setSortBy: (sortBy) => {
+      set({ sortBy })
+      get().savePreference('sortBy', sortBy)
+    },
 
     // Processing filter
     setShowOnlyProcessing: (enabled) => set({ showOnlyProcessing: enabled, currentPage: 1 }),
 
     // View mode
-    setViewMode: (mode) => set({ viewMode: mode }),
+    setViewMode: (mode) => {
+      set({ viewMode: mode })
+      get().savePreference('viewMode', mode)
+    },
+
+    // Preferences
+    fetchPreferences: async () => {
+      try {
+        const token = localStorage.getItem('authToken')
+        if (!token) return
+
+        const response = await fetch(`${API_BASE_URL}/preferences`, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        })
+
+        if (!response.ok) {
+          throw new Error('Failed to fetch preferences')
+        }
+
+        const data = await response.json()
+        const prefs = data.preferences || {}
+        const settings = prefs.settings || {}
+
+        set({
+          preferences: prefs,
+          sidebarWidth: settings.sidebarWidth !== undefined ? settings.sidebarWidth : 280,
+          layoutMode: settings.layoutMode || 'gallery',
+          sortBy: settings.sortBy || 'date_added',
+          viewMode: settings.viewMode || 'cards'
+        })
+      } catch (error) {
+        console.error('Fetch preferences error:', error)
+      }
+    },
+
+    savePreference: async (key, value) => {
+      // Optimistically update the store state first
+      set({ [key]: value })
+
+      const state = get()
+      const currentPrefs = state.preferences || {}
+      const currentSettings = currentPrefs.settings || {}
+
+      // Build updated settings
+      const updatedSettings = {
+        ...currentSettings,
+        [key]: value
+      }
+
+      // Update local state copy
+      const newPrefs = {
+        ...currentPrefs,
+        settings: updatedSettings
+      }
+      set({ preferences: newPrefs })
+
+      // Debounce the backend API call to avoid overloading during fast UI updates (like dragging)
+      if (preferencesTimeout) clearTimeout(preferencesTimeout)
+
+      preferencesTimeout = setTimeout(async () => {
+        try {
+          const token = localStorage.getItem('authToken')
+          if (!token) return
+
+          await fetch(`${API_BASE_URL}/preferences`, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({
+              settings: updatedSettings
+            })
+          })
+        } catch (error) {
+          console.error('Save preferences error:', error)
+        }
+      }, 500)
+    },
 
     // Get filtered bookmarks
     getFilteredBookmarks: () => {

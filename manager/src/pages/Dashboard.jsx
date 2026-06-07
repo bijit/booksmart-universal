@@ -37,13 +37,15 @@ function Dashboard({ darkMode, toggleDarkMode, onLogout }) {
     totalPages,
     totalBookmarks,
     researchOnWeb,
-    searchMode
+    searchMode,
+    sidebarWidth,
+    layoutMode,
+    savePreference,
+    fetchPreferences
   } = useBookmarkStore()
 
   const filteredBookmarks = getFilteredBookmarks()
 
-  const [sidebarWidth, setSidebarWidth] = useState(280)
-  const [layoutMode, setLayoutMode] = useState('gallery')
   const [isResizing, setIsResizing] = useState(false)
   const sidebarRef = useRef(null)
 
@@ -80,10 +82,10 @@ function Dashboard({ darkMode, toggleDarkMode, onLogout }) {
     if (isResizing) {
       const newWidth = e.clientX
       if (newWidth > 200 && newWidth < 600) {
-        setSidebarWidth(newWidth)
+        savePreference('sidebarWidth', newWidth)
       }
     }
-  }, [isResizing])
+  }, [isResizing, savePreference])
 
   useEffect(() => {
     window.addEventListener('mousemove', resize)
@@ -96,6 +98,7 @@ function Dashboard({ darkMode, toggleDarkMode, onLogout }) {
 
 
   useEffect(() => {
+    fetchPreferences()
     fetchBookmarks()
 
     // Poll for updates every 5 minutes
@@ -104,7 +107,7 @@ function Dashboard({ darkMode, toggleDarkMode, onLogout }) {
     }, 300000)
 
     return () => clearInterval(interval)
-  }, [fetchBookmarks])
+  }, [fetchPreferences, fetchBookmarks])
 
   return (
     <div className="flex flex-col min-h-screen">
@@ -260,14 +263,14 @@ function Dashboard({ darkMode, toggleDarkMode, onLogout }) {
                   {(viewMode === 'cards' || viewMode === 'timeline') && (
                     <div className="flex items-center bg-gray-100 dark:bg-gray-800 rounded-lg p-1 border border-light-border dark:border-dark-border">
                       <button
-                        onClick={() => setLayoutMode('gallery')}
+                        onClick={() => savePreference('layoutMode', 'gallery')}
                         className={`p-1.5 rounded-md transition-colors ${layoutMode === 'gallery' ? 'bg-white dark:bg-gray-700 shadow-sm text-accent dark:text-accent-dark' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}
                         title="Gallery View"
                       >
                         <LayoutGrid className="w-4 h-4" />
                       </button>
                       <button
-                        onClick={() => setLayoutMode('pinterest')}
+                        onClick={() => savePreference('layoutMode', 'pinterest')}
                         className={`p-1.5 rounded-md transition-colors ${layoutMode === 'pinterest' ? 'bg-white dark:bg-gray-700 shadow-sm text-accent dark:text-accent-dark' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}
                         title="Pinterest View"
                       >

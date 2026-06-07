@@ -29,6 +29,9 @@ router.get('/', async (req, res) => {
         auto_extract: preferences.auto_extract !== false, // Default true
         search_threshold: preferences.search_threshold || 0.5,
         max_results: preferences.max_results || 20,
+        default_view: preferences.default_view || 'card',
+        theme: preferences.theme || 'light',
+        settings: preferences.settings || {},
         created_at: preferences.created_at,
         updated_at: preferences.updated_at
       }
@@ -50,7 +53,7 @@ router.get('/', async (req, res) => {
 router.put('/', async (req, res) => {
   try {
     const userId = req.user.id;
-    const { default_tags, auto_extract, search_threshold, max_results } = req.body;
+    const { default_tags, auto_extract, search_threshold, max_results, default_view, theme, settings } = req.body;
 
     // Validate inputs
     const updates = {};
@@ -97,6 +100,36 @@ router.put('/', async (req, res) => {
       updates.max_results = maxRes;
     }
 
+    if (default_view !== undefined) {
+      if (typeof default_view !== 'string') {
+        return res.status(400).json({
+          error: 'Bad Request',
+          message: 'default_view must be a string'
+        });
+      }
+      updates.default_view = default_view;
+    }
+
+    if (theme !== undefined) {
+      if (typeof theme !== 'string') {
+        return res.status(400).json({
+          error: 'Bad Request',
+          message: 'theme must be a string'
+        });
+      }
+      updates.theme = theme;
+    }
+
+    if (settings !== undefined) {
+      if (typeof settings !== 'object' || settings === null || Array.isArray(settings)) {
+        return res.status(400).json({
+          error: 'Bad Request',
+          message: 'settings must be a JSON object'
+        });
+      }
+      updates.settings = settings;
+    }
+
     // Update preferences
     const updatedPreferences = await upsertUserPreferences(userId, updates);
 
@@ -107,6 +140,9 @@ router.put('/', async (req, res) => {
         auto_extract: updatedPreferences.auto_extract !== false,
         search_threshold: updatedPreferences.search_threshold || 0.5,
         max_results: updatedPreferences.max_results || 20,
+        default_view: updatedPreferences.default_view || 'card',
+        theme: updatedPreferences.theme || 'light',
+        settings: updatedPreferences.settings || {},
         updated_at: updatedPreferences.updated_at
       }
     });
