@@ -777,46 +777,119 @@ router.post('/:id/reindex', async (req, res) => {
     const { id } = req.params;
     const userId = req.user.id;
 
-    // 1. Get bookmark from Supabase to check ownership
-    const bookmark = await getBookmarkRecord(id);
+    let bookmark;
+    let isRecovered = false;
 
-    if (!bookmark) {
-      return res.status(404).json({
-        error: 'Not Found',
-        message: 'Bookmark not found'
+    try {
+      // 1. Get bookmark from Supabase to check ownership
+      bookmark = await getBookmarkRecord(id);
+    } catch (dbError) {
+      // Catch PGRST116 (0 rows returned / not found) to attempt recovery from Qdrant
+      const isNotFoundError = dbError.message && (
+        dbError.message.includes('Cannot coerce') || 
+        dbError.message.includes('PGRST116') || 
+        dbError.message.includes('not found')
+      );
+
+      if (isNotFoundError) {
+        console.log(`[Reindex] Bookmark ${id} not found in Supabase. Attempting to recover from Qdrant...`);
+        
+        const { getBookmarkChunks, getBookmarkById } = await import('../services/qdrant.service.js');
+        let qdrantData = null;
+
+        try {
+          const chunks = await getBookmarkChunks(id);
+          if (chunks && chunks.length > 0) {
+            qdrantData = chunks[0];
+          } else {
+            qdrantData = await getBookmarkById(id);
+          }
+        } catch (qError) {
+          console.error(`[Reindex] Failed to fetch metadata from Qdrant for ${id}:`, qError.message);
+        }
+
+        if (qdrantData) {
+          // Verify user ownership in the Qdrant payload
+          if (qdrantData.user_id !== userId) {
+            return res.status(403).json({
+              error: 'Forbidden',
+              message: 'You do not have access to this bookmark'
+            });
+          }
+
+          console.log(`[Reindex] Found metadata in Qdrant. Restoring Supabase record for: ${qdrantData.url}`);
+          
+          const { supabaseAdmin } = await import('../config/supabase.js');
+          const { data, error: insertError } = await supabaseAdmin
+            .from('bookmarks')
+            .insert({
+              id, // Re-use the existing ID to align with Qdrant
+              user_id: userId,
+              url: qdrantData.url,
+              title: qdrantData.title || 'Recovered Bookmark',
+              description: qdrantData.description || null,
+              tags: qdrantData.tags || [],
+              folder_id: qdrantData.folder_id || null,
+              folder_path: qdrantData.folder_path || null,
+              cover_image: qdrantData.cover_image || null,
+              extracted_images: qdrantData.extracted_images || null,
+              created_at: qdrantData.created_at || new Date().toISOString(),
+              processing_status: 'pending', // Queue it for re-scraping
+              extraction_method: null,
+              extracted_content: null,
+              qdrant_point_id: id,
+              retry_count: 0
+            })
+            .select()
+            .single();
+
+          if (insertError) {
+            console.error('[Reindex] Failed to insert recovered bookmark:', insertError.message);
+            throw new Error(`Failed to restore recovered bookmark: ${insertError.message}`);
+          }
+
+          bookmark = data;
+          isRecovered = true;
+        }
+      }
+
+      if (!bookmark) {
+        throw dbError; // Re-throw if it wasn't a not-found error or couldn't be recovered
+      }
+    }
+
+    if (!isRecovered) {
+      // 2. Check ownership for existing Supabase bookmark
+      if (bookmark.user_id !== userId) {
+        return res.status(403).json({
+          error: 'Forbidden',
+          message: 'You do not have access to this bookmark'
+        });
+      }
+
+      // 3. Reset processing status to pending and clear extraction info to force a re-scrape
+      bookmark = await updateBookmarkRecord(id, {
+        processing_status: 'pending',
+        extraction_method: null,
+        extracted_content: null,
+        cover_image: null,
+        extracted_images: null,
+        error_message: null,
+        retry_count: 0
       });
     }
 
-    // 2. Check ownership
-    if (bookmark.user_id !== userId) {
-      return res.status(403).json({
-        error: 'Forbidden',
-        message: 'You do not have access to this bookmark'
-      });
-    }
-
-    // 3. Reset processing status to pending and clear extraction info to force a re-scrape
-    const updated = await updateBookmarkRecord(id, {
-      processing_status: 'pending',
-      extraction_method: null,
-      extracted_content: null,
-      cover_image: null,
-      extracted_images: null,
-      error_message: null,
-      retry_count: 0
-    });
-
-    console.log(`[Bookmarks] User ${userId} queued bookmark ${id} for re-indexing`);
+    console.log(`[Bookmarks] User ${userId} queued bookmark ${id} for re-indexing ${isRecovered ? '(recovered from Qdrant)' : ''}`);
 
     res.json({
-      message: 'Bookmark queued for re-indexing',
-      bookmark: updated
+      message: isRecovered ? 'Bookmark recovered and queued for re-indexing' : 'Bookmark queued for re-indexing',
+      bookmark: bookmark
     });
   } catch (error) {
     console.error('Re-index bookmark error:', error);
     res.status(500).json({
       error: 'Internal Server Error',
-      message: 'Failed to queue bookmark for re-indexing'
+      message: `Failed to queue bookmark for re-indexing: ${error.message}`
     });
   }
 });
