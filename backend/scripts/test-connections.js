@@ -21,7 +21,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 // Load .env.local from project root
-config({ path: resolve(__dirname, '../../.env.local') });
+config({ path: resolve(__dirname, '../../.env.local'), override: true });
 
 console.log('🧪 Testing connections to all services...\n');
 
@@ -176,7 +176,11 @@ async function runTests() {
     process.stdout.write(`Testing ${test.name}... `);
     await test.fn();
 
-    const resultKey = test.name.toLowerCase().replace(/\s+/g, '').replace('cloud', '');
+    const resultKey = test.name.toLowerCase()
+      .replace(/\s+/g, '')
+      .replace('cloud', '')
+      .replace('google', '')
+      .replace('ai', '');
     const result = results[resultKey];
     if (result && result.status === 'success') {
       console.log(`✅ ${result.message}`);

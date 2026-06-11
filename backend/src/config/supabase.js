@@ -34,13 +34,27 @@ export let supabaseAdmin;
 if (supabaseUrl && supabaseAnonKey) {
   try {
     supabase = createClient(supabaseUrl, supabaseAnonKey, {
-      auth: { autoRefreshToken: true, persistSession: false },
+      auth: { autoRefreshToken: false, persistSession: false },
       realtime: { enabled: false }
     });
     console.log('✅ Supabase client initialized');
   } catch (err) {
     console.error('❌ Supabase client failed:', err.message);
   }
+}
+
+/**
+ * Creates and returns a fresh, request-scoped, stateless Supabase client.
+ * Safe to use concurrently in an Express environment to prevent session bleeding.
+ */
+export function getSupabaseClient() {
+  if (!supabaseUrl || !supabaseAnonKey) {
+    throw new Error('Supabase URL or Anon Key is missing');
+  }
+  return createClient(supabaseUrl, supabaseAnonKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+    realtime: { enabled: false }
+  });
 }
 
 if (supabaseUrl && supabaseServiceKey) {

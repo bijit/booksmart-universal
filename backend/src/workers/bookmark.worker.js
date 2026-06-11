@@ -717,12 +717,13 @@ async function pollAndLazyScrape() {
  */
 async function resetStaleJobs() {
   try {
-    console.log('[Worker] Checking for stale "processing" jobs...');
+    console.log('[Worker] Checking for stale "processing" and "scraping" jobs...');
     
-    // Any bookmark stuck in 'processing' for more than 30 minutes is likely orphaned
+    // Any bookmark stuck in 'processing' or 'scraping' for more than 30 minutes is likely orphaned
     const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000).toISOString();
     
-    const { count, error } = await supabaseAdmin
+    // 1. Reset Phase 1 stale jobs (processing -> pending)
+    const { count: phase1Count, error: error1 } = await supabaseAdmin
       .from('bookmarks')
       .update({ 
         processing_status: 'pending',
@@ -731,10 +732,27 @@ async function resetStaleJobs() {
       .eq('processing_status', 'processing')
       .lt('updated_at', thirtyMinutesAgo);
 
-    if (error) throw error;
+    if (error1) throw error1;
+
+    // 2. Reset Phase 2 stale scraping jobs (scraping -> metadata)
+    const { count: phase2Count, error: error2 } = await supabaseAdmin
+      .from('bookmarks')
+      .update({
+        extraction_method: 'metadata',
+        error_message: 'Stale Phase 2 scraping job reset by worker'
+      })
+      .eq('extraction_method', 'scraping')
+      .lt('updated_at', thirtyMinutesAgo);
+
+    if (error2) throw error2;
     
-    if (count > 0) {
-      console.log(`[Worker] 🔄 Reset ${count} stale "processing" bookmarks back to "pending"`);
+    if (phase1Count > 0 || phase2Count > 0) {
+      if (phase1Count > 0) {
+        console.log(`[Worker] 🔄 Reset ${phase1Count} stale "processing" bookmarks back to "pending"`);
+      }
+      if (phase2Count > 0) {
+        console.log(`[Worker] 🔄 Reset ${phase2Count} stale "scraping" bookmarks back to "metadata"`);
+      }
     } else {
       console.log('[Worker] No stale jobs found.');
     }

@@ -31,6 +31,30 @@ export async function checkBookmarkExists(userId, url) {
 }
 
 /**
+ * Get a user's bookmark record by URL
+ */
+export async function getBookmarkByUrl(userId, url) {
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('bookmarks')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('url', url)
+      .maybeSingle();
+
+    if (error) {
+      throw error;
+    }
+
+    return data;
+
+  } catch (error) {
+    console.error('Error fetching bookmark by URL in Supabase:', error);
+    throw new Error(`Failed to fetch bookmark by URL: ${error.message}`);
+  }
+}
+
+/**
  * Create a bookmark record in Supabase
  */
 export async function createBookmarkRecord(userId, bookmarkData) {

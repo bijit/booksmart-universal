@@ -183,8 +183,8 @@ function App() {
   // Listen for changes in localStorage from other tabs/windows to prevent cross-account contamination
   useEffect(() => {
     const handleStorageChange = (e) => {
-      if (e.key === 'authToken') {
-        console.log('[Auth] Detected auth token change in another tab/window. Reloading page...');
+      if (e.key === 'userEmail' && e.newValue !== e.oldValue) {
+        console.log('[Auth] Detected user account change in another tab/window. Reloading page...');
         window.location.reload();
       }
     };

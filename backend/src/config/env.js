@@ -6,8 +6,9 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 // Load environment variables immediately
-config({ path: resolve(__dirname, '../../.env.local') });
-config(); // Also load from process.env (for Cloud Run)
+config({ path: resolve(__dirname, '../../.env.local'), override: true });
+config({ override: true }); // Also load from process.env (for Cloud Run)
+
 
 console.log('🌍 Environment variables check:');
 console.log('   - SUPABASE_URL:', !!process.env.SUPABASE_URL);

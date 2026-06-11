@@ -61,10 +61,11 @@ app.use('/api/debug', lazyRoute('./routes/debug.routes.js'));
 // OAuth direct trigger endpoint (must handle redirect directly outside standard API response constraints)
 app.get('/auth/google', async (req, res) => {
   try {
-    const { supabase } = await import('./config/supabase.js');
+    const { getSupabaseClient } = await import('./config/supabase.js');
     const redirectUrl = process.env.MANAGER_BASE_URL || 'http://localhost:5173';
     
-    const { data, error } = await supabase.auth.signInWithOAuth({
+    const supabaseClient = getSupabaseClient();
+    const { data, error } = await supabaseClient.auth.signInWithOAuth({
       provider: 'google',
       options: {
         redirectTo: `${redirectUrl}/login`,

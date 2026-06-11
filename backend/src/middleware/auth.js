@@ -4,7 +4,7 @@
  * Validates JWT tokens from Supabase Auth
  */
 
-import { supabase } from '../config/supabase.js';
+import { getSupabaseClient } from '../config/supabase.js';
 
 /**
  * Middleware to verify JWT token and attach user to request
@@ -23,8 +23,9 @@ export async function requireAuth(req, res, next) {
 
     const token = authHeader.substring(7); // Remove 'Bearer ' prefix
 
-    // Verify token with Supabase
-    const { data: { user }, error } = await supabase.auth.getUser(token);
+    // Verify token with a request-scoped Supabase client
+    const supabaseClient = getSupabaseClient();
+    const { data: { user }, error } = await supabaseClient.auth.getUser(token);
 
     if (error || !user) {
       return res.status(401).json({
@@ -54,8 +55,8 @@ export async function optionalAuth(req, res, next) {
     const authHeader = req.headers.authorization;
 
     if (authHeader && authHeader.startsWith('Bearer ')) {
-      const token = authHeader.substring(7);
-      const { data: { user } } = await supabase.auth.getUser(token);
+      const supabaseClient = getSupabaseClient();
+      const { data: { user } } = await supabaseClient.auth.getUser(token);
       req.user = user || null;
     } else {
       req.user = null;

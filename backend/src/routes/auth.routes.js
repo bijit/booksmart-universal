@@ -5,7 +5,7 @@
  */
 
 import { Router } from 'express';
-import { supabase } from '../config/supabase.js';
+import { getSupabaseClient } from '../config/supabase.js';
 import { requireAuth } from '../middleware/auth.js';
 
 const router = Router();
@@ -33,8 +33,9 @@ router.post('/register', async (req, res) => {
       });
     }
 
-    // Register user with Supabase Auth
-    const { data, error } = await supabase.auth.signUp({
+    // Register user with request-scoped Supabase client
+    const supabaseClient = getSupabaseClient();
+    const { data, error } = await supabaseClient.auth.signUp({
       email,
       password,
       options: {
@@ -93,8 +94,9 @@ router.post('/login', async (req, res) => {
       });
     }
 
-    // Sign in with Supabase Auth
-    const { data, error } = await supabase.auth.signInWithPassword({
+    // Sign in with request-scoped Supabase client
+    const supabaseClient = getSupabaseClient();
+    const { data, error } = await supabaseClient.auth.signInWithPassword({
       email,
       password
     });
@@ -146,8 +148,9 @@ router.post('/refresh', async (req, res) => {
       });
     }
 
-    // Refresh session with Supabase
-    const { data, error } = await supabase.auth.refreshSession({
+    // Refresh session with request-scoped Supabase client
+    const supabaseClient = getSupabaseClient();
+    const { data, error } = await supabaseClient.auth.refreshSession({
       refresh_token
     });
 
@@ -215,8 +218,9 @@ router.post('/oauth-callback', async (req, res) => {
       });
     }
 
-    // Set the session on the server-side supabase client
-    const { data: { user }, error } = await supabase.auth.getUser(access_token);
+    // Set the session on the server-side request-scoped supabase client
+    const supabaseClient = getSupabaseClient();
+    const { data: { user }, error } = await supabaseClient.auth.getUser(access_token);
 
     if (error || !user) {
       return res.status(401).json({

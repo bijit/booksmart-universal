@@ -9,9 +9,11 @@ import { requireAuth } from '../middleware/auth.js';
 import {
   createBookmarkRecord,
   getBookmarkRecord,
+  getBookmarkByUrl,
   getUserBookmarkRecords,
   getUserBookmarkCount,
   updateBookmarkRecord,
+  upsertBookmarkSource,
   deleteBookmarkRecord,
   deleteAllUserBookmarks,
   getUserUniqueFolderPaths,
@@ -85,6 +87,63 @@ router.post('/', async (req, res) => {
       console.log('[Bookmark] No extracted content, worker will use Jina fallback');
     }
 
+    // Check if a bookmark with the same URL already exists for the user to prevent duplicates
+    const existingBookmark = await getBookmarkByUrl(userId, url);
+    
+    if (existingBookmark) {
+      console.log(`[Bookmark] Bookmark with URL ${url} already exists for user ${userId}. Handling deduplication...`);
+      
+      // 1. Update/upsert the source info (folder_id, folder_path, browser)
+      if (folder_path || folder_id) {
+        await upsertBookmarkSource(existingBookmark.id, {
+          browser: browser || 'unknown',
+          folder_id: folder_id || null,
+          folder_path: folder_path || null
+        });
+      }
+
+      // 2. Check if we should upgrade a metadata-only or content-less bookmark to full text content
+      const existingHasNoContent = !existingBookmark.extracted_content || existingBookmark.extracted_content.length <= 500;
+      const existingIsMetadataOnly = existingBookmark.extraction_method === 'metadata' || existingBookmark.processing_status === 'failed';
+      
+      if (hasExtractedContent && (existingHasNoContent || existingIsMetadataOnly)) {
+        console.log(`[Bookmark] Upgrading existing metadata-only bookmark ${existingBookmark.id} to full text content...`);
+        const updated = await updateBookmarkRecord(existingBookmark.id, {
+          title: extractedTitle || title || existingBookmark.title,
+          processing_status: 'pending',
+          extraction_method: extractedMethod,
+          extracted_content: extractedContent,
+          cover_image: cover_image || null,
+          extracted_images: extracted_images || null,
+          error_message: null,
+          retry_count: 0
+        });
+
+        return res.status(200).json({
+          message: 'Bookmark updated and queued for full processing',
+          bookmark: {
+            id: updated.id,
+            url: updated.url,
+            title: updated.title,
+            status: updated.processing_status,
+            created_at: updated.created_at
+          }
+        });
+      }
+
+      // Otherwise, the bookmark is already processed or is pending full extraction, so just return it
+      return res.status(200).json({
+        message: 'Bookmark already exists',
+        bookmark: {
+          id: existingBookmark.id,
+          url: existingBookmark.url,
+          title: existingBookmark.title,
+          status: existingBookmark.processing_status,
+          created_at: existingBookmark.created_at
+        }
+      });
+    }
+
     // Create bookmark record in Supabase with "pending" status
     // The bookmark will be processed by background worker
     const bookmark = await createBookmarkRecord(userId, {
@@ -100,8 +159,6 @@ router.post('/', async (req, res) => {
       extracted_images: extracted_images || null,
       created_at: created_at || null,
       qdrant_point_id: null,
-
-
       error_message: null,
       retry_count: 0
     });

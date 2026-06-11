@@ -42,3 +42,39 @@ Allow premium users to filter and search their library using custom domain schem
 To ensure instant load times (<100ms) for the Chrome extension popup while delivering a premium, highly animated search and navigation dashboard:
 *   **Chrome Extension Popup:** Utilize **Svelte** (or lightweight vanilla JS). Svelte compiles down to minimal, zero-dependency JavaScript, eliminating framework runtime overhead and guaranteeing instant popup renders.
 *   **Web Manager Dashboard:** Stick to **React/Next.js** paired with **Framer Motion** for physics-based, fluid micro-animations (e.g. card expansions, timeline transitions) and Tailwind CSS/Shadcn for design system consistency. This keeps the application SEO-friendly and extremely responsive.
+
+## 8. The Context Engine & Chrome Extension Search Bridge
+
+This feature transforms the user's private bookmark database into an active, context-generating launcher for open-web searches. 
+
+### A. UX & Interaction Model
+1. **Google/Search Engine Interception:** The Chrome extension runs content scripts on main search engines (Google, Bing, DuckDuckGo, arXiv). When it detects a search query input, it sends a message containing the query to the background service worker.
+2. **Local Cache / Fast Vector Query:** The service worker runs a quick ANN (Approximate Nearest Neighbor) check or hits the fast search API of the backend to see if the user's database contains relevant bookmarks.
+3. **In-Page Widget & Chrome Side Panel:** If relevant matches are found, the extension injects a subtle Booksmart pill or expands the Chrome Side Panel. 
+   * **Shadow DOM Isolation:** To prevent Google/arXiv's complex stylesheets from overriding the widget styles, widgets are injected into a Shadow DOM container.
+   * **Svelte-based Side Panel:** A Svelte-based side panel launches dynamically, listing matching bookmarks and letting the user check/uncheck bookmarks to toggle their inclusion in the search context.
+4. **Execution:** Clicking the button compiles a context-guided web query, redirects the search page (or updates the query input), and highlights semantic overlaps.
+
+### B. Technical Architecture & Data Flow
+1. **Content Script Query Capture:** Detects the page URL (e.g. `google.com/search?q=...`) or captures form inputs, extracting the raw string `original_query`.
+2. **Background Context Fetching:** Send `original_query` to `background.js` via `chrome.runtime.sendMessage`. The service worker makes an authenticated `POST` request to the backend endpoint `/api/search/context-bridge` with `{ query: original_query }`.
+3. **Backend Synthesizer:**
+   * Retrieves the top 3-5 relevant bookmark chunks from Qdrant using hybrid vector search.
+   * Feeds the query + chunks to Gemini with a structured prompt.
+   * **Prompt Structure & Output Schema:**
+     ```javascript
+     const prompt = `
+     You are a web search query architect. A user is searching the web for: "${originalQuery}".
+     They have the following context saved in their Booksmart library:
+     ${JSON.stringify(retrievedChunks)}
+
+     Generate a JSON object containing:
+     1. "refinedWebQuery": A query optimized with Google advanced search operators (OR, site:, filetype:) utilizing terms from their context, targeting GAPS in their library.
+     2. "negativeKeywords": Terms/domains to exclude (e.g. -site:alreadybookmarked.com).
+     3. "llmGroundingContext": A 2-sentence summary of what they already know, formatted to paste into AI tools.
+     `;
+     ```
+4. **Injection/Redirect:** The background worker updates the active tab URL with the advanced query parameter (e.g., `window.location.href = 'https://www.google.com/search?q=' + encodeURIComponent(data.refinedWebQuery)`), forcing a Google search reload with highly refined search terms.
+5. **Conversational Grounding:** If the user is on ChatGPT or Gemini web clients, the extension content script intercepts the textarea/prompt box and injects a clipboard-ready context block: *"I am researching [query]. Here is what I already know from my library: [brief synthesized list of papers/concepts]. Find new information that builds on this."*
+
+
