@@ -769,6 +769,59 @@ router.post('/:id/summarize', async (req, res) => {
 });
 
 /**
+ * POST /api/bookmarks/:id/reindex
+ * Queue a bookmark for re-indexing (scrapes page again and updates Qdrant)
+ */
+router.post('/:id/reindex', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.id;
+
+    // 1. Get bookmark from Supabase to check ownership
+    const bookmark = await getBookmarkRecord(id);
+
+    if (!bookmark) {
+      return res.status(404).json({
+        error: 'Not Found',
+        message: 'Bookmark not found'
+      });
+    }
+
+    // 2. Check ownership
+    if (bookmark.user_id !== userId) {
+      return res.status(403).json({
+        error: 'Forbidden',
+        message: 'You do not have access to this bookmark'
+      });
+    }
+
+    // 3. Reset processing status to pending and clear extraction info to force a re-scrape
+    const updated = await updateBookmarkRecord(id, {
+      processing_status: 'pending',
+      extraction_method: null,
+      extracted_content: null,
+      cover_image: null,
+      extracted_images: null,
+      error_message: null,
+      retry_count: 0
+    });
+
+    console.log(`[Bookmarks] User ${userId} queued bookmark ${id} for re-indexing`);
+
+    res.json({
+      message: 'Bookmark queued for re-indexing',
+      bookmark: updated
+    });
+  } catch (error) {
+    console.error('Re-index bookmark error:', error);
+    res.status(500).json({
+      error: 'Internal Server Error',
+      message: 'Failed to queue bookmark for re-indexing'
+    });
+  }
+});
+
+/**
  * POST /api/bookmarks/analyze
  * Real-time analysis for tag suggestions (Pre-save)
  */

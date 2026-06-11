@@ -930,6 +930,43 @@ const useBookmarkStore = create((set, get) => {
       } finally {
         set({ loading: false })
       }
+    },
+
+    // Queue bookmark for re-indexing
+    reindexBookmark: async (bookmarkId) => {
+      try {
+        const token = localStorage.getItem('authToken')
+        const response = await fetch(
+          `${API_BASE_URL}/bookmarks/${bookmarkId}/reindex`,
+          {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${token}`
+            }
+          }
+        )
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => null)
+          throw new Error(errorData?.message || 'Failed to trigger re-index')
+        }
+
+        const { bookmark } = await response.json()
+
+        // Update in state
+        set((state) => ({
+          bookmarks: state.bookmarks.map(b => b.id === bookmarkId ? { ...b, ...bookmark } : b)
+        }))
+
+        return bookmark
+      } catch (error) {
+        if (isAuthError(error)) {
+          handleAuthError()
+          return
+        }
+        set({ error: error.message })
+        throw error
+      }
     }
   }
 })

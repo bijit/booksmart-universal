@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ExternalLink, Trash2, Edit2, Calendar, Clock, Sparkles, ChevronDown, ChevronUp, CheckCircle2, FileText } from 'lucide-react'
+import { ExternalLink, Trash2, Edit2, Calendar, Clock, Sparkles, ChevronDown, ChevronUp, CheckCircle2, FileText, RefreshCw } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 import useBookmarkStore from '../store/useBookmarkStore'
 import EditBookmarkModal from './EditBookmarkModal'
@@ -8,10 +8,11 @@ function BookmarkCard({ bookmark, layoutMode = 'gallery' }) {
   const [isDeleting, setIsDeleting] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
   const [isSummarizing, setIsSummarizing] = useState(false)
+  const [isReindexing, setIsReindexing] = useState(false)
   const [showSummary, setShowSummary] = useState(false)
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false)
   const [showAllImages, setShowAllImages] = useState(false)
-  const { deleteBookmark, toggleTag, generateSummary } = useBookmarkStore()
+  const { deleteBookmark, toggleTag, generateSummary, reindexBookmark } = useBookmarkStore()
 
   const handleDelete = async () => {
     if (!confirm('Are you sure you want to delete this bookmark?')) {
@@ -46,6 +47,26 @@ function BookmarkCard({ bookmark, layoutMode = 'gallery' }) {
       alert('Summarization failed: ' + error.message)
     } finally {
       setIsSummarizing(false)
+    }
+  }
+
+  const handleReindex = async (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+
+    if (isReindexing) return
+    if (!confirm('Are you sure you want to re-scrape and re-index this page?')) {
+      return
+    }
+
+    setIsReindexing(true)
+    try {
+      await reindexBookmark(bookmark.id)
+    } catch (error) {
+      console.error('Re-indexing failed:', error)
+      alert('Re-indexing failed: ' + error.message)
+    } finally {
+      setIsReindexing(false)
     }
   }
 
@@ -180,6 +201,16 @@ function BookmarkCard({ bookmark, layoutMode = 'gallery' }) {
               title={bookmark.detailed_summary ? "View/Refresh Summary" : "Generate Deep Summary"}
             >
               <Sparkles className={`w-4 h-4 ${isSummarizing ? 'animate-spin' : ''}`} />
+            </button>
+            <button
+              onClick={handleReindex}
+              disabled={isReindexing}
+              className={`p-1.5 rounded hover:bg-light-bg dark:hover:bg-dark-bg transition-colors ${
+                isReindexing ? 'animate-spin text-accent dark:text-accent-dark' : ''
+              }`}
+              title="Force re-scrape / Re-index page"
+            >
+              <RefreshCw className={`w-4 h-4 ${isReindexing ? 'animate-spin' : ''}`} />
             </button>
             <button
               onClick={() => setIsEditing(true)}
