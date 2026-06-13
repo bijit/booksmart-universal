@@ -1356,3 +1356,40 @@ input:checked + .slider:before {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* Recent folders title — clock icon + label */
+.recent-folders-title {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: #92400E;
+}
+
+/* Recent folder pill — warm amber tint */
+.recent-folder-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  background: #FFFBEB;
+  border: 1px solid #FDE68A;
+  border-radius: 100px;
+  font-size: 11px;
+  font-weight: 500;
+  color: #78350F;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  max-width: 100%;
+}
+
+.recent-folder-pill:hover {
+  background: #FEF3C7;
+  border-color: #FCD34D;
+  transform: translateY(-0.5px);
+}
+
+.recent-folder-pill span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

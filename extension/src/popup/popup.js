@@ -905,77 +905,198 @@ async function loadFolderPaths() {
 
     console.log(`[FolderPicker] Loaded ${allFolderPaths.length} folders (${dbFolders.length} from DB, ${chromeFolders.length} from Chrome)`);
     
-    // Generate pre-save folder recommendations based on tab title
+    // Show recently-used folders
+    await showRecentFolders();
+
+    // Generate pre-save folder recommendations based on tab title + URL
     if (currentTabData && currentTabData.title && allFolderPaths.length > 0) {
-      generateFolderRecommendations(currentTabData.title);
+      generateFolderRecommendations(currentTabData.title, currentTabData.url);
     }
   } catch (e) {
     console.warn('[FolderPicker] Could not load folders:', e.message);
   }
 }
 
+// Common English stop words to skip during token matching
+const STOP_WORDS = new Set([
+  'the','a','an','and','or','but','in','on','at','to','for','of','with',
+  'by','from','up','about','into','through','during','is','are','was',
+  'were','be','been','being','have','has','had','do','does','did','will',
+  'would','could','should','may','might','can','not','no','nor','so',
+  'yet','both','either','neither','this','that','these','those','its',
+  'it','he','she','they','we','you','i','my','your','his','her','their',
+  'our','all','more','most','other','some','such','than','too','very',
+  'just','how','what','which','who','when','where','why','www','http',
+  'https','com','org','net','io','co','html','htm','php','asp'
+]);
+
 /**
- * Generate Suggested Folders using token similarity matching
+ * Extract meaningful tokens from a page title and URL for folder matching.
+ * Filters stop words and short tokens (<= 2 chars).
  */
-function generateFolderRecommendations(pageTitle) {
+function extractPageTokens(pageTitle, pageUrl) {
+  const titleTokens = (pageTitle || '')
+    .toLowerCase()
+    .split(/[\s\-\_\.\,\:\;\/\\\|\(\)\[\]\{\}\+\=\&\%\#\@\!\?]+/)
+    .filter(t => t.length > 2 && !STOP_WORDS.has(t));
+
+  let urlTokens = [];
+  try {
+    const parsed = new URL(pageUrl || '');
+    // Extract hostname segments (e.g. "github" from "github.com")
+    const hostTokens = parsed.hostname
+      .replace(/^www\./, '')
+      .split(/[\.\_\-]+/)
+      .filter(t => t.length > 2 && !STOP_WORDS.has(t));
+    // Extract path segments
+    const pathTokens = parsed.pathname
+      .split(/[\/_\-\.]+/)
+      .filter(t => t.length > 2 && !STOP_WORDS.has(t.toLowerCase()))
+      .map(t => t.toLowerCase());
+    urlTokens = [...hostTokens, ...pathTokens];
+  } catch (_) { /* ignore invalid URLs */ }
+
+  // Deduplicate; URL tokens are those not already in the title set
+  const titleSet = new Set(titleTokens);
+  const urlOnly = urlTokens.filter(t => !titleSet.has(t));
+
+  return { titleTokens, urlTokens: urlOnly, allTokens: [...titleTokens, ...urlOnly] };
+}
+
+/**
+ * Word-boundary check: true if `str` contains `token` as a whole word
+ * (preceded/followed by a non-alphanumeric character or string boundary).
+ */
+function containsWholeWord(str, token) {
+  const escaped = token.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&');
+  return new RegExp(`(?:^|[^a-z0-9])${escaped}(?:[^a-z0-9]|$)`).test(str);
+}
+
+/**
+ * Generate Suggested Folders using improved token + URL similarity scoring.
+ * @param {string} pageTitle - Current tab title
+ * @param {string} [pageUrl]  - Current tab URL (optional but improves results)
+ */
+function generateFolderRecommendations(pageTitle, pageUrl) {
   const container = document.getElementById('suggestedFoldersContainer');
   const list = document.getElementById('suggestedFoldersList');
   if (!container || !list) return;
 
-  const pageTokens = pageTitle.toLowerCase().split(/[\s\-\_\.\,\:\/\\\|]+/).filter(t => t.length > 2);
-  if (pageTokens.length === 0) {
+  const { titleTokens, urlTokens, allTokens } = extractPageTokens(pageTitle, pageUrl);
+
+  if (allTokens.length === 0) {
     container.classList.add('hidden');
     return;
   }
 
   const scoredFolders = allFolderPaths.map(path => {
-    // Score based on token overlap between folder path and page title
     const pathLower = path.toLowerCase();
     const pathSegments = pathLower.split(' > ');
     const leafSegment = pathSegments[pathSegments.length - 1];
-    
+
     let score = 0;
-    
-    pageTokens.forEach(token => {
-      // High match score if matches leaf folder segment name
-      if (leafSegment.includes(token)) {
-        score += 15;
-      }
-      // Lower match score if matches intermediate parent folders
-      if (pathLower.includes(token)) {
-        score += 5;
-      }
+
+    titleTokens.forEach(token => {
+      // +25 whole-word match in leaf folder name
+      if (containsWholeWord(leafSegment, token)) score += 25;
+      // +15 substring match in leaf folder name
+      else if (leafSegment.includes(token)) score += 15;
+      // +8 whole-word match anywhere in path
+      if (containsWholeWord(pathLower, token)) score += 8;
+      // +5 substring match anywhere in path
+      else if (pathLower.includes(token)) score += 5;
+    });
+
+    urlTokens.forEach(token => {
+      // URL tokens get a bonus since domain/path are strong signals
+      if (containsWholeWord(leafSegment, token)) score += 20;
+      else if (leafSegment.includes(token)) score += 12;
+      if (containsWholeWord(pathLower, token)) score += 7;
+      else if (pathLower.includes(token)) score += 4;
     });
 
     return { path, score };
   });
 
-  // Filter out zero scores and sort by highest similarity
+  // Exclude folders already shown in the Recent section to avoid duplicates
+  const recentPaths = _recentFolderState.recentPaths;
   const recommendations = scoredFolders
-    .filter(x => x.score > 0)
+    .filter(x => x.score > 0 && !recentPaths.includes(x.path))
     .sort((a, b) => b.score - a.score)
     .slice(0, 3);
 
   if (recommendations.length > 0) {
     list.innerHTML = '';
+    const folderIcon = `<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>`;
     recommendations.forEach(({ path }) => {
       const pill = document.createElement('div');
       pill.className = 'suggested-folder-pill';
-      
-      const folderIcon = `<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>`;
-      // Show only last segment to keep layout clean, hover tooltip reveals full path
       const segments = path.split(' > ');
       const displayTitle = segments[segments.length - 1];
-      
       pill.innerHTML = `${folderIcon}<span title="${path}">${displayTitle}</span>`;
-      pill.addEventListener('click', () => {
-        selectFolder(path);
-      });
+      pill.addEventListener('click', () => selectFolder(path));
       list.appendChild(pill);
     });
     container.classList.remove('hidden');
   } else {
     container.classList.add('hidden');
+  }
+}
+
+// ─── Recent Folders ───────────────────────────────────────────────────────────
+
+/** In-memory cache so showRecentFolders does not need to hit storage twice */
+const _recentFolderState = { recentPaths: [] };
+
+/**
+ * Render the last N folders the user actually saved to, above the
+ * Recommended section. Uses amber-tint pills to differentiate visually.
+ */
+async function showRecentFolders() {
+  const container = document.getElementById('recentFoldersContainer');
+  const list = document.getElementById('recentFoldersList');
+  if (!container || !list) return;
+
+  try {
+    const { recent_folders = [] } = await browser.storage.local.get('recent_folders');
+    _recentFolderState.recentPaths = recent_folders;
+
+    if (recent_folders.length === 0) {
+      container.classList.add('hidden');
+      return;
+    }
+
+    list.innerHTML = '';
+    const clockIcon = `<svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>`;
+
+    recent_folders.forEach(path => {
+      const pill = document.createElement('div');
+      pill.className = 'recent-folder-pill';
+      const segments = path.split(' > ');
+      const displayTitle = segments[segments.length - 1];
+      pill.innerHTML = `${clockIcon}<span title="${path}">${displayTitle}</span>`;
+      pill.addEventListener('click', () => selectFolder(path));
+      list.appendChild(pill);
+    });
+    container.classList.remove('hidden');
+  } catch (e) {
+    console.warn('[FolderPicker] Could not load recent folders:', e.message);
+    container.classList.add('hidden');
+  }
+}
+
+/**
+ * Persist a folder path to the top of the recent-folders list (max 3 entries).
+ * Call this after a successful bookmark save/update.
+ */
+async function recordRecentFolder(path) {
+  if (!path) return;
+  try {
+    const { recent_folders = [] } = await browser.storage.local.get('recent_folders');
+    const updated = [path, ...recent_folders.filter(f => f !== path)].slice(0, 3);
+    await browser.storage.local.set({ recent_folders: updated });
+  } catch (e) {
+    console.warn('[FolderPicker] Could not record recent folder:', e.message);
   }
 }
 
@@ -1182,6 +1303,9 @@ async function handleSaveCurrentPage() {
         folderPath: selectedFolderPath || null
       }).catch(e => console.warn('[BookSmart] Could not mirror update to Chrome:', e.message));
 
+      // Record folder so it appears in 'Recent' next time
+      if (selectedFolderPath) await recordRecentFolder(selectedFolderPath);
+
       updateSaveBtnToSaved('Updated!');
     } else {
       // Create new bookmark
@@ -1194,6 +1318,9 @@ async function handleSaveCurrentPage() {
         title,
         folderPath: selectedFolderPath || null
       }).catch(e => console.warn('[BookSmart] Could not mirror to Chrome:', e.message));
+
+      // Record folder so it appears in 'Recent' next time
+      if (selectedFolderPath) await recordRecentFolder(selectedFolderPath);
 
       updateSaveBtnToSaved('Saved to Library');
     }
