@@ -11,8 +11,21 @@ MANAGER_SERVICE_NAME="booksmart-manager"
 # Navigate to manager directory
 cd "$(dirname "$0")/.."
 
+# ── Load VITE env vars from .env.production ───────────────────────────────────
+# This ensures Cloud Build always gets the correct values regardless of the
+# shell environment, so the Vite build bakes in the right API URLs/keys.
+if [ -f ".env.production" ]; then
+  echo "📦 Loading env vars from .env.production..."
+  set -a
+  source .env.production
+  set +a
+else
+  echo "⚠️  Warning: .env.production not found — falling back to shell environment vars"
+fi
+
 echo "🚀 Deploying BookSmart Manager to Cloud Run..."
 echo "Project ID: $PROJECT_ID"
+echo "API URL: $VITE_API_BASE_URL"
 
 # Build the manager image using Cloud Build
 echo "🏗️  Building manager container image..."
