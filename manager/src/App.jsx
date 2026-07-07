@@ -5,25 +5,23 @@ import Login from './pages/Login'
 import { refreshSession } from './utils/auth'
 
 // ── Extension auth bridge ─────────────────────────────────────────────────────
-// Set this to the BookSmart extension ID shown in chrome://extensions
-// (looks like "abcdefghijklmnopqrstuvwxyz123456")
-// It is also stored in localStorage so you can update it from the browser console:
-//   localStorage.setItem('booksmartExtensionId', 'YOUR_ID_HERE')
-const EXTENSION_ID = localStorage.getItem('booksmartExtensionId') || '';
+// Retrieve the BookSmart extension ID dynamically from localStorage
+const getExtensionId = () => localStorage.getItem('booksmartExtensionId') || '';
 
 /**
  * Pushes auth tokens directly into the extension via chrome.runtime.sendMessage.
  * Requires externally_connectable in the manifest (already configured).
  */
 function sendTokensToExtension(token, refreshToken, email, name) {
-  if (!EXTENSION_ID) {
+  const extensionId = getExtensionId();
+  if (!extensionId) {
     console.warn('[BookSmart] Extension ID not set – skipping push sync. Set it with: localStorage.setItem("booksmartExtensionId", "YOUR_ID")');
     return;
   }
   if (typeof chrome === 'undefined' || !chrome.runtime?.sendMessage) return;
   try {
     chrome.runtime.sendMessage(
-      EXTENSION_ID,
+      extensionId,
       { type: 'BOOKSMART_AUTH_SYNC', token, refreshToken, email, name },
       (response) => {
         if (chrome.runtime.lastError) {
@@ -192,6 +190,36 @@ function App() {
     return () => window.removeEventListener('storage', handleStorageChange);
   }, [])
 
+  // Auto-detect extension ID from the injected content-bridge script
+  useEffect(() => {
+    const handleExtensionDetected = (event) => {
+      if (event.data?.type === 'BOOKSMART_EXTENSION_INSTALLED') {
+        const detectedId = event.data.extensionId;
+        if (detectedId && detectedId !== localStorage.getItem('booksmartExtensionId')) {
+          console.log('[BookSmart] Auto-detected extension ID:', detectedId);
+          localStorage.setItem('booksmartExtensionId', detectedId);
+          
+          // If already authenticated, sync tokens to the newly detected extension immediately
+          const token = localStorage.getItem('authToken');
+          const refreshToken = localStorage.getItem('refreshToken');
+          const email = localStorage.getItem('userEmail');
+          const name = localStorage.getItem('userName');
+          if (token) {
+            console.log('[BookSmart] Performing immediate sync with newly detected extension');
+            sendTokensToExtension(token, refreshToken, email, name);
+          }
+        }
+      }
+    };
+
+    window.addEventListener('message', handleExtensionDetected);
+
+    // Ping the extension in case it is already loaded and waiting
+    window.postMessage({ type: 'BOOKSMART_PING_EXTENSION' }, '*');
+
+    return () => window.removeEventListener('message', handleExtensionDetected);
+  }, []);
+
   const toggleDarkMode = () => {
     setDarkMode(prev => !prev)
   }
@@ -216,10 +244,11 @@ function App() {
     localStorage.removeItem('userEmail')
     
     // Clear credentials in extension
-    if (EXTENSION_ID && typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
+    const extensionId = getExtensionId();
+    if (extensionId && typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
       try {
         chrome.runtime.sendMessage(
-          EXTENSION_ID,
+          extensionId,
           { type: 'BOOKSMART_AUTH_LOGOUT' },
           (response) => {
             if (chrome.runtime.lastError) {

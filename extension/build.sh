@@ -37,6 +37,7 @@ mv dist/background.js.tmp dist/background.js
 
 # Copy content extraction files
 cp src/content-extractor.js dist/
+cp src/content-bridge.js dist/
 cp src/lib/Readability.js dist/lib/
 
 # Copy popup files
