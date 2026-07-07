@@ -51,6 +51,9 @@ function aggregateChunksByBookmark(chunks, limit = 10) {
         extracted_images: chunk.extracted_images,
         created_at: chunk.created_at,
         updated_at: chunk.updated_at,
+        content_type: chunk.content_type,
+        notes: chunk.notes,
+        processing_status: chunk.processing_status,
         // Keep track of best matching chunk (or the bookmark itself if legacy)
         best_chunk: {
           score: chunk.score,
@@ -70,18 +73,31 @@ function aggregateChunksByBookmark(chunks, limit = 10) {
 
       // Update best score if this chunk is better
       if (chunk.score > bookmark.best_chunk.score) {
+        const bestRaw = chunk.chunk_text;
+        const bestText = typeof bestRaw === 'string' ? bestRaw
+          : typeof bestRaw === 'object' && bestRaw !== null
+            ? [bestRaw.tldr, bestRaw.analysis].filter(Boolean).join(' ')
+            : String(bestRaw ?? '');
         bookmark.best_chunk = {
           score: chunk.score,
           chunk_index: chunk.chunk_index,
-          chunk_text: chunk.chunk_text
+          chunk_text: bestText
         };
       }
+
+      // chunk_text may be a JSON object for deep_summary chunks — coerce to string
+      const rawChunkText = chunk.chunk_text;
+      const chunkTextStr = typeof rawChunkText === 'string'
+        ? rawChunkText
+        : typeof rawChunkText === 'object' && rawChunkText !== null
+          ? [rawChunkText.tldr, rawChunkText.analysis].filter(Boolean).join(' ')
+          : String(rawChunkText ?? '');
 
       // Add to matching chunks list
       bookmark.matching_chunks.push({
         chunk_index: chunk.chunk_index,
         score: chunk.score,
-        chunk_text: chunk.chunk_text.substring(0, 2000)
+        chunk_text: chunkTextStr.substring(0, 2000)
       });
     }
   }
@@ -102,6 +118,9 @@ function aggregateChunksByBookmark(chunks, limit = 10) {
       extracted_images: bookmark.extracted_images,
       created_at: bookmark.created_at,
       updated_at: bookmark.updated_at,
+      content_type: bookmark.content_type,
+      notes: bookmark.notes,
+      processing_status: bookmark.processing_status,
       score: bookmark.best_chunk.score,
       chunk_index: bookmark.best_chunk.chunk_index,
       matching_chunks_count: bookmark.matching_chunks.length,
@@ -158,7 +177,8 @@ export async function semanticSearch(userId, query, options = {}) {
           startDate,
           endDate,
           scoreThreshold,
-          folderPath
+          folderPath,
+          contentType: options.contentType
         });
         console.log(`[Search] Qdrant returned ${chunkResults.length} matching chunks`);
         results = aggregateChunksByBookmark(chunkResults, limit);
@@ -177,7 +197,8 @@ export async function semanticSearch(userId, query, options = {}) {
           startDate,
           endDate,
           scoreThreshold,
-          folderPath
+          folderPath,
+          contentType: options.contentType
         });
         console.log(`[Search] Qdrant returned ${results.length} results`);
       } catch (qdrantError) {
@@ -189,7 +210,7 @@ export async function semanticSearch(userId, query, options = {}) {
     // Step 4: Record search in history (fire and forget)
     createSearchHistory(userId, {
       query,
-      filters: { tags, startDate, endDate, scoreThreshold },
+      filters: { tags, startDate, endDate, scoreThreshold, contentType: options.contentType },
       result_count: results.length
     }).catch(err => console.error('[Search] Failed to save search history:', err));
 
@@ -223,13 +244,14 @@ export async function hybridSearch(userId, query, options = {}) {
       scoreThreshold = 0.3,
       folderPath = null,
       generateAnswer = true,
-      deepSearch = false // Default to fast search
+      deepSearch = false, // Default to fast search
+      contentType = null
     } = options;
 
     // Run Semantic Search (AI Vector) and Metadata Search (Database Exact Match) in parallel
     const [semanticResults, metadataResults] = await Promise.all([
-      semanticSearch(userId, query, { limit: limit * 2, offset, tags, startDate, endDate, scoreThreshold, folderPath }),
-      searchBookmarksByText(userId, query, limit * 2)
+      semanticSearch(userId, query, { limit: limit * 2, offset, tags, startDate, endDate, scoreThreshold, folderPath, contentType }),
+      searchBookmarksByText(userId, query, limit * 2, { contentType })
     ]);
 
     // Merge results. Use Map to deduplicate by ID.
@@ -363,5 +385,34 @@ export async function searchByTags(userId, tags, options = {}) {
   } catch (error) {
     console.error('[Search] Tag search failed:', error);
     throw new Error(`Tag search failed: ${error.message}`);
+  }
+}
+
+/**
+ * Generate an AI answer for a query given already-fetched results.
+ * This is the second async phase of AI Overview search — decoupled from
+ * the initial fast retrieval so results can render immediately.
+ *
+ * @param {string} query - Original user query
+ * @param {Array} results - Already-fetched search results to synthesize
+ * @returns {Promise<Object|null>} AI answer object or null on failure
+ */
+export async function generateAnswerForResults(query, results) {
+  if (!results || results.length === 0 || query.length <= 5) return null;
+
+  try {
+    // Optional: rerank before answering for better answer quality
+    let rankedResults = results;
+    if (ENABLE_RERANKING && results.length > 1) {
+      console.log(`[Search] Async answer: reranking ${results.length} results...`);
+      rankedResults = await rerankResults(query, results);
+    }
+
+    console.log('[Search] Async answer: generating AI answer...');
+    const answer = await generateSearchAnswer(query, rankedResults);
+    return answer;
+  } catch (error) {
+    console.error('[Search] Async answer generation failed:', error.message);
+    throw error;
   }
 }

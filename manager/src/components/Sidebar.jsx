@@ -18,10 +18,21 @@ function Sidebar() {
     setDateRange,
     clearDateRange,
     selectedFolder,
-    clearFolder
+    clearFolder,
+    selectedContentType,
+    setSelectedContentType
   } = useBookmarkStore()
   
   const [tagSearch, setTagSearch] = useState('')
+
+  const contentTypesList = [
+    { value: 'webpage', label: 'Webpages', icon: '🌐' },
+    { value: 'document', label: 'Documents', icon: '📄' },
+    { value: 'email', label: 'Emails', icon: '✉️' },
+    { value: 'video', label: 'Videos', icon: '🎬' },
+    { value: 'audio', label: 'Audio', icon: '🎵' },
+    { value: 'social', label: 'Social', icon: '💬' }
+  ]
 
   const allTags = [...new Set(bookmarks.flatMap(b => b.tags || []))]
     .sort((a, b) => a.localeCompare(b))
@@ -45,6 +56,43 @@ function Sidebar() {
 
   return (
     <aside className="w-full h-full bg-light-card dark:bg-dark-card border-r border-light-border dark:border-dark-border p-6 overflow-y-auto">
+      {/* Content Library */}
+      <div className="mb-6">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <span className="text-lg">📚</span>
+            <h3 className="font-bold text-xs uppercase tracking-wider text-light-text-secondary dark:text-dark-text-secondary">Library</h3>
+          </div>
+          {selectedContentType && (
+            <button
+              onClick={() => setSelectedContentType(null)}
+              className="text-xs text-accent hover:underline"
+            >
+              Show All
+            </button>
+          )}
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          {contentTypesList.map(type => {
+            const isSelected = selectedContentType === type.value;
+            return (
+              <button
+                key={type.value}
+                onClick={() => setSelectedContentType(isSelected ? null : type.value)}
+                className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border text-xs font-semibold transition-all transform hover:scale-[1.02] active:scale-95 ${
+                  isSelected 
+                    ? 'bg-accent text-white border-accent shadow-md shadow-accent/20' 
+                    : 'bg-light-bg dark:bg-dark-bg border-light-border dark:border-dark-border hover:border-accent hover:text-accent'
+                }`}
+              >
+                <span className="text-base">{type.icon}</span>
+                <span className="truncate">{type.label}</span>
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
       {/* Sort */}
       <div className="mb-6">
         <div className="flex items-center gap-2 mb-3">

@@ -16,6 +16,7 @@ function Dashboard({ darkMode, toggleDarkMode, onLogout }) {
   const {
     loading,
     isDeepSearching,
+    isAnswerLoading,
     error,
     fetchBookmarks,
     performSearch,
@@ -159,7 +160,7 @@ function Dashboard({ darkMode, toggleDarkMode, onLogout }) {
               </div>
             )}
             {/* AI Overview (RAG) Section */}
-            {searchQuery && (isDeepSearching || aiAnswer) && (
+            {searchQuery && (isAnswerLoading || aiAnswer) && (
               <div className="mb-8 p-6 bg-gradient-to-br from-accent/10 to-accent-dark/10 dark:from-accent/20 dark:to-accent-dark/20 rounded-2xl border border-accent/20 dark:border-accent-dark/20 shadow-lg shadow-accent/5 overflow-hidden relative">
                 {/* Decorative background element */}
                 <div className="absolute -top-10 -right-10 w-40 h-40 bg-accent/10 rounded-full blur-3xl"></div>
@@ -167,12 +168,12 @@ function Dashboard({ darkMode, toggleDarkMode, onLogout }) {
                 <div className="relative z-10">
                   <div className="flex items-center gap-2 mb-4">
                     <div className="p-1.5 bg-accent text-white rounded-lg">
-                      <Sparkles className={`w-5 h-5 ${isDeepSearching ? 'animate-pulse' : ''}`} />
+                      <Sparkles className={`w-5 h-5 ${isAnswerLoading ? 'animate-pulse' : ''}`} />
                     </div>
                     <h3 className="text-lg font-bold">AI Overview</h3>
                   </div>
 
-                  {isDeepSearching ? (
+                  {isAnswerLoading ? (
                     <div className="space-y-3">
                       <div className="h-4 bg-accent/10 rounded w-3/4 animate-pulse"></div>
                       <div className="h-4 bg-accent/10 rounded w-full animate-pulse delay-75"></div>

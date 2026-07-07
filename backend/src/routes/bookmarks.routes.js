@@ -29,6 +29,14 @@ import {
   deleteQdrantBookmarks,
   dissolveQdrantFolder
 } from '../services/qdrant.service.js';
+import { generateEmbedding } from '../services/gemini.service.js';
+import { QdrantClient } from '@qdrant/js-client-rest';
+
+const qdrantClient = new QdrantClient({
+  url: process.env.QDRANT_URL,
+  apiKey: process.env.QDRANT_API_KEY
+});
+const COLLECTION_NAME = 'bookmarks';
 
 const router = Router();
 
@@ -163,8 +171,15 @@ router.post('/', async (req, res) => {
       retry_count: 0
     });
 
-    // TODO: In next session, we'll add this to a job queue
-    // For now, just return the pending bookmark
+    // Trigger background worker cycle immediately (asynchronously, do not block API response)
+    import('../workers/bookmark.worker.js').then(({ pollAndProcess, pollAndLazyScrape }) => {
+      console.log(`[Route] Triggered immediate worker cycles for new bookmark: ${bookmark.id}`);
+      pollAndProcess().catch(err => console.error('[Route] Immediate pollAndProcess failed:', err));
+      // Give a tiny offset to lazy-scraping so Phase 1 completes first
+      setTimeout(() => {
+        pollAndLazyScrape().catch(err => console.error('[Route] Immediate pollAndLazyScrape failed:', err));
+      }, 2000);
+    }).catch(err => console.error('[Route] Failed to load worker functions in route:', err));
 
     res.status(201).json({
       message: 'Bookmark created successfully',
@@ -203,7 +218,8 @@ router.get('/', async (req, res) => {
       start_date = null,
       end_date = null,
       folder_path = null,
-      folder_id = null
+      folder_id = null,
+      content_type = null
     } = req.query;
 
     // Parse tags if provided (comma-separated)
@@ -216,7 +232,8 @@ router.get('/', async (req, res) => {
       start_date,
       end_date,
       folder_path,
-      folder_id
+      folder_id,
+      content_type
     });
 
     // If limit=0, just return the count (used for badge polling)
@@ -242,7 +259,8 @@ router.get('/', async (req, res) => {
       start_date,
       end_date,
       folder_path,
-      folder_id
+      folder_id,
+      content_type
     });
 
     // Handle empty or null bookmarks
@@ -754,6 +772,52 @@ router.post('/:id/summarize', async (req, res) => {
     await updateBookmarkRecord(id, {
       detailed_summary: summary
     });
+
+    // 7. Re-index the deep summary into Qdrant so it becomes searchable.
+    //    We embed the summary text and upsert it as a dedicated 'deep_summary' chunk.
+    //    Failures here are non-fatal — the summary is still returned to the client.
+    try {
+      // Convert the structured summary object to plain text for embedding
+      const summaryText = typeof summary === 'object' && summary !== null
+        ? [summary.tldr, summary.analysis,
+           summary.category ? `Category: ${summary.category}` : null,
+           Array.isArray(summary.key_takeaways) ? 'Key takeaways: ' + summary.key_takeaways.join('. ') : summary.key_takeaways
+          ].filter(Boolean).join('\n\n')
+        : String(summary);
+      const summaryEmbedding = await generateEmbedding(summaryText);
+      const { v4: uuidv4 } = await import('uuid');
+
+      await qdrantClient.upsert(COLLECTION_NAME, {
+        wait: true,
+        points: [{
+          id: uuidv4(),
+          vector: summaryEmbedding,
+          payload: {
+            user_id: userId,
+            bookmark_id: id,            // Supabase bookmark ID
+            url: bookmark.url,
+            title: bookmark.title,
+            description: bookmark.description,
+            tags: bookmark.tags || [],
+            favicon_url: bookmark.favicon_url || null,
+            folder_id: bookmark.folder_id || null,
+            folder_path: bookmark.folder_path || null,
+            cover_image: bookmark.cover_image || null,
+            extracted_images: bookmark.extracted_images || [],
+            // Summary-specific chunk fields
+            chunk_index: -1,            // Sentinel: -1 = deep summary chunk
+            chunk_text: summaryText,      // plain string — always safe for .substring()
+            chunk_type: 'deep_summary', // Distinguishes from regular content chunks
+            is_chunk: true,
+            created_at: bookmark.created_at || new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          }
+        }]
+      });
+      console.log(`[Summarize] Deep summary chunk upserted to Qdrant for bookmark ${id}`);
+    } catch (qdrantError) {
+      console.warn(`[Summarize] Failed to index summary in Qdrant (non-fatal): ${qdrantError.message}`);
+    }
 
     res.status(200).json({
       message: 'Deep summary generated successfully',

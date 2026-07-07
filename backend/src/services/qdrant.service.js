@@ -76,6 +76,23 @@ async function ensurePayloadIndexes() {
       wait: true
     });
 
+    await qdrantClient.createPayloadIndex(COLLECTION_NAME, {
+      field_name: 'created_at',
+      field_schema: 'datetime',
+      wait: true
+    });
+
+    await qdrantClient.createPayloadIndex(COLLECTION_NAME, {
+      field_name: 'chunk_type',
+      field_schema: 'keyword',
+      wait: true
+    });
+
+    await qdrantClient.createPayloadIndex(COLLECTION_NAME, {
+      field_name: 'content_type',
+      field_schema: 'keyword',
+      wait: true
+    });
 
     console.log('[Qdrant] Payload indexes verified/created');
   } catch (error) {
@@ -108,6 +125,18 @@ async function createNewCollection(size) {
     wait: true
   });
 
+  await qdrantClient.createPayloadIndex(COLLECTION_NAME, {
+    field_name: 'created_at',
+    field_schema: 'datetime',
+    wait: true
+  });
+
+  await qdrantClient.createPayloadIndex(COLLECTION_NAME, {
+    field_name: 'content_type',
+    field_schema: 'keyword',
+    wait: true
+  });
+
   console.log('[Qdrant] Payload indexes created successfully');
 }
 
@@ -133,6 +162,7 @@ export async function createBookmark(userId, bookmarkData) {
         folder_path: bookmarkData.folder_path || null,
         cover_image: bookmarkData.cover_image || null,
         extracted_images: bookmarkData.extracted_images || [],
+        content_type: bookmarkData.content_type || 'webpage',
         created_at: bookmarkData.created_at || new Date().toISOString(),
         updated_at: new Date().toISOString()
       }
@@ -186,6 +216,7 @@ export async function updateBookmark(pointId, bookmarkData) {
         reading_time: bookmarkData.reading_time !== undefined ? bookmarkData.reading_time : (existingPayload.reading_time || null),
         language: bookmarkData.language !== undefined ? bookmarkData.language : (existingPayload.language || null),
         notes: bookmarkData.notes !== undefined ? bookmarkData.notes : (existingPayload.notes || null),
+        content_type: bookmarkData.content_type !== undefined ? bookmarkData.content_type : (existingPayload.content_type || 'webpage'),
         updated_at: new Date().toISOString()
       }
     };
@@ -233,7 +264,8 @@ export async function searchBookmarks(userId, queryEmbedding, options = {}) {
       startDate = null,
       endDate = null,
       scoreThreshold = 0.5,
-      folderPath = null
+      folderPath = null,
+      contentType = null
     } = options;
 
     // Build filter
@@ -246,6 +278,14 @@ export async function searchBookmarks(userId, queryEmbedding, options = {}) {
       ]
     };
     
+    // Add content_type filter if provided
+    if (contentType) {
+      filter.must.push({
+        key: 'content_type',
+        match: { value: contentType }
+      });
+    }
+
     // Add folder filter if provided
     if (folderPath) {
       filter.must.push({
@@ -306,7 +346,8 @@ export async function getBookmarksByUser(userId, options = {}) {
       limit = 50,
       offset = 0,
       tags = null,
-      folderPath = null
+      folderPath = null,
+      contentType = null
     } = options;
 
     // Build filter
@@ -318,6 +359,14 @@ export async function getBookmarksByUser(userId, options = {}) {
         }
       ]
     };
+
+    // Add content_type filter if provided
+    if (contentType) {
+      filter.must.push({
+        key: 'content_type',
+        match: { value: contentType }
+      });
+    }
 
     // Add tag filter if provided
     if (tags && tags.length > 0) {
@@ -427,7 +476,7 @@ export async function countUserBookmarks(userId) {
  */
 export async function createBookmarkChunks(userId, bookmarkData) {
   try {
-    const { bookmark_id, url, title, description, content, tags, chunks, favicon_url, folder_id, folder_path, cover_image, extracted_images } = bookmarkData;
+    const { bookmark_id, url, title, description, content, tags, chunks, favicon_url, folder_id, folder_path, cover_image, extracted_images, content_type } = bookmarkData;
 
 
     if (!chunks || chunks.length === 0) {
@@ -459,6 +508,7 @@ export async function createBookmarkChunks(userId, bookmarkData) {
         reading_time: bookmarkData.reading_time || null,
         language: bookmarkData.language || null,
         notes: bookmarkData.notes || null,
+        content_type: content_type || 'webpage',
 
         // Chunk-specific data
         chunk_index: chunk.index,
@@ -506,7 +556,8 @@ export async function searchChunks(userId, queryEmbedding, options = {}) {
       startDate = null,
       endDate = null,
       scoreThreshold = 0.3,
-      folderPath = null
+      folderPath = null,
+      contentType = null
     } = options;
 
     // Build filter for chunks
@@ -518,6 +569,14 @@ export async function searchChunks(userId, queryEmbedding, options = {}) {
         }
       ]
     };
+
+    // Add content_type filter if provided
+    if (contentType) {
+      filter.must.push({
+        key: 'content_type',
+        match: { value: contentType }
+      });
+    }
 
     // Add folder filter if provided
     if (folderPath) {

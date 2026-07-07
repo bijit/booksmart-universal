@@ -3,16 +3,24 @@ import { Search, Moon, Sun, LogOut, Grid, List, Clock, Layers, Upload, X, Sparkl
 import useBookmarkStore from '../store/useBookmarkStore'
 
 function Header({ darkMode, toggleDarkMode, onLogout, onOpenImport }) {
-  const { searchQuery, setSearchQuery, viewMode, setViewMode, deepSearchEnabled, setDeepSearchEnabled, searchMode, setSearchMode } = useBookmarkStore()
+  const { searchQuery, setSearchQuery, commitSearch, viewMode, setViewMode, deepSearchEnabled, setDeepSearchEnabled, searchMode, setSearchMode } = useBookmarkStore()
   const [searchFocused, setSearchFocused] = useState(false)
   const [localSearchQuery, setLocalSearchQuery] = useState(searchQuery)
   const searchTimeoutRef = useRef(null)
   const userName = localStorage.getItem('userName') || localStorage.getItem('userEmail') || 'User'
 
-  // Debounce search to avoid excessive API calls
+  // Debounce search — but only for Instant and Semantic modes.
+  // AI Overview mode is triggered on Enter only, so we skip the debounce here.
   useEffect(() => {
     if (searchTimeoutRef.current) {
       clearTimeout(searchTimeoutRef.current)
+    }
+
+    // In AI Overview mode, only update the visible query string; don't fire the API.
+    // commitSearch() will handle the actual search when Enter is pressed.
+    if (deepSearchEnabled && searchMode === 'semantic') {
+      setSearchQuery(localSearchQuery) // sync local state (no API call when empty / same)
+      return
     }
 
     searchTimeoutRef.current = setTimeout(() => {
@@ -24,7 +32,7 @@ function Header({ darkMode, toggleDarkMode, onLogout, onOpenImport }) {
         clearTimeout(searchTimeoutRef.current)
       }
     }
-  }, [localSearchQuery, setSearchQuery])
+  }, [localSearchQuery, setSearchQuery, deepSearchEnabled, searchMode])
 
   return (
     <header className="sticky top-0 z-50 bg-light-card dark:bg-dark-card border-b border-light-border dark:border-dark-border">
@@ -39,17 +47,23 @@ function Header({ darkMode, toggleDarkMode, onLogout, onOpenImport }) {
           </div>
 
           {/* Search Bar */}
-          <div className="flex-1 max-w-2xl min-w-0 mx-2 sm:mx-4 lg:mx-8">
+          <div className="flex-1 max-w-2xl min-w-0 mx-2 sm:mx-4 lg:mx-8 relative">
             <div className="flex items-center gap-2">
               <div className={`relative flex-1 transition-all duration-200 ${searchFocused ? 'transform scale-105' : ''}`}>
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-light-text-secondary dark:text-dark-text-secondary w-5 h-5" />
                 <input
                   type="text"
-                  placeholder="Search bookmarks..."
+                  placeholder={deepSearchEnabled && searchMode === 'semantic' ? 'Type your query and press Enter...' : 'Search bookmarks...'}
                   value={localSearchQuery}
                   onChange={(e) => setLocalSearchQuery(e.target.value)}
                   onFocus={() => setSearchFocused(true)}
                   onBlur={() => setSearchFocused(false)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && deepSearchEnabled && searchMode === 'semantic') {
+                      e.preventDefault()
+                      commitSearch(localSearchQuery)
+                    }
+                  }}
                   className="input pl-10 pr-10 w-full"
                 />
                 {localSearchQuery && (
@@ -62,6 +76,13 @@ function Header({ darkMode, toggleDarkMode, onLogout, onOpenImport }) {
                   </button>
                 )}
               </div>
+              {/* AI Overview Enter-to-search hint */}
+              {deepSearchEnabled && searchMode === 'semantic' && localSearchQuery && (
+                <div className="absolute top-full left-0 right-0 mt-1 flex items-center gap-1.5 px-3 py-1 text-[11px] text-accent dark:text-accent-dark font-medium animate-in fade-in duration-200">
+                  <span className="opacity-70">↩</span>
+                  <span>Press Enter to search</span>
+                </div>
+              )}
               
               {/* Unified 3-state Search Mode Segmented Control */}
               <div className="flex items-center bg-light-bg dark:bg-dark-bg rounded-xl p-1 border border-light-border dark:border-dark-border gap-0.5 shadow-sm">

@@ -270,13 +270,27 @@ export async function upsertBookmarkSource(bookmarkId, sourceData) {
  */
 export async function getBookmarkRecord(bookmarkId) {
   try {
+    // 1. Try primary key lookup first
     const { data, error } = await supabaseAdmin
       .from('bookmarks')
       .select('*')
       .eq('id', bookmarkId)
       .single();
 
-    if (error) {
+    if (error && error.code === 'PGRST116') {
+      // 2. Fall back to qdrant_point_id lookup (bridges legacy / Qdrant IDs)
+      console.log(`[Supabase] Primary key lookup returned 0 rows for ID ${bookmarkId}, falling back to qdrant_point_id...`);
+      const { data: fallbackData, error: fallbackError } = await supabaseAdmin
+        .from('bookmarks')
+        .select('*')
+        .eq('qdrant_point_id', bookmarkId)
+        .single();
+
+      if (fallbackError) {
+        throw fallbackError;
+      }
+      return fallbackData;
+    } else if (error) {
       throw error;
     }
 
@@ -299,7 +313,8 @@ export async function getUserBookmarkCount(userId, options = {}) {
       start_date = null,
       end_date = null,
       folder_path = null,
-      folder_id = null
+      folder_id = null,
+      content_type = null
     } = options;
 
     let query = supabaseAdmin
@@ -312,6 +327,10 @@ export async function getUserBookmarkCount(userId, options = {}) {
     } else {
       // Exclude failed bookmarks by default to keep pagination consistent with client views
       query = query.neq('processing_status', 'failed');
+    }
+
+    if (content_type) {
+      query = query.eq('content_type', content_type);
     }
 
     if (url) {
@@ -363,7 +382,8 @@ export async function getUserBookmarkRecords(userId, options = {}) {
       start_date = null,
       end_date = null,
       folder_path = null,
-      folder_id = null
+      folder_id = null,
+      content_type = null
     } = options;
 
     let query = supabaseAdmin
@@ -378,6 +398,10 @@ export async function getUserBookmarkRecords(userId, options = {}) {
     } else {
       // Exclude failed bookmarks by default to keep pagination consistent with client views
       query = query.neq('processing_status', 'failed');
+    }
+
+    if (content_type) {
+      query = query.eq('content_type', content_type);
     }
 
     if (folder_path) {
@@ -650,7 +674,7 @@ export async function getUserUniqueFolderPaths(userId) {
  * @param {number} limit - Max results
  * @returns {Promise<Array>} List of matching bookmarks
  */
-export async function searchBookmarksByText(userId, query, limit = 20) {
+export async function searchBookmarksByText(userId, query, limit = 20, options = {}) {
   try {
     // Basic safety: if query is too short, avoid massive database scans
     if (!query || query.trim().length < 2) return [];
@@ -660,10 +684,16 @@ export async function searchBookmarksByText(userId, query, limit = 20) {
     // For a more advanced text search, we could use Postgres Full Text Search (to_tsquery).
     const safeQuery = query.trim().replace(/[%_]/g, '\\$&'); // escape ILIKE special chars
     
-    const { data, error } = await supabaseAdmin
+    let dbQuery = supabaseAdmin
       .from('bookmarks')
       .select('*')
-      .eq('user_id', userId)
+      .eq('user_id', userId);
+
+    if (options.contentType) {
+      dbQuery = dbQuery.eq('content_type', options.contentType);
+    }
+
+    const { data, error } = await dbQuery
       .or(`notes.ilike.%${safeQuery}%,title.ilike.%${safeQuery}%,description.ilike.%${safeQuery}%`)
       .limit(limit);
 

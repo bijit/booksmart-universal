@@ -11,7 +11,8 @@ const useBookmarkStore = create((set, get) => {
     bookmarks: [],
     cachedBookmarks: [], // Cache of non-search results for instant filtering
     loading: false,
-    isDeepSearching: false, // API search in progress
+    isDeepSearching: false, // API search (Phase 1 — results) in progress
+    isAnswerLoading: false, // API search (Phase 2 — AI answer) in progress
     deepSearchEnabled: false, // User toggle for AI-powered search
     error: null,
     aiAnswer: null,
@@ -30,6 +31,7 @@ const useBookmarkStore = create((set, get) => {
     searchQuery: '',
     selectedTags: [],
     selectedFolder: null, // Full path string
+    selectedContentType: localStorage.getItem('selectedContentType') || null, // 'webpage', 'document', 'email', 'video', 'audio', 'social'
     dateRange: { start: null, end: null },
     sortBy: 'date_added', // date_added, title, date_published
     showOnlyProcessing: false,
@@ -55,6 +57,24 @@ const useBookmarkStore = create((set, get) => {
     // Set deep search toggle
     setDeepSearchEnabled: (enabled) => set({ deepSearchEnabled: enabled }),
     
+    // Set selected content type
+    setSelectedContentType: async (contentType) => {
+      if (contentType) {
+        localStorage.setItem('selectedContentType', contentType);
+      } else {
+        localStorage.removeItem('selectedContentType');
+      }
+      set({ selectedContentType: contentType });
+
+      // Refetch with new filter (respect search if active)
+      const state = get();
+      if (state.searchQuery.trim()) {
+        await state.performSearch(state.searchQuery);
+      } else {
+        await state.fetchBookmarks();
+      }
+    },
+    
     // Search mode: 'semantic' or 'instant'
     searchMode: 'semantic',
     setSearchMode: (mode) => {
@@ -74,7 +94,6 @@ const useBookmarkStore = create((set, get) => {
       // If there's a search query, perform Instant Local Search first
       if (trimmedQuery) {
         // 1. Perform local keyword match on currently loaded bookmarks
-        // Use cachedBookmarks if we were already searching, or the current bookmarks if we just started
         const sourceList = state.cachedBookmarks.length > 0 ? state.cachedBookmarks : state.bookmarks
 
         // If this is the first search character, save current bookmarks to cache
@@ -95,15 +114,20 @@ const useBookmarkStore = create((set, get) => {
         // Show local results immediately
         set({ bookmarks: localMatches, totalBookmarks: localMatches.length })
 
-        // 2. Trigger Database Keyword Search or Semantic Search
+        // 2. Trigger API search based on mode:
+        //    - instant: local only, no API call
+        //    - semantic: debounced API call
+        //    - AI Overview (deepSearchEnabled): Enter-only, skip here
         if (searchTimeout) clearTimeout(searchTimeout)
-        searchTimeout = setTimeout(async () => {
-          if (state.searchMode === 'semantic') {
+
+        if (state.searchMode === 'semantic' && !state.deepSearchEnabled) {
+          // Semantic: fire debounced API search
+          searchTimeout = setTimeout(async () => {
             await get().performSearch(trimmedQuery)
-          } else {
-            await get().performTextSearch(trimmedQuery)
-          }
-        }, 400) // Lower debounce for text search (400ms)
+          }, 400)
+        }
+        // AI Overview mode: do NOT fire here. commitSearch() handles it on Enter.
+        // Instant mode: local filter above is all we do.
       } else {
         // If search is cleared, cancel pending search and restore from cache
         if (searchTimeout) clearTimeout(searchTimeout)
@@ -113,6 +137,7 @@ const useBookmarkStore = create((set, get) => {
             bookmarks: state.cachedBookmarks,
             cachedBookmarks: [],
             isDeepSearching: false,
+            isAnswerLoading: false,
             aiAnswer: null
           })
         } else {
@@ -121,16 +146,36 @@ const useBookmarkStore = create((set, get) => {
       }
     },
 
+    /**
+     * commitSearch — fires the full search for AI Overview mode.
+     * Called when the user presses Enter in the search input while
+     * deepSearchEnabled is true. Runs two phases:
+     *   Phase 1: fast hybrid search → results visible immediately
+     *   Phase 2: async AI answer generation → injected when ready
+     */
+    commitSearch: async (query) => {
+      const trimmedQuery = query.trim()
+      if (!trimmedQuery) return
+
+      // Ensure query state is synced
+      set({ searchQuery: query, searchOffset: 0, hasMoreResults: true })
+
+      await get().performSearch(trimmedQuery)
+    },
+
     // Perform semantic search using the API
     performSearch: async (query, append = false) => {
       const state = get()
       const offset = append ? state.searchOffset : 0
+      const deepSearchEnabled = get().deepSearchEnabled
 
+      // Phase 1: Fast hybrid search (always runs, regardless of deepSearch toggle)
       set({ isDeepSearching: true, error: null })
-      if (!append) set({ aiAnswer: null })
+      if (!append) set({ aiAnswer: null, isAnswerLoading: false })
 
+      let searchResults = []
       try {
-        const { selectedTags, dateRange, selectedFolder, pageSize } = get()
+        const { selectedTags, dateRange, selectedFolder, pageSize, selectedContentType } = get()
         const token = localStorage.getItem('authToken')
         const response = await fetch(`${API_BASE_URL}/search`, {
           method: 'POST',
@@ -147,10 +192,10 @@ const useBookmarkStore = create((set, get) => {
             startDate: dateRange.start ? dateRange.start.toISOString() : null,
             endDate: dateRange.end ? dateRange.end.toISOString() : null,
             folderPath: selectedFolder,
-            deepSearch: get().deepSearchEnabled // Pass the user toggle
+            deepSearch: false, // Always fast for Phase 1
+            contentType: selectedContentType
           })
         })
-
 
         if (!response.ok) {
           const errorData = await response.json().catch(() => null)
@@ -159,34 +204,55 @@ const useBookmarkStore = create((set, get) => {
         }
 
         const data = await response.json()
-        const results = data.results || []
-        const aiAnswer = data.answer || null
+        searchResults = data.results || []
 
-        // If we are appending, merge with existing bookmarks
         const currentBookmarks = append ? state.bookmarks : []
-        const newBookmarks = [...currentBookmarks, ...results]
-
-        // Remove duplicates just in case (by ID)
+        const newBookmarks = [...currentBookmarks, ...searchResults]
         const uniqueBookmarks = Array.from(new Map(newBookmarks.map(b => [b.id, b])).values())
 
         set({
           bookmarks: uniqueBookmarks,
-          aiAnswer: append ? state.aiAnswer : aiAnswer, // Keep old answer if appending
           isDeepSearching: false,
           error: null,
           currentPage: 1,
-          totalPages: 0, // 0 indicates search mode
+          totalPages: 0,
           totalBookmarks: uniqueBookmarks.length,
-          searchOffset: offset + results.length,
-          hasMoreResults: results.length === pageSize // If we got fewer than pageSize, we likely hit the end
+          searchOffset: offset + searchResults.length,
+          hasMoreResults: searchResults.length === pageSize
         })
       } catch (error) {
-        // Check if this is an authentication error
         if (isAuthError(error)) {
           handleAuthError()
           return
         }
         set({ error: error.message, isDeepSearching: false })
+        return
+      }
+
+      // Phase 2: Async AI answer generation (only when AI Overview mode is active)
+      if (deepSearchEnabled && searchResults.length > 0 && !append) {
+        set({ isAnswerLoading: true })
+        try {
+          const token = localStorage.getItem('authToken')
+          const answerResponse = await fetch(`${API_BASE_URL}/search/answer`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ query, results: searchResults })
+          })
+
+          if (answerResponse.ok) {
+            const answerData = await answerResponse.json()
+            set({ aiAnswer: answerData.answer || null, isAnswerLoading: false })
+          } else {
+            set({ isAnswerLoading: false })
+          }
+        } catch (answerError) {
+          console.error('[Store] Async AI answer failed:', answerError.message)
+          set({ isAnswerLoading: false })
+        }
       }
     },
 
@@ -485,7 +551,7 @@ const useBookmarkStore = create((set, get) => {
 
     // Fetch bookmarks from API (page 1 by default)
     fetchBookmarks: async (page = 1) => {
-      const { pageSize, selectedTags, dateRange, selectedFolder, searchQuery } = get()
+      const { pageSize, selectedTags, dateRange, selectedFolder, searchQuery, selectedContentType } = get()
 
       // If search is active, do not fetch standard bookmarks
       if (searchQuery.trim()) return;
@@ -495,15 +561,14 @@ const useBookmarkStore = create((set, get) => {
       try {
         const token = localStorage.getItem('authToken')
 
-        // SPECIAL CASE: If tags or folder filter is active, fetch entire set via search API
-        if (selectedTags.length > 0 || selectedFolder) {
+        // SPECIAL CASE: If tags filter is active, fetch entire set via search API
+        if (selectedTags.length > 0) {
           let endpoint = `${API_BASE_URL}/search/tags?limit=10000`;
           if (selectedTags.length > 0) {
             endpoint += `&tags=${selectedTags.join(',')}`;
           }
-          if (selectedFolder) {
-            // We might need to add folderPath to the search/tags endpoint, or use POST /api/search with empty query
-            // Since GET /api/search/tags doesn't currently accept folder_path, we will use POST /api/search
+          if (selectedFolder || selectedContentType) {
+            // Use POST /api/search for folder/type combinations with tags
             const response = await fetch(`${API_BASE_URL}/search`, {
               method: 'POST',
               headers: {
@@ -513,9 +578,10 @@ const useBookmarkStore = create((set, get) => {
               body: JSON.stringify({
                 query: " ", // Empty query for pure filter
                 limit: 5000,
-                searchType: 'semantic', // Fallback to semantic which just delegates to Qdrant filters if query is weak
+                searchType: 'semantic',
                 tags: selectedTags.length > 0 ? selectedTags : null,
-                folderPath: selectedFolder
+                folderPath: selectedFolder,
+                contentType: selectedContentType
               })
             });
 
@@ -568,7 +634,7 @@ const useBookmarkStore = create((set, get) => {
           }
         }
 
-        // STANDARD FETCH (No tags/folders)
+        // STANDARD FETCH (No tags, folder and content types are passed directly as GET params)
         // Calculate offset from page number
         const offset = (page - 1) * pageSize
 
@@ -589,6 +655,11 @@ const useBookmarkStore = create((set, get) => {
         // Add folder filtering
         if (selectedFolder) {
           params.append('folder_path', selectedFolder)
+        }
+
+        // Add content type filtering
+        if (selectedContentType) {
+          params.append('content_type', selectedContentType)
         }
 
 

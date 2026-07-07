@@ -10,7 +10,7 @@
 
 import { extractContent } from '../services/readability.service.js';
 import { extractDocumentContent, isSupportedDocument } from '../services/document.service.js';
-import { processContent, processContentWithChunking, summarizeFromMetadata, generateEmbedding } from '../services/gemini.service.js';
+import { processContent, processContentWithChunking, summarizeFromMetadata, generateEmbedding, generateDeepSummary } from '../services/gemini.service.js';
 import { createBookmark, createBookmarkChunks, deleteBookmark, deleteBookmarkChunks } from '../services/qdrant.service.js';
 import {
   getUserBookmarkRecords,
@@ -18,6 +18,7 @@ import {
   deleteBookmarkRecord
 } from '../services/supabase.service.js';
 import { isQuotaError } from '../utils/errors.js';
+import { detectContentType } from '../utils/contentType.js';
 
 // Worker configuration
 const POLL_INTERVAL_MS = 1000; // Check for new bookmarks every 1 second (faster batch processing)
@@ -48,6 +49,9 @@ async function processMetadataOnly(id, url, title, user_id, created_at) {
     console.log(`[Worker] Step 1/3: Generating metadata-based summary...`);
     const summary = await summarizeFromMetadata(url, title);
 
+    const contentType = detectContentType(url, 'metadata-only');
+    console.log(`[Worker] Metadata-only Content Type: ${contentType}`);
+
     // Step 2: Generate embedding from metadata (URL + title + description)
     console.log(`[Worker] Step 2/3: Generating embedding from metadata...`);
     const metadataText = `${url}\n${summary.title}\n${summary.description}\n${summary.tags.join(' ')}`;
@@ -63,7 +67,8 @@ async function processMetadataOnly(id, url, title, user_id, created_at) {
       embedding: embedding,
       tags: summary.tags || [],
       favicon_url: getFaviconUrl(url),
-      created_at: created_at
+      created_at: created_at,
+      content_type: contentType
     });
 
     // Step 4: Update Supabase with completion
@@ -74,6 +79,7 @@ async function processMetadataOnly(id, url, title, user_id, created_at) {
       qdrant_point_id: qdrantPointId,
       processing_status: 'completed',
       extraction_method: 'metadata-only', // Mark as fallback method
+      content_type: contentType,
       error_message: 'Content extraction blocked by website, summarized via metadata'
     });
 
@@ -117,6 +123,9 @@ async function processBookmarkFast(bookmark) {
       tags = ['imported'];
     }
 
+    const contentType = detectContentType(url, 'metadata');
+    console.log(`[Worker] [Phase 1] Content Type: ${contentType}`);
+
     // Step 3: Generate embedding from metadata (URL + title + folder path)
     // We only call generateEmbedding (high rate limit), NO Gemini summary generation!
     console.log(`[Worker] [Phase 1] Generating embedding from metadata...`);
@@ -135,7 +144,8 @@ async function processBookmarkFast(bookmark) {
       favicon_url: getFaviconUrl(url),
       folder_id: folder_id || null,
       folder_path: folder_path || null,
-      created_at: created_at
+      created_at: created_at,
+      content_type: contentType
     });
 
     // Step 5: Update Supabase with completion
@@ -147,6 +157,7 @@ async function processBookmarkFast(bookmark) {
       processing_status: 'completed',
       extraction_method: 'metadata', // Mark as metadata phase
       favicon_url: getFaviconUrl(url),
+      content_type: contentType,
       error_message: null
     });
 
@@ -235,6 +246,13 @@ async function processBookmark(bookmark) {
       }
     }
 
+    // Detect content type
+    const extractionMethodUsed = hasValidExtractedContent 
+      ? extraction_method 
+      : (extracted.method === 'pdf-parse' || extracted.method === 'mammoth' ? 'document-service' : 'readability');
+    const contentType = detectContentType(url, extractionMethodUsed);
+    console.log(`[Worker] Detected content type for ${id}: ${contentType}`);
+
     // Step 3: Process with Gemini (summarize + embed)
     console.log(`[Worker] Step 2/4: Generating AI summary and embeddings...`);
     let aiResult;
@@ -260,7 +278,8 @@ async function processBookmark(bookmark) {
         folder_id: folder_id || null,
         cover_image: extracted.cover_image || null,
         extracted_images: extracted.extracted_images || [],
-        created_at: created_at
+        created_at: created_at,
+        content_type: contentType
       });
 
       console.log(`[Worker] Created ${qdrantPointIds.length} chunk points in Qdrant`);
@@ -283,7 +302,8 @@ async function processBookmark(bookmark) {
         folder_id: folder_id || null,
         cover_image: extracted.cover_image || null,
         extracted_images: extracted.extracted_images || [],
-        created_at: created_at
+        created_at: created_at,
+        content_type: contentType
       });
 
       qdrantPointIds = [qdrantPointId];
@@ -297,9 +317,7 @@ async function processBookmark(bookmark) {
       tags: aiResult.tags || [],
       qdrant_point_id: qdrantPointIds[0], // Store first chunk ID for legacy compatibility
       processing_status: 'completed',
-      extraction_method: hasValidExtractedContent 
-        ? extraction_method 
-        : (extracted.method === 'pdf-parse' || extracted.method === 'mammoth' ? 'document-service' : 'readability'),
+      extraction_method: extractionMethodUsed,
       cover_image: extracted.cover_image || null,
       extracted_images: extracted.extracted_images || [],
       author: extracted.author || null,
@@ -308,10 +326,80 @@ async function processBookmark(bookmark) {
       published_date: extracted.published_date || null,
       reading_time: extracted.reading_time || null,
       language: extracted.language || null,
+      content_type: contentType,
       error_message: null
     });
 
     console.log(`[Worker] ✅ Successfully processed bookmark ${id}`);
+
+    // Step 5 (non-blocking): Auto-generate deep summary for full-content bookmarks.
+    // Skipped for metadata-only extractions (no real content to summarize).
+    // Failures do NOT affect the bookmark's 'completed' status.
+    extractionMethodUsed = hasValidExtractedContent ? extraction_method : (extracted.method || '');
+    const isMetadataOnly = extractionMethodUsed === 'metadata-only';
+
+    if (!isMetadataOnly && extracted.content && extracted.content.length >= 200) {
+      (async () => {
+        try {
+          console.log(`[Worker] Step 5/5: Auto-generating deep summary for bookmark ${id}...`);
+          const deepSummary = await generateDeepSummary(extracted.content, aiResult.title || title);
+
+          // Serialize the structured JSON to plain prose for embedding — always a safe string
+          const summaryText = [
+            deepSummary.tldr,
+            deepSummary.analysis,
+            deepSummary.category ? `Category: ${deepSummary.category}` : null,
+            Array.isArray(deepSummary.key_takeaways)
+              ? 'Key takeaways: ' + deepSummary.key_takeaways.join('. ')
+              : deepSummary.key_takeaways
+          ].filter(Boolean).join('\n\n');
+
+          const summaryEmbedding = await generateEmbedding(summaryText);
+
+          const { v4: uuidv4 } = await import('uuid');
+          const { QdrantClient } = await import('@qdrant/js-client-rest');
+          const qdrantClient = new QdrantClient({
+            url: process.env.QDRANT_URL,
+            apiKey: process.env.QDRANT_API_KEY
+          });
+
+          await qdrantClient.upsert('bookmarks', {
+            wait: true,
+            points: [{
+              id: uuidv4(),
+              vector: summaryEmbedding,
+              payload: {
+                user_id,
+                bookmark_id: id,
+                url,
+                title: aiResult.title || title,
+                description: aiResult.description || null,
+                tags: aiResult.tags || [],
+                favicon_url: extracted.favicon || null,
+                folder_id: folder_id || null,
+                folder_path: folder_path || null,
+                cover_image: extracted.cover_image || null,
+                extracted_images: extracted.extracted_images || [],
+                chunk_index: -1,
+                chunk_text: summaryText,     // plain string — always safe for .substring()
+                chunk_type: 'deep_summary',
+                is_chunk: true,
+                created_at: created_at || new Date().toISOString(),
+                updated_at: new Date().toISOString()
+              }
+            }]
+          });
+
+          // Persist structured JSON to Supabase for the UI cards
+          await updateBookmarkRecord(id, { detailed_summary: deepSummary });
+
+          console.log(`[Worker] ✅ Deep summary auto-generated and indexed for bookmark ${id}`);
+        } catch (deepErr) {
+          console.warn(`[Worker] ⚠️  Deep summary step failed for bookmark ${id} (non-fatal): ${deepErr.message}`);
+        }
+      })();
+    }
+
     return true;
 
   } catch (error) {
@@ -493,7 +581,7 @@ async function processBookmarksSequentially(bookmarks) {
 /**
  * Poll for pending bookmarks and process them
  */
-async function pollAndProcess() {
+export async function pollAndProcess() {
   if (isProcessing) {
     return; // Already processing, skip this cycle
   }
@@ -559,7 +647,7 @@ const LAZY_SCRAPE_INTERVAL_MS = 15000; // Check every 15 seconds
 /**
  * Poll for completed metadata-only bookmarks and lazy-scrape their full content
  */
-async function pollAndLazyScrape() {
+export async function pollAndLazyScrape() {
   if (isLazyScraping) {
     return;
   }

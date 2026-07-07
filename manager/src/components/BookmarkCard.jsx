@@ -135,18 +135,6 @@ function BookmarkCard({ bookmark, layoutMode = 'gallery' }) {
           <span>{bookmark.processing_status === 'pending' ? 'PENDING' : 'PROCESSING...'}</span>
         </div>
       )}
-
-      {/* Document Type Badge */}
-      {docType && (
-        <div className={`absolute ${bookmark.processing_status && bookmark.processing_status !== 'completed' ? 'top-10' : 'top-2'} left-2 z-10 flex items-center gap-1.5 px-2 py-1 rounded-full text-[10px] font-bold shadow-sm backdrop-blur-sm border ${
-          docType === 'PDF' 
-            ? 'bg-red-500/90 text-white border-red-400' 
-            : 'bg-blue-500/90 text-white border-blue-400'
-        }`}>
-          <FileText className="w-3 h-3" />
-          <span>{docType}</span>
-        </div>
-      )}
       
       <div className={`p-5 flex-1 flex flex-col min-h-0 ${isSearchResult ? 'bg-accent/5 dark:bg-accent-dark/5' : ''} ${bookmark.cover_image ? 'rounded-b-lg' : 'rounded-lg'}`}>
         {/* Header - FIXED */}
@@ -370,6 +358,20 @@ function BookmarkCard({ bookmark, layoutMode = 'gallery' }) {
                 </div>
               )}
             </div>
+
+            {bookmark.content_type && (
+              <div className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border bg-light-bg/50 dark:bg-dark-bg/50 border-light-border dark:border-dark-border text-light-text-secondary dark:text-dark-text-secondary">
+                <span>
+                  {bookmark.content_type === 'webpage' && '🌐'}
+                  {bookmark.content_type === 'document' && '📄'}
+                  {bookmark.content_type === 'email' && '✉️'}
+                  {bookmark.content_type === 'video' && '🎬'}
+                  {bookmark.content_type === 'audio' && '🎵'}
+                  {bookmark.content_type === 'social' && '💬'}
+                </span>
+                <span className="capitalize">{bookmark.content_type}</span>
+              </div>
+            )}
           </div>
           <a
             href={bookmark.url}

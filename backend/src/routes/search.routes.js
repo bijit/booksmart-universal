@@ -6,7 +6,7 @@
 
 import { Router } from 'express';
 import { requireAuth } from '../middleware/auth.js';
-import { semanticSearch, hybridSearch, searchByTags } from '../services/search.service.js';
+import { semanticSearch, hybridSearch, searchByTags, generateAnswerForResults } from '../services/search.service.js';
 import { parseSearchIntent } from '../services/gemini.service.js';
 
 const router = Router();
@@ -20,7 +20,7 @@ router.use(requireAuth);
  */
 router.post('/', async (req, res) => {
   try {
-    const { query, tags, startDate, endDate, limit, scoreThreshold, searchType, folderPath, offset } = req.body;
+    const { query, tags, startDate, endDate, limit, scoreThreshold, searchType, folderPath, offset, contentType } = req.body;
     const userId = req.user.id;
 
     // Validate input
@@ -31,7 +31,7 @@ router.post('/', async (req, res) => {
       });
     }
 
-    const isPureFilter = query.trim().length === 0 && (tags || folderPath);
+    const isPureFilter = query.trim().length === 0 && (tags || folderPath || contentType);
     if (!isPureFilter && query.trim().length === 0) {
       return res.status(400).json({
         error: 'Bad Request',
@@ -70,7 +70,8 @@ router.post('/', async (req, res) => {
       folderPath: folderPath || null,
       scoreThreshold: parseFloat(scoreThreshold) || 0.5,
       deepSearch, // Pass the deep search flag
-      generateAnswer: req.body.generateAnswer !== false // Default to true if not specified
+      generateAnswer: req.body.generateAnswer !== false, // Default to true if not specified
+      contentType: contentType || null
     };
 
     // Validate limits
@@ -99,7 +100,8 @@ router.post('/', async (req, res) => {
         limit: options.limit,
         offset: options.offset,
         tags: options.tags,
-        folderPath: options.folderPath
+        folderPath: options.folderPath,
+        contentType: options.contentType
       });
       
       // De-duplicate by bookmark_id to get unique bookmarks
@@ -114,14 +116,15 @@ router.post('/', async (req, res) => {
       searchData = { results: uniqueResults, answer: null };
     } else if (type === 'text') {
       const { searchBookmarksByText } = await import('../services/supabase.service.js');
-      const results = await searchBookmarksByText(userId, effectiveQuery, options.limit);
+      const results = await searchBookmarksByText(userId, effectiveQuery, options.limit, { contentType: options.contentType });
       searchData = { results, answer: null };
     } else if (type === 'semantic') {
       const results = await semanticSearch(userId, effectiveQuery, options);
       searchData = { results, answer: null };
     } else if (type === 'hybrid') {
       searchData = await hybridSearch(userId, effectiveQuery, options);
-    } else {
+    }
+ else {
       return res.status(400).json({
         error: 'Bad Request',
         message: 'Search type must be "text", "semantic" or "hybrid"'
@@ -144,6 +147,10 @@ router.post('/', async (req, res) => {
         cover_image: r.cover_image || null,
         extracted_images: r.extracted_images || [],
         created_at: r.created_at,
+        detailed_summary: r.detailed_summary || null,
+        notes: r.notes || null,
+        content_type: r.content_type || 'webpage',
+        processing_status: r.processing_status || 'completed',
         score: r.rerank_score || r.hybrid_score || r.score,
         hybrid_score: r.hybrid_score,
         rerank_score: r.rerank_score,
@@ -234,6 +241,43 @@ router.post('/web-query', async (req, res) => {
     res.status(500).json({
       error: 'Internal Server Error',
       message: 'Failed to generate web search query'
+    });
+  }
+});
+
+/**
+ * POST /api/search/answer
+ * Async phase-2 endpoint for AI Overview mode.
+ * Accepts the query and already-fetched results from the client and runs
+ * Gemini reranking + RAG answer generation without repeating the search.
+ */
+router.post('/answer', async (req, res) => {
+  try {
+    const { query, results } = req.body;
+
+    if (!query || typeof query !== 'string') {
+      return res.status(400).json({
+        error: 'Bad Request',
+        message: 'query is required and must be a string'
+      });
+    }
+
+    if (!Array.isArray(results) || results.length === 0) {
+      return res.status(400).json({
+        error: 'Bad Request',
+        message: 'results must be a non-empty array'
+      });
+    }
+
+    const answer = await generateAnswerForResults(query, results);
+
+    res.json({ answer });
+
+  } catch (error) {
+    console.error('[Route] /api/search/answer error:', error);
+    return res.status(500).json({
+      error: 'Internal Server Error',
+      message: 'Failed to generate AI answer'
     });
   }
 });
