@@ -3,7 +3,21 @@ import { Search, Moon, Sun, LogOut, Grid, List, Clock, Layers, Upload, X, Sparkl
 import useBookmarkStore from '../store/useBookmarkStore'
 
 function Header({ darkMode, toggleDarkMode, onLogout, onOpenImport }) {
-  const { searchQuery, setSearchQuery, commitSearch, viewMode, setViewMode, deepSearchEnabled, setDeepSearchEnabled, searchMode, setSearchMode } = useBookmarkStore()
+  const { 
+    searchQuery, 
+    setSearchQuery, 
+    commitSearch, 
+    viewMode, 
+    setViewMode, 
+    deepSearchEnabled, 
+    setDeepSearchEnabled, 
+    searchMode, 
+    setSearchMode,
+    clearFolder,
+    clearTags,
+    clearDateRange,
+    setSelectedContentType
+  } = useBookmarkStore()
   const [searchFocused, setSearchFocused] = useState(false)
   const [localSearchQuery, setLocalSearchQuery] = useState(searchQuery)
   const searchTimeoutRef = useRef(null)
@@ -45,10 +59,21 @@ function Header({ darkMode, toggleDarkMode, onLogout, onOpenImport }) {
         <div className="flex items-center justify-between gap-2 sm:gap-4 h-16">
           {/* Logo */}
           <div className="flex items-center flex-shrink-0">
-            <div className="text-xl sm:text-2xl font-bold whitespace-nowrap">
+            <button
+              onClick={() => {
+                setLocalSearchQuery('')
+                setSearchQuery('')
+                clearFolder()
+                clearTags()
+                clearDateRange()
+                setSelectedContentType(null)
+              }}
+              className="text-xl sm:text-2xl font-bold whitespace-nowrap hover:opacity-80 active:scale-[0.98] transition-all bg-transparent border-none cursor-pointer flex items-center p-0"
+              title="Return to Home View"
+            >
               <span className="text-accent dark:text-accent-dark">Book</span>
-              <span>Smart</span>
-            </div>
+              <span className="text-light-text dark:text-dark-text">Smart</span>
+            </button>
           </div>
 
           {/* Search Bar */}
