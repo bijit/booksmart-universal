@@ -48,6 +48,20 @@ function Dashboard({ darkMode, toggleDarkMode, onLogout }) {
 
   const filteredBookmarks = getFilteredBookmarks()
 
+  // Calculate dynamic list header text based on active filters
+  let listHeaderText = 'All Bookmarks'
+  if (searchQuery) {
+    listHeaderText = `Search Results: "${searchQuery}"`
+  } else if (showOnlyProcessing) {
+    listHeaderText = 'Processing Queue'
+  } else if (selectedFolder) {
+    listHeaderText = `Folder: ${selectedFolder}`
+  } else if (selectedTags && selectedTags.length > 0) {
+    listHeaderText = selectedTags.length === 1
+      ? `Tag: #${selectedTags[0]}`
+      : `Tags: ${selectedTags.map(t => `#${t}`).join(', ')}`
+  }
+
   const [isResizing, setIsResizing] = useState(false)
   const sidebarRef = useRef(null)
 
@@ -253,7 +267,7 @@ function Dashboard({ darkMode, toggleDarkMode, onLogout }) {
             {!loading && !error && (filteredBookmarks.length > 0 || searchQuery || showOnlyProcessing) && (
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
                 <h3 className="text-lg font-bold text-light-text-secondary dark:text-dark-text-secondary uppercase tracking-wider">
-                  {searchQuery ? `Search Results: "${searchQuery}"` : 'All Bookmarks'}
+                  {listHeaderText}
                 </h3>
                 <div className="flex flex-wrap items-center gap-3">
                   {/* Processing Filter Toggle */}
