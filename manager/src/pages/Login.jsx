@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { BookmarkPlus } from 'lucide-react'
+import { BookmarkPlus, Mail, X } from 'lucide-react'
 import { API_BASE_URL } from '../config'
 
 function Login({ onLogin }) {
@@ -8,6 +8,13 @@ function Login({ onLogin }) {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+
+  // Forgot password state
+  const [showForgotModal, setShowForgotModal] = useState(false)
+  const [forgotEmail, setForgotEmail] = useState('')
+  const [forgotLoading, setForgotLoading] = useState(false)
+  const [forgotSuccess, setForgotSuccess] = useState(false)
+  const [forgotError, setForgotError] = useState('')
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -100,6 +107,43 @@ function Login({ onLogin }) {
     }
   }
 
+  const handleForgotPassword = async (e) => {
+    e.preventDefault()
+    setForgotError('')
+    setForgotSuccess(false)
+    setForgotLoading(true)
+
+    try {
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
+      const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+      const redirectUrl = `${window.location.origin}/reset-password`
+
+      const response = await fetch(`${supabaseUrl}/auth/v1/recover`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': supabaseAnonKey
+        },
+        body: JSON.stringify({
+          email: forgotEmail,
+          redirectTo: redirectUrl
+        })
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.msg || errorData.message || 'Failed to send recovery email')
+      }
+
+      setForgotSuccess(true)
+      setForgotEmail('')
+    } catch (err) {
+      setForgotError(err.message)
+    } finally {
+      setForgotLoading(false)
+    }
+  }
+
   return (
     <div className="min-h-screen flex items-center justify-center px-4">
       <div className="max-w-md w-full">
@@ -161,9 +205,24 @@ function Login({ onLogin }) {
               </div>
 
               <div>
-                <label htmlFor="password" className="block text-sm font-medium mb-2">
-                  Password
-                </label>
+                <div className="flex justify-between items-center mb-2">
+                  <label htmlFor="password" className="block text-sm font-medium">
+                    Password
+                  </label>
+                  {isLogin && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setForgotSuccess(false)
+                        setForgotError('')
+                        setShowForgotModal(true)
+                      }}
+                      className="text-xs text-accent hover:underline font-semibold"
+                    >
+                      Forgot password?
+                    </button>
+                  )}
+                </div>
                 <input
                   id="password"
                   type="password"
@@ -251,6 +310,75 @@ function Login({ onLogin }) {
           </button>
         </p>
       </div>
+
+      {/* Forgot Password Modal */}
+      {showForgotModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn">
+          <div className="relative w-full max-w-sm bg-white dark:bg-gray-900 rounded-3xl border border-gray-200 dark:border-gray-800 shadow-2xl p-6 space-y-4">
+            <div className="flex items-center justify-between pb-2 border-b border-gray-150 dark:border-gray-800">
+              <h3 className="text-md font-bold text-gray-900 dark:text-white">Recover Password</h3>
+              <button 
+                onClick={() => setShowForgotModal(false)}
+                className="p-1 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {forgotSuccess ? (
+              <div className="space-y-4 py-2 text-center">
+                <div className="w-10 h-10 rounded-full bg-emerald-100 dark:bg-emerald-900/40 flex items-center justify-center mx-auto text-emerald-600 dark:text-emerald-400">
+                  <Mail className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-gray-800 dark:text-gray-200">Recovery Email Sent</h4>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Please check your inbox (and spam) for a secure reset link.</p>
+                </div>
+                <button
+                  onClick={() => setShowForgotModal(false)}
+                  className="w-full py-2.5 bg-gray-100 dark:bg-gray-850 hover:bg-gray-200 text-xs font-bold rounded-xl transition-all"
+                >
+                  Close
+                </button>
+              </div>
+            ) : (
+              <form onSubmit={handleForgotPassword} className="space-y-4">
+                <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
+                  Enter your email address below, and we will send you a secure link to reset your account password.
+                </p>
+
+                {forgotError && (
+                  <div className="p-3 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900 rounded-xl">
+                    <p className="text-[11px] text-red-700 dark:text-red-300 font-semibold">{forgotError}</p>
+                  </div>
+                )}
+
+                <div className="space-y-1">
+                  <label htmlFor="forgot-email" className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider block">Email Address</label>
+                  <input
+                    id="forgot-email"
+                    type="email"
+                    required
+                    placeholder="you@example.com"
+                    value={forgotEmail}
+                    onChange={(e) => setForgotEmail(e.target.value)}
+                    className="w-full px-4 py-2.5 bg-light-bg dark:bg-dark-bg/60 border border-light-border dark:border-dark-border rounded-xl focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent transition-all text-xs"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={forgotLoading}
+                  className="w-full py-2.5 bg-accent hover:bg-accent-dark text-white rounded-xl text-xs font-bold transition-all disabled:opacity-50 flex items-center justify-center gap-1.5"
+                >
+                  <Mail className="w-3.5 h-3.5" />
+                  <span>{forgotLoading ? 'Sending...' : 'Send Recovery Email'}</span>
+                </button>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

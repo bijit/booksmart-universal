@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import Dashboard from './pages/Dashboard'
 import Login from './pages/Login'
+import ResetPassword from './pages/ResetPassword'
 import { refreshSession } from './utils/auth'
 
 // ── Extension auth bridge ─────────────────────────────────────────────────────
@@ -276,6 +277,10 @@ function App() {
                 <Navigate to="/" replace /> :
                 <Login onLogin={handleLogin} />
             }
+          />
+          <Route
+            path="/reset-password"
+            element={<ResetPassword />}
           />
           <Route
             path="/"
