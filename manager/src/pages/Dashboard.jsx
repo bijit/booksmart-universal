@@ -53,12 +53,21 @@ function Dashboard({ darkMode, toggleDarkMode, onLogout }) {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     const folder = params.get('folder')
+    const searchParam = params.get('search')
+    
     if (folder) {
       setSelectedFolder(folder)
+    }
+    
+    if (searchParam) {
+      performSearch(searchParam)
+    }
+    
+    if (folder || searchParam) {
       // Clean query params so reloading doesn't pin the view
       window.history.replaceState({}, document.title, window.location.pathname)
     }
-  }, [setSelectedFolder])
+  }, [setSelectedFolder, performSearch])
 
   const loadMoreResults = useCallback(() => {
     if (!loading && !isDeepSearching && hasMoreResults && searchQuery) {
