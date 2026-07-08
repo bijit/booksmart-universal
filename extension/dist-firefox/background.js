@@ -3,7 +3,7 @@ import './lib/browser-polyfill.js';
 // This script runs in the background and listens to browser bookmark events
 
 import './config.js';
-import { bookmarks, auth } from './utils/api.js';
+import { bookmarks, auth, search } from './utils/api.js';
 import { getAuthData, saveAuthData, clearAuthData, STORAGE_KEYS } from './utils/storage.js';
 import { showNotification } from './utils/notifications.js';
 
@@ -487,6 +487,18 @@ updateBadgeCount();
 
 // Message listener
 browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message.type === 'BOOKSMART_SEARCH_PULSE') {
+    search.query({ query: message.query, limit: 5 })
+      .then(response => {
+        sendResponse(response);
+      })
+      .catch(error => {
+        console.warn('[BookSmart] Search bridge query failed:', error.message);
+        sendResponse({ results: [] });
+      });
+    return true; // Keep channel open for async response
+  }
+
   if (message.action === 'updateBadge') {
     updateBadgeCount();
     sendResponse({ success: true });

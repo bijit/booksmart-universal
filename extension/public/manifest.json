@@ -51,6 +51,14 @@
       ],
       "js": ["content-bridge.js"],
       "run_at": "document_start"
+    },
+    {
+      "matches": [
+        "*://*.google.com/search*",
+        "*://*.duckduckgo.com/*"
+      ],
+      "js": ["search-bridge.js"],
+      "run_at": "document_idle"
     }
   ],
   "browser_specific_settings": {

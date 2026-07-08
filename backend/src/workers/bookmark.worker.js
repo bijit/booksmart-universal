@@ -28,7 +28,7 @@ const QUOTA_BACKOFF_MS = 5 * 60 * 1000; // Back off for 5 minutes when quota is 
 
 // Parallel processing configuration (set ENABLE_PARALLEL_PROCESSING = false to use sequential)
 const ENABLE_PARALLEL_PROCESSING = true; // Toggle between parallel and sequential processing
-const CONCURRENCY = 5; // Process 5 bookmarks at a time for faster batch imports
+const CONCURRENCY = 2; // Process 2 bookmarks at a time to stay safely within Gemini free-tier RPM limits
 
 // Chunking configuration (set to true to use improved chunked embedding)
 const ENABLE_CHUNKING = true; // Enable chunked embedding for better search quality
@@ -37,6 +37,7 @@ let isProcessing = false;
 let workerRunning = false;
 let quotaExhausted = false;
 let quotaBackoffUntil = null;
+let currentQuotaBackoffMs = 10000; // Start backoff at 10s on first 429, double exponentially up to 5m
 
 /**
  * Process bookmark using metadata-only (fallback when content extraction fails)
@@ -168,6 +169,11 @@ async function processBookmarkFast(bookmark) {
     
     // Check if it's a quota error
     if (isQuotaError(error)) {
+      quotaExhausted = true;
+      currentQuotaBackoffMs = Math.min(currentQuotaBackoffMs * 2, 5 * 60 * 1000); // Double backoff, max 5 minutes
+      quotaBackoffUntil = Date.now() + currentQuotaBackoffMs;
+      console.log(`[Worker] [Phase 1] Quota exceeded. Backing off for ${currentQuotaBackoffMs / 1000}s (Until ${new Date(quotaBackoffUntil).toLocaleTimeString()})`);
+
       await updateBookmarkRecord(id, {
         processing_status: 'pending',
         error_message: 'Quota exceeded in Phase 1 - will retry'
@@ -426,11 +432,11 @@ async function processBookmark(bookmark) {
 
     // Check if this is a quota error
     if (isQuotaError(error)) {
-      console.log(`[Worker] 🚫 Quota exceeded! Keeping bookmark ${id} in pending state for retry tomorrow`);
-
       // Set quota backoff flag
       quotaExhausted = true;
-      quotaBackoffUntil = Date.now() + QUOTA_BACKOFF_MS;
+      currentQuotaBackoffMs = Math.min(currentQuotaBackoffMs * 2, 5 * 60 * 1000); // Double backoff, max 5 minutes
+      quotaBackoffUntil = Date.now() + currentQuotaBackoffMs;
+      console.log(`[Worker] Quota exceeded. Backing off for ${currentQuotaBackoffMs / 1000}s (Until ${new Date(quotaBackoffUntil).toLocaleTimeString()})`);
 
       // Keep in pending state, DON'T increment retry count
       await updateBookmarkRecord(id, {
@@ -630,8 +636,12 @@ export async function pollAndProcess() {
         results = await processBookmarksSequentially(pendingBookmarks);
       }
 
-      const { successful, failed } = results;
+      const { successful, failed, quotaHit } = results;
       console.log(`[Worker] Batch complete: ${successful} successful, ${failed} failed/pending`);
+      
+      if (successful > 0 && !quotaHit) {
+        currentQuotaBackoffMs = 10000; // Reset backoff on success
+      }
     }
 
   } catch (error) {
@@ -771,6 +781,7 @@ export async function pollAndLazyScrape() {
         });
 
         console.log(`[Worker] ✅ [Phase 2] Successfully lazy-scraped bookmark ${bookmark.id}`);
+        currentQuotaBackoffMs = 10000; // Reset backoff on success
       } catch (scrapeError) {
         console.error(`[Worker] ❌ [Phase 2] Lazy scraping failed for ${bookmark.id}:`, scrapeError.message);
 
@@ -781,7 +792,9 @@ export async function pollAndLazyScrape() {
           });
           // Set backoff
           quotaExhausted = true;
-          quotaBackoffUntil = Date.now() + QUOTA_BACKOFF_MS;
+          currentQuotaBackoffMs = Math.min(currentQuotaBackoffMs * 2, 5 * 60 * 1000); // Double backoff, max 5 minutes
+          quotaBackoffUntil = Date.now() + currentQuotaBackoffMs;
+          console.log(`[Worker] [Phase 2] Quota exceeded. Backing off for ${currentQuotaBackoffMs / 1000}s (Until ${new Date(quotaBackoffUntil).toLocaleTimeString()})`);
           throw scrapeError;
         }
 
