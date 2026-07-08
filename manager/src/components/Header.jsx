@@ -9,6 +9,11 @@ function Header({ darkMode, toggleDarkMode, onLogout, onOpenImport }) {
   const searchTimeoutRef = useRef(null)
   const userName = localStorage.getItem('userName') || localStorage.getItem('userEmail') || 'User'
 
+  // Sync local query state with store query state (crucial for URL parameter routing and external updates)
+  useEffect(() => {
+    setLocalSearchQuery(searchQuery)
+  }, [searchQuery])
+
   // Debounce search — but only for Instant and Semantic modes.
   // AI Overview mode is triggered on Enter only, so we skip the debounce here.
   useEffect(() => {

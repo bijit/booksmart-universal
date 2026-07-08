@@ -253,7 +253,7 @@ function Dashboard({ darkMode, toggleDarkMode, onLogout }) {
             {!loading && !error && (filteredBookmarks.length > 0 || searchQuery || showOnlyProcessing) && (
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
                 <h3 className="text-lg font-bold text-light-text-secondary dark:text-dark-text-secondary uppercase tracking-wider">
-                  {searchQuery ? 'Search Results' : 'All Bookmarks'}
+                  {searchQuery ? `Search Results: "${searchQuery}"` : 'All Bookmarks'}
                 </h3>
                 <div className="flex flex-wrap items-center gap-3">
                   {/* Processing Filter Toggle */}
