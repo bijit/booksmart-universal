@@ -20,6 +20,7 @@ function Dashboard({ darkMode, toggleDarkMode, onLogout }) {
     error,
     fetchBookmarks,
     performSearch,
+    commitSearch,
     performTextSearch,
     goToPage,
     getFilteredBookmarks,
@@ -60,14 +61,14 @@ function Dashboard({ darkMode, toggleDarkMode, onLogout }) {
     }
     
     if (searchParam) {
-      performSearch(searchParam)
+      commitSearch(searchParam)
     }
     
     if (folder || searchParam) {
       // Clean query params so reloading doesn't pin the view
       window.history.replaceState({}, document.title, window.location.pathname)
     }
-  }, [setSelectedFolder, performSearch])
+  }, [setSelectedFolder, commitSearch])
 
   const loadMoreResults = useCallback(() => {
     if (!loading && !isDeepSearching && hasMoreResults && searchQuery) {
