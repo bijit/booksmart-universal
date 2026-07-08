@@ -19,33 +19,62 @@
     return null;
   }
 
-  // 2. Main execution block
-  const searchQuery = getSearchQuery();
-  if (!searchQuery || searchQuery.trim().length < 2) return;
+  let lastProcessedQuery = null;
 
-  console.log('[BookSmart Co-Pilot] Intercepted search query:', searchQuery);
-
-  // Send message to background script to query BookSmart library
-  chrome.runtime.sendMessage(
-    { type: 'BOOKSMART_SEARCH_PULSE', query: searchQuery },
-    (response) => {
-      if (chrome.runtime.lastError) {
-        console.warn('[BookSmart Co-Pilot] Background query failed:', chrome.runtime.lastError.message);
-        return;
-      }
-      
-      if (response && response.results && response.results.length > 0) {
-        injectCopilotWidget(response.results, searchQuery);
-      } else {
-        console.log('[BookSmart Co-Pilot] No matching bookmarks found in your library.');
-      }
+  // 2. Query check and run block
+  function checkAndRunQuery() {
+    const searchQuery = getSearchQuery();
+    
+    if (!searchQuery || searchQuery.trim().length < 2) {
+      // If search query is cleared, remove the widget
+      const existing = document.getElementById('booksmart-copilot-root');
+      if (existing) existing.remove();
+      lastProcessedQuery = null;
+      return;
     }
-  );
+
+    // Skip if query has not changed
+    if (searchQuery === lastProcessedQuery) return;
+    lastProcessedQuery = searchQuery;
+
+    console.log('[BookSmart Co-Pilot] Query changed. Querying library for:', searchQuery);
+
+    // Send message to background script to query BookSmart library
+    chrome.runtime.sendMessage(
+      { type: 'BOOKSMART_SEARCH_PULSE', query: searchQuery },
+      (response) => {
+        if (chrome.runtime.lastError) {
+          console.warn('[BookSmart Co-Pilot] Background query failed:', chrome.runtime.lastError.message);
+          return;
+        }
+        
+        if (response && response.results && response.results.length > 0) {
+          injectCopilotWidget(response.results, searchQuery);
+        } else {
+          console.log('[BookSmart Co-Pilot] No matching bookmarks found in your library.');
+          const existing = document.getElementById('booksmart-copilot-root');
+          if (existing) existing.remove();
+        }
+      }
+    );
+  }
+
+  // Initial execution
+  checkAndRunQuery();
+
+  // Listen to browser forward/back buttons
+  window.addEventListener('popstate', checkAndRunQuery);
+
+  // Fallback poller to detect silent in-page AJAX search navigations
+  setInterval(checkAndRunQuery, 1000);
 
   // 3. Inject the Co-Pilot Sidebar Widget
   function injectCopilotWidget(bookmarks, query) {
-    // Check if widget already exists
-    if (document.getElementById('booksmart-copilot-root')) return;
+    // Remove old widget if it exists to refresh results
+    const existing = document.getElementById('booksmart-copilot-root');
+    if (existing) {
+      existing.remove();
+    }
 
     // Create mount point
     const rootContainer = document.createElement('div');
