@@ -51,7 +51,15 @@ function Dashboard({ darkMode, toggleDarkMode, onLogout }) {
   // Calculate dynamic list header text based on active filters
   let listHeaderText = 'All Bookmarks'
   if (searchQuery) {
-    listHeaderText = `Search Results: "${searchQuery}"`
+    let contextStr = ''
+    if (selectedFolder) {
+      contextStr += ` in Folder: ${selectedFolder}`
+    }
+    if (selectedTags && selectedTags.length > 0) {
+      const tagsStr = selectedTags.map(t => `#${t}`).join(', ')
+      contextStr += ` matching ${selectedTags.length === 1 ? 'Tag' : 'Tags'}: ${tagsStr}`
+    }
+    listHeaderText = `Search Results: "${searchQuery}"${contextStr}`
   } else if (showOnlyProcessing) {
     listHeaderText = 'Processing Queue'
   } else if (selectedFolder) {
