@@ -74,6 +74,7 @@ router.get('/pending-bookmarks', requireAuth, async (req, res) => {
 router.get('/bookmark-stats', requireAuth, async (req, res) => {
   try {
     const { supabaseAdmin } = await import('../config/supabase.js');
+    const { getWorkerHealth } = await import('../workers/bookmark.worker.js');
     const userId = req.user.id;
 
     // Get counts by status for user
@@ -100,10 +101,29 @@ router.get('/bookmark-stats', requireAuth, async (req, res) => {
       }
     });
 
+    // Get recent failures for the user (specifically containing errors or failed status)
+    const { data: recentFailures, error: failuresError } = await supabaseAdmin
+      .from('bookmarks')
+      .select('id, url, title, error_message, updated_at, retry_count')
+      .eq('user_id', userId)
+      .not('error_message', 'is', null)
+      .order('updated_at', { ascending: false })
+      .limit(5);
+
+    // Get worker health stats
+    let workerHealth = null;
+    try {
+      workerHealth = getWorkerHealth();
+    } catch (e) {
+      console.warn('Could not read worker health:', e.message);
+    }
+
     res.json({
       userId,
       stats,
       total: userStats?.length || 0,
+      recentFailures: recentFailures || [],
+      workerHealth,
       timestamp: new Date().toISOString()
     });
 

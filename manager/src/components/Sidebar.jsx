@@ -1,11 +1,13 @@
 import { useState } from 'react'
-import { X, Tag, SortAsc, Search, Check, FolderTree } from 'lucide-react'
+import { X, Tag, SortAsc, Search, Check, FolderTree, Activity } from 'lucide-react'
 import TimelineSlider from './TimelineSlider'
 import FolderExplorer from './FolderExplorer'
+import IngestionDiagnosticsModal from './IngestionDiagnosticsModal'
 import useBookmarkStore from '../store/useBookmarkStore'
 
 
 function Sidebar() {
+  const [showDiagnostics, setShowDiagnostics] = useState(false)
   const {
     bookmarks,
     selectedTags,
@@ -238,7 +240,7 @@ function Sidebar() {
 
       {/* Stats */}
       <div className="pt-6 border-t border-light-border dark:border-dark-border">
-        <div className="space-y-2 text-sm">
+        <div className="space-y-4 text-sm">
           <div className="flex justify-between">
             <span className="text-light-text-secondary dark:text-dark-text-secondary">Total Bookmarks</span>
             <span className="font-medium">{bookmarks.length}</span>
@@ -247,8 +249,22 @@ function Sidebar() {
             <span className="text-light-text-secondary dark:text-dark-text-secondary">Tags</span>
             <span className="font-medium">{allTags.length}</span>
           </div>
+          
+          <button
+            onClick={() => setShowDiagnostics(true)}
+            className="w-full flex items-center justify-center gap-2 py-2.5 px-4 bg-gray-100 hover:bg-gray-250 dark:bg-gray-800 dark:hover:bg-gray-700/80 rounded-xl text-xs font-bold text-gray-700 dark:text-gray-300 transition-all border border-light-border dark:border-dark-border active:scale-[0.98]"
+          >
+            <Activity className="w-4 h-4 text-accent" />
+            <span>Ingestion Diagnostics</span>
+          </button>
         </div>
       </div>
+
+      {/* Ingestion Diagnostics Modal */}
+      <IngestionDiagnosticsModal 
+        isOpen={showDiagnostics} 
+        onClose={() => setShowDiagnostics(false)} 
+      />
     </aside>
   )
 }

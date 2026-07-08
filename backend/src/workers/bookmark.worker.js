@@ -914,3 +914,20 @@ export function stopWorker() {
 
 // Import supabaseAdmin for worker queries
 import { supabaseAdmin } from '../config/supabase.js';
+
+/**
+ * Get current background worker health stats
+ */
+export function getWorkerHealth() {
+  return {
+    workerRunning,
+    isProcessing,
+    isLazyScraping,
+    quotaExhausted,
+    quotaBackoffUntil: quotaBackoffUntil ? new Date(quotaBackoffUntil).toISOString() : null,
+    currentQuotaBackoffMs,
+    concurrencyLimit: CONCURRENCY,
+    parallelProcessing: ENABLE_PARALLEL_PROCESSING,
+    chunkingEnabled: ENABLE_CHUNKING
+  };
+}
