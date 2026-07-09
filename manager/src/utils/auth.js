@@ -79,10 +79,6 @@ export function syncWithExtension(token, refreshToken) {
 
 let activeRefreshPromise = null;
 
-/**
- * Refreshes the session using the stored refresh token.
- * Serializes concurrent refresh requests to prevent invalidating single-use tokens.
- */
 export async function refreshSession() {
   const refreshToken = localStorage.getItem('refreshToken')
   if (!refreshToken) return null
@@ -90,6 +86,25 @@ export async function refreshSession() {
   if (activeRefreshPromise) {
     return activeRefreshPromise
   }
+
+  // Cross-tab lock: check if another tab is currently performing a refresh (lock active for max 10 seconds)
+  const refreshLock = localStorage.getItem('authRefreshLock')
+  if (refreshLock && Date.now() - parseInt(refreshLock, 10) < 10000) {
+    console.log('[Auth] Another tab is currently refreshing. Waiting to see if new token is set...');
+    
+    // Poll every 300ms for up to 3 seconds to see if the other tab finished refreshing
+    for (let i = 0; i < 10; i++) {
+      await new Promise(resolve => setTimeout(resolve, 300));
+      const token = localStorage.getItem('authToken');
+      if (token && !isTokenExpired(token)) {
+        console.log('[Auth] Detected fresh token set by another tab. Skipping duplicate refresh.');
+        return token;
+      }
+    }
+  }
+
+  // Set cross-tab lock
+  localStorage.setItem('authRefreshLock', Date.now().toString())
 
   activeRefreshPromise = (async () => {
     try {
@@ -126,6 +141,7 @@ export async function refreshSession() {
       return null
     } finally {
       activeRefreshPromise = null
+      localStorage.removeItem('authRefreshLock')
     }
   })()
 
