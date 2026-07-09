@@ -61,6 +61,13 @@ function App() {
           localStorage.setItem('refreshToken', refreshToken)
         }
 
+        const type = params.get('type')
+        if (type === 'recovery') {
+          // Redirect to the reset password page with the hash token intact
+          window.location.href = `/reset-password${window.location.hash}`
+          return false
+        }
+
         // Parse user details
         let oauthEmail = null, oauthName = null;
         try {
