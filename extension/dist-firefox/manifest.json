@@ -31,13 +31,6 @@
     },
     "default_title": "BookSmart - AI Bookmark Manager"
   },
-  "externally_connectable": {
-    "matches": [
-      "https://booksmart-manager-920600341451.us-central1.run.app/*",
-      "https://booksmart-manager-urznzrq37a-uc.a.run.app/*",
-      "http://localhost:5173/*"
-    ]
-  },
   "content_scripts": [
     {
       "matches": [

@@ -61,6 +61,7 @@ const fs = require('fs');
 const manifest = JSON.parse(fs.readFileSync('dist-firefox/manifest.json', 'utf8'));
 manifest.background = { page: 'background.html' };
 delete manifest.chrome_url_overrides;
+delete manifest.externally_connectable;
 fs.writeFileSync('dist-firefox/manifest.json', JSON.stringify(manifest, null, 2));
 "
 
