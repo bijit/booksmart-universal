@@ -66,7 +66,17 @@ fs.writeFileSync('dist-firefox/manifest.json', JSON.stringify(manifest, null, 2)
 # Create background.html for Firefox to load background.js as a module
 echo '<!DOCTYPE html><html><head><meta charset="utf-8"><script type="module" src="background.js"></script></head></html>' > dist-firefox/background.html
 
-echo "Build complete!"
+# Package dist.zip for Chrome Web Store
+echo "Packaging dist.zip for Chrome Web Store..."
+rm -f dist.zip
+cd dist && zip -r ../dist.zip * > /dev/null && cd ..
+
+# Package dist-firefox.zip for Firefox Add-ons
+echo "Packaging dist-firefox.zip for Firefox Add-ons..."
+rm -f dist-firefox.zip
+cd dist-firefox && zip -r ../dist-firefox.zip * > /dev/null && cd ..
+
+echo "Build and packaging complete!"
 echo ""
 echo "To load the extension in Chrome/Edge:"
 echo "1. Enable 'Developer mode' at chrome://extensions/"
