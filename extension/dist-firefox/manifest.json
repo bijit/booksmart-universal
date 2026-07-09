@@ -22,9 +22,6 @@
   "background": {
     "page": "background.html"
   },
-  "chrome_url_overrides": {
-    "bookmarks": "bookmarks.html"
-  },
   "action": {
     "default_popup": "popup.html",
     "default_icon": {
