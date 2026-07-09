@@ -220,6 +220,25 @@ browser.bookmarks.onCreated.addListener(async (id, bookmark) => {
   console.log('New bookmark created:', bookmark);
   if (!bookmark.url) return;
 
+  // Sync Protection: check if the bookmarked URL is open in any browser tab
+  try {
+    const tabs = await browser.tabs.query({});
+    const isUrlOpen = tabs.some(tab => {
+      if (!tab.url) return false;
+      // Strip trailing slashes for loose comparison
+      const cleanTabUrl = tab.url.replace(/\/$/, '');
+      const cleanBookmarkUrl = bookmark.url.replace(/\/$/, '');
+      return cleanTabUrl === cleanBookmarkUrl;
+    });
+
+    if (!isUrlOpen) {
+      console.log('[BookSmart] Ignoring background bookmark creation event (likely triggered by Chrome Sync):', bookmark.url);
+      return;
+    }
+  } catch (tabError) {
+    console.warn('[BookSmart] Error querying tabs for sync validation, proceeding:', tabError.message);
+  }
+
   // Skip bookmarks that WE just created to avoid double-syncing
   if (hasSelfModifiedUrl(bookmark.url)) {
     deleteSelfModifiedUrl(bookmark.url);
@@ -249,9 +268,27 @@ browser.bookmarks.onCreated.addListener(async (id, bookmark) => {
 // Listen to bookmarks being removed
 browser.bookmarks.onRemoved.addListener(async (id, removeInfo) => {
   console.log('Bookmark removed:', id, removeInfo);
-  if (removeInfo.node && removeInfo.node.url) {
-    await handleDeletedBookmark(removeInfo.node.url);
+  if (!removeInfo.node || !removeInfo.node.url) return;
+
+  // Sync Protection: check if the bookmarked URL is open in any browser tab
+  try {
+    const tabs = await browser.tabs.query({});
+    const isUrlOpen = tabs.some(tab => {
+      if (!tab.url) return false;
+      const cleanTabUrl = tab.url.replace(/\/$/, '');
+      const cleanBookmarkUrl = removeInfo.node.url.replace(/\/$/, '');
+      return cleanTabUrl === cleanBookmarkUrl;
+    });
+
+    if (!isUrlOpen) {
+      console.log('[BookSmart] Ignoring background bookmark removal event (likely triggered by Chrome Sync):', removeInfo.node.url);
+      return;
+    }
+  } catch (tabError) {
+    console.warn('[BookSmart] Error querying tabs for sync validation on delete, proceeding:', tabError.message);
   }
+
+  await handleDeletedBookmark(removeInfo.node.url);
 });
 
 // Listen to bookmarks being moved
