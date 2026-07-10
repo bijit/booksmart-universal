@@ -3,10 +3,12 @@ import { ExternalLink, Trash2, Edit2, Calendar, Clock, Sparkles, ChevronDown, Ch
 import { formatDistanceToNow } from 'date-fns'
 import useBookmarkStore from '../store/useBookmarkStore'
 import EditBookmarkModal from './EditBookmarkModal'
+import BookmarkDetailsModal from './BookmarkDetailsModal'
 
 function BookmarkCard({ bookmark, layoutMode = 'gallery' }) {
   const [isDeleting, setIsDeleting] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
+  const [isViewDetailsOpen, setIsViewDetailsOpen] = useState(false)
   const [isSummarizing, setIsSummarizing] = useState(false)
   const [isReindexing, setIsReindexing] = useState(false)
   const [showSummary, setShowSummary] = useState(false)
@@ -14,7 +16,10 @@ function BookmarkCard({ bookmark, layoutMode = 'gallery' }) {
   const [showAllImages, setShowAllImages] = useState(false)
   const { deleteBookmark, toggleTag, generateSummary, reindexBookmark } = useBookmarkStore()
 
-  const handleDelete = async () => {
+  const handleDelete = async (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+
     if (!confirm('Are you sure you want to delete this bookmark?')) {
       return
     }
@@ -28,7 +33,9 @@ function BookmarkCard({ bookmark, layoutMode = 'gallery' }) {
     }
   }
 
-  const handleTagClick = (tag) => {
+  const handleTagClick = (e, tag) => {
+    e.preventDefault()
+    e.stopPropagation()
     toggleTag(tag)
   }
 
@@ -102,13 +109,16 @@ function BookmarkCard({ bookmark, layoutMode = 'gallery' }) {
   const docType = getDocType()
 
   return (
-    <div className={`card group relative flex flex-col overflow-hidden ${isDeleting ? 'opacity-50 pointer-events-none' : ''} ${
-      layoutMode === 'gallery' ? 'h-[580px]' : ''
-    } ${
-      isSearchResult 
-        ? 'border-accent/30 dark:border-accent-dark/30 shadow-sm shadow-accent/5' 
-        : ''
-    }`}>
+    <div 
+      onClick={() => setIsViewDetailsOpen(true)}
+      className={`card group relative flex flex-col overflow-hidden cursor-pointer hover:shadow-md dark:hover:shadow-black/30 transition-all ${isDeleting ? 'opacity-50 pointer-events-none' : ''} ${
+        layoutMode === 'gallery' ? 'h-[580px]' : ''
+      } ${
+        isSearchResult 
+          ? 'border-accent/30 dark:border-accent-dark/30 shadow-sm shadow-accent/5' 
+          : ''
+      }`}
+    >
       {/* Cover Image */}
       {bookmark.cover_image && (
         <div className={`w-full overflow-hidden rounded-t-lg bg-gray-100 dark:bg-gray-800 border-b border-light-border dark:border-dark-border ${
@@ -331,7 +341,7 @@ function BookmarkCard({ bookmark, layoutMode = 'gallery' }) {
               {bookmark.tags.map((tag, index) => (
                 <span
                   key={index}
-                  onClick={() => handleTagClick(tag)}
+                  onClick={(e) => handleTagClick(e, tag)}
                   className="tag"
                 >
                   {tag}
@@ -378,11 +388,19 @@ function BookmarkCard({ bookmark, layoutMode = 'gallery' }) {
             target="_blank"
             rel="noopener noreferrer"
             className="text-xs text-accent dark:text-accent-dark hover:underline line-clamp-1 block"
+            onClick={(e) => e.stopPropagation()}
           >
             {bookmark.url}
           </a>
         </div>
       </div>
+
+      {isViewDetailsOpen && (
+        <BookmarkDetailsModal
+          bookmark={bookmark}
+          onClose={() => setIsViewDetailsOpen(false)}
+        />
+      )}
     </div>
   )
 }
