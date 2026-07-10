@@ -55,6 +55,33 @@ function BookmarkDetailsModal({ bookmark, onClose }) {
     }
   }
 
+  // Extract YouTube video ID
+  const getYouTubeId = (url) => {
+    if (!url) return null
+    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/
+    const match = url.match(regExp)
+    return (match && match[2].length === 11) ? match[2] : null
+  }
+
+  // Detect Media Types
+  const isAudioFile = (url) => {
+    if (!url) return false
+    const cleanUrl = url.toLowerCase().split('?')[0]
+    return cleanUrl.endsWith('.mp3') || cleanUrl.endsWith('.wav') || cleanUrl.endsWith('.ogg') || cleanUrl.endsWith('.m4a')
+  }
+
+  const isVideoFile = (url) => {
+    if (!url) return false
+    const cleanUrl = url.toLowerCase().split('?')[0]
+    return cleanUrl.endsWith('.mp4') || cleanUrl.endsWith('.webm') || cleanUrl.endsWith('.ogg')
+  }
+
+  const isPdfFile = (url) => {
+    if (!url) return false
+    const cleanUrl = url.toLowerCase().split('?')[0]
+    return cleanUrl.endsWith('.pdf')
+  }
+
   // Generate favicon URL
   const getFaviconUrl = (url) => {
     try {
@@ -141,6 +168,71 @@ function BookmarkDetailsModal({ bookmark, onClose }) {
             {/* Left Column: AI Deep Summary & Description */}
             <div className="md:col-span-2 space-y-6">
               
+              {/* Embedded Player/Viewer Preview */}
+              {(() => {
+                const youtubeId = getYouTubeId(currentBookmark.url);
+                if (youtubeId) {
+                  return (
+                    <div className="space-y-2">
+                      <h3 className="text-sm font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500">Video Preview</h3>
+                      <div className="relative w-full aspect-video rounded-2xl overflow-hidden border border-gray-200 dark:border-gray-800 shadow-sm">
+                        <iframe
+                          src={`https://www.youtube.com/embed/${youtubeId}`}
+                          title="YouTube video player"
+                          frameBorder="0"
+                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                          allowFullScreen
+                          className="absolute inset-0 w-full h-full"
+                        ></iframe>
+                      </div>
+                    </div>
+                  );
+                }
+
+                if (isVideoFile(currentBookmark.url)) {
+                  return (
+                    <div className="space-y-2">
+                      <h3 className="text-sm font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500">Video Preview</h3>
+                      <video
+                        src={currentBookmark.url}
+                        controls
+                        className="w-full rounded-2xl border border-gray-200 dark:border-gray-800 shadow-sm max-h-[360px]"
+                      ></video>
+                    </div>
+                  );
+                }
+
+                if (isAudioFile(currentBookmark.url) || currentBookmark.content_type === 'audio') {
+                  return (
+                    <div className="space-y-2">
+                      <h3 className="text-sm font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500">Audio Preview</h3>
+                      <audio
+                        src={currentBookmark.url}
+                        controls
+                        className="w-full rounded-2xl border border-gray-200 dark:border-gray-800 shadow-sm bg-gray-50 dark:bg-gray-850 p-2"
+                      ></audio>
+                    </div>
+                  );
+                }
+
+                if (isPdfFile(currentBookmark.url)) {
+                  return (
+                    <div className="space-y-2">
+                      <h3 className="text-sm font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500">Document Preview</h3>
+                      <div className="w-full h-96 rounded-2xl overflow-hidden border border-gray-200 dark:border-gray-800 shadow-sm bg-gray-50 dark:bg-gray-950">
+                        <iframe
+                          src={`https://docs.google.com/viewer?url=${encodeURIComponent(currentBookmark.url)}&embedded=true`}
+                          className="w-full h-full border-0"
+                          title="PDF Document Viewer"
+                        ></iframe>
+                      </div>
+                    </div>
+                  );
+                }
+
+                return null;
+              })()}
+
               {/* Description */}
               {currentBookmark.description && (
                 <div className="space-y-2">
