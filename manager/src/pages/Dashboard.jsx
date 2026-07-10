@@ -7,12 +7,14 @@ import TagCloudView from '../components/TagCloudView'
 import EmptyState from '../components/EmptyState'
 import ImportBookmarks from '../components/ImportBookmarks'
 import Pagination from '../components/Pagination'
+import BookmarkDetailsModal from '../components/BookmarkDetailsModal'
 import { Virtuoso, VirtuosoGrid } from 'react-virtuoso'
 import useBookmarkStore from '../store/useBookmarkStore'
 import { Sparkles, LayoutGrid, Columns, Globe, ExternalLink, Inbox } from 'lucide-react'
 
 function Dashboard({ darkMode, toggleDarkMode, onLogout }) {
   const [showImport, setShowImport] = useState(false)
+  const [activeDetailsBookmark, setActiveDetailsBookmark] = useState(null)
   const {
     loading,
     isDeepSearching,
@@ -351,7 +353,11 @@ function Dashboard({ darkMode, toggleDarkMode, onLogout }) {
                   <div className="columns-1 md:columns-2 lg:columns-3 gap-4 sm:gap-6 space-y-4 sm:space-y-6">
                     {filteredBookmarks.map(bookmark => (
                       <div key={bookmark.id} className="break-inside-avoid">
-                        <BookmarkCard bookmark={bookmark} layoutMode="pinterest" />
+                        <BookmarkCard 
+                          bookmark={bookmark} 
+                          layoutMode="pinterest" 
+                          onViewDetails={setActiveDetailsBookmark} 
+                        />
                       </div>
                     ))}
                     {searchQuery && hasMoreResults && (
@@ -376,7 +382,12 @@ function Dashboard({ darkMode, toggleDarkMode, onLogout }) {
                     increaseViewportBy={300}
                     listClassName="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6"
                     itemContent={(index, bookmark) => (
-                      <BookmarkCard key={bookmark.id} bookmark={bookmark} layoutMode="gallery" />
+                      <BookmarkCard 
+                        key={bookmark.id} 
+                        bookmark={bookmark} 
+                        layoutMode="gallery" 
+                        onViewDetails={setActiveDetailsBookmark} 
+                      />
                     )}
                     components={{
                       Footer: () => (
@@ -404,7 +415,11 @@ function Dashboard({ darkMode, toggleDarkMode, onLogout }) {
                   increaseViewportBy={300}
                   itemContent={(index, bookmark) => (
                     <div className="mb-3 sm:mb-4">
-                      <BookmarkCard key={bookmark.id} bookmark={bookmark} />
+                      <BookmarkCard 
+                        key={bookmark.id} 
+                        bookmark={bookmark} 
+                        onViewDetails={setActiveDetailsBookmark} 
+                      />
                     </div>
                   )}
                   components={{
@@ -468,7 +483,11 @@ function Dashboard({ darkMode, toggleDarkMode, onLogout }) {
                       }>
                         {bookmarks.map(bookmark => (
                           <div key={bookmark.id} className={layoutMode === 'pinterest' ? "break-inside-avoid" : ""}>
-                            <BookmarkCard bookmark={bookmark} layoutMode={layoutMode} />
+                            <BookmarkCard 
+                              bookmark={bookmark} 
+                              layoutMode={layoutMode} 
+                              onViewDetails={setActiveDetailsBookmark} 
+                            />
                           </div>
                         ))}
                       </div>
@@ -506,6 +525,13 @@ function Dashboard({ darkMode, toggleDarkMode, onLogout }) {
           onImportComplete={() => {
             fetchBookmarks()
           }}
+        />
+      )}
+
+      {activeDetailsBookmark && (
+        <BookmarkDetailsModal
+          bookmark={activeDetailsBookmark}
+          onClose={() => setActiveDetailsBookmark(null)}
         />
       )}
     </div>

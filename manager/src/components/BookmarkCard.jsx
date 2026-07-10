@@ -3,12 +3,9 @@ import { ExternalLink, Trash2, Edit2, Calendar, Clock, Sparkles, ChevronDown, Ch
 import { formatDistanceToNow } from 'date-fns'
 import useBookmarkStore from '../store/useBookmarkStore'
 import EditBookmarkModal from './EditBookmarkModal'
-import BookmarkDetailsModal from './BookmarkDetailsModal'
-
-function BookmarkCard({ bookmark, layoutMode = 'gallery' }) {
+function BookmarkCard({ bookmark, layoutMode = 'gallery', onViewDetails }) {
   const [isDeleting, setIsDeleting] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
-  const [isViewDetailsOpen, setIsViewDetailsOpen] = useState(false)
   const [isSummarizing, setIsSummarizing] = useState(false)
   const [isReindexing, setIsReindexing] = useState(false)
   const [showSummary, setShowSummary] = useState(false)
@@ -110,7 +107,7 @@ function BookmarkCard({ bookmark, layoutMode = 'gallery' }) {
 
   return (
     <div 
-      onClick={() => setIsViewDetailsOpen(true)}
+      onClick={() => onViewDetails && onViewDetails(bookmark)}
       className={`card group relative flex flex-col overflow-hidden cursor-pointer hover:shadow-md dark:hover:shadow-black/30 transition-all ${isDeleting ? 'opacity-50 pointer-events-none' : ''} ${
         layoutMode === 'gallery' ? 'h-[580px]' : ''
       } ${
@@ -394,13 +391,6 @@ function BookmarkCard({ bookmark, layoutMode = 'gallery' }) {
           </a>
         </div>
       </div>
-
-      {isViewDetailsOpen && (
-        <BookmarkDetailsModal
-          bookmark={bookmark}
-          onClose={() => setIsViewDetailsOpen(false)}
-        />
-      )}
     </div>
   )
 }
