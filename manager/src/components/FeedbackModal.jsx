@@ -1,15 +1,45 @@
 import { useState } from 'react'
-import { X, MessageSquare, CheckCircle2 } from 'lucide-react'
+import { X, MessageSquare, CheckCircle2, Camera, Paperclip, Trash2 } from 'lucide-react'
 
 function FeedbackModal({ isOpen, onClose }) {
   const [type, setType] = useState('bug')
   const [subject, setSubject] = useState('')
   const [message, setMessage] = useState('')
+  const [screenshot, setScreenshot] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [success, setSuccess] = useState(false)
 
   if (!isOpen) return null
+
+  const handlePaste = (e) => {
+    const items = e.clipboardData?.items
+    if (!items) return
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].type.indexOf('image') !== -1) {
+        const file = items[i].getAsFile()
+        if (file) {
+          const reader = new FileReader()
+          reader.onload = (event) => {
+            setScreenshot(event.target.result)
+          }
+          reader.readAsDataURL(file)
+        }
+        break
+      }
+    }
+  }
+
+  const handleFileChange = (e) => {
+    const file = e.target.files?.[0]
+    if (file && file.type.startsWith('image/')) {
+      const reader = new FileReader()
+      reader.onload = (event) => {
+        setScreenshot(event.target.result)
+      }
+      reader.readAsDataURL(file)
+    }
+  }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -30,7 +60,7 @@ function FeedbackModal({ isOpen, onClose }) {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ type, subject, message })
+        body: JSON.stringify({ type, subject, message, screenshot })
       })
 
       if (!response.ok) {
@@ -41,6 +71,7 @@ function FeedbackModal({ isOpen, onClose }) {
       setSuccess(true)
       setSubject('')
       setMessage('')
+      setScreenshot(null)
       // Auto close after 2 seconds
       setTimeout(() => {
         onClose()
@@ -115,16 +146,52 @@ function FeedbackModal({ isOpen, onClose }) {
           </div>
 
           <div className="space-y-1">
-            <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
-              Description
-            </label>
+            <div className="flex items-center justify-between">
+              <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
+                Description
+              </label>
+              <span className="text-[10px] text-gray-400 dark:text-gray-500">
+                You can paste screenshots directly (Cmd+V)
+              </span>
+            </div>
             <textarea
               value={message}
               onChange={(e) => setMessage(e.target.value)}
-              placeholder="Please provide as much detail as possible..."
+              onPaste={handlePaste}
+              placeholder="Please provide as much detail as possible. Paste (Cmd+V) annotated screenshots here..."
               rows="4"
               className="w-full px-4 py-2 border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-850 text-gray-900 dark:text-white rounded-xl text-xs outline-none focus:ring-1 focus:ring-accent resize-none"
             />
+          </div>
+
+          {/* Screenshot Upload / Preview Area */}
+          <div className="space-y-2">
+            {!screenshot ? (
+              <div className="flex items-center gap-2">
+                <label className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700/80 border border-gray-200 dark:border-gray-750 text-gray-700 dark:text-gray-300 rounded-xl text-xs font-semibold cursor-pointer transition-colors">
+                  <Camera className="w-3.5 h-3.5 text-accent" />
+                  <span>Attach Screenshot</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleFileChange}
+                    className="hidden"
+                  />
+                </label>
+              </div>
+            ) : (
+              <div className="relative w-28 aspect-video rounded-xl overflow-hidden border border-gray-200 dark:border-gray-800 group shadow-sm bg-gray-50">
+                <img src={screenshot} alt="Attached screenshot" className="w-full h-full object-cover" />
+                <button
+                  type="button"
+                  onClick={() => setScreenshot(null)}
+                  className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white transition-opacity duration-200"
+                  title="Remove screenshot"
+                >
+                  <Trash2 className="w-5 h-5 text-red-400" />
+                </button>
+              </div>
+            )}
           </div>
 
           <button

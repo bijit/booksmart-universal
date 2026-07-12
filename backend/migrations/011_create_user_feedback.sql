@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS user_feedback (
   type TEXT NOT NULL,
   subject TEXT NOT NULL,
   message TEXT NOT NULL,
+  screenshot TEXT,
   created_at TIMESTAMPTZ DEFAULT now() NOT NULL
 );
 

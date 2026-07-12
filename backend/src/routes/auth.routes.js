@@ -358,7 +358,7 @@ router.post('/reactivate-account', requireAuth, async (req, res) => {
 router.post('/feedback', requireAuth, async (req, res) => {
   try {
     const userId = req.user.id;
-    const { type, subject, message } = req.body;
+    const { type, subject, message, screenshot } = req.body;
 
     if (!type || !subject || !message) {
       return res.status(400).json({
@@ -367,7 +367,7 @@ router.post('/feedback', requireAuth, async (req, res) => {
       });
     }
 
-    console.log(`[Feedback] Submitting feedback from user ${userId}...`);
+    console.log(`[Feedback] Submitting feedback from user ${userId} (has screenshot: ${!!screenshot})...`);
 
     const { data, error } = await supabaseAdmin
       .from('user_feedback')
@@ -375,7 +375,8 @@ router.post('/feedback', requireAuth, async (req, res) => {
         user_id: userId,
         type,
         subject,
-        message
+        message,
+        screenshot: screenshot || null
       })
       .select();
 
