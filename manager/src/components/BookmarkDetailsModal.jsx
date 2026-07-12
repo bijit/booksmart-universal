@@ -41,12 +41,12 @@ function BookmarkDetailsModal({ bookmark, onClose }) {
     if (isSummarizing) return
     setIsSummarizing(true)
     try {
-      const updated = await generateSummary(currentBookmark.id)
-      if (updated) {
-        setCurrentBookmark(updated)
-      } else {
-        // Fallback: reload state or just update properties
-        alert('Summary generated! Please reopen the card to sync detailed items.')
+      const summary = await generateSummary(currentBookmark.id)
+      if (summary) {
+        setCurrentBookmark(prev => ({
+          ...prev,
+          detailed_summary: summary
+        }))
       }
     } catch (err) {
       alert('Summarization failed: ' + err.message)
