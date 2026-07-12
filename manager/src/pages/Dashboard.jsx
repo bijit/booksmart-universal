@@ -9,13 +9,15 @@ import ImportBookmarks from '../components/ImportBookmarks'
 import Pagination from '../components/Pagination'
 import BookmarkDetailsModal from '../components/BookmarkDetailsModal'
 import SettingsModal from '../components/SettingsModal'
+import FeedbackModal from '../components/FeedbackModal'
 import { Virtuoso, VirtuosoGrid } from 'react-virtuoso'
 import useBookmarkStore from '../store/useBookmarkStore'
-import { Sparkles, LayoutGrid, Columns, Globe, ExternalLink, Inbox } from 'lucide-react'
+import { Sparkles, LayoutGrid, Columns, Globe, ExternalLink, Inbox, MessageSquare } from 'lucide-react'
 
 function Dashboard({ darkMode, toggleDarkMode, onLogout }) {
   const [showImport, setShowImport] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
+  const [showFeedback, setShowFeedback] = useState(false)
   const [activeDetailsBookmark, setActiveDetailsBookmark] = useState(null)
   
   const [userMetadata, setUserMetadata] = useState(() => {
@@ -576,6 +578,21 @@ function Dashboard({ darkMode, toggleDarkMode, onLogout }) {
           // If we reactivated/deleted, update the localStorage/JWT if needed, or simply let the session reflect it.
           // We can sync this back into local userMetadata state so the banner updates immediately.
         }}
+      />
+
+      {/* Floating Feedback Trigger Button */}
+      <button
+        onClick={() => setShowFeedback(true)}
+        className="fixed bottom-6 right-6 z-40 p-4 bg-accent hover:bg-accent-hover text-white rounded-full shadow-lg hover:shadow-xl hover:scale-105 active:scale-95 transition-all flex items-center justify-center border border-white/10"
+        title="Share Your Feedback"
+      >
+        <MessageSquare className="w-6 h-6 animate-pulse" />
+      </button>
+
+      {/* Feedback Modal Overlay */}
+      <FeedbackModal
+        isOpen={showFeedback}
+        onClose={() => setShowFeedback(false)}
       />
     </div>
   )

@@ -56,6 +56,9 @@ function Sidebar() {
     return acc
   }, {})
 
+  const [tagsExpanded, setTagsExpanded] = useState(false)
+  const [timelineExpanded, setTimelineExpanded] = useState(false)
+
   return (
     <aside className="w-full h-full bg-light-card dark:bg-dark-card border-r border-light-border dark:border-dark-border p-6 overflow-y-auto">
       {/* Content Library */}
@@ -133,110 +136,155 @@ function Sidebar() {
 
 
       {/* Tags Section */}
-      <div className="mb-8">
-        <div className="flex items-center justify-between mb-4">
+      <div className="mb-6 border-t border-light-border/40 dark:border-dark-border/40 pt-4">
+        <div 
+          onClick={() => setTagsExpanded(!tagsExpanded)}
+          className="flex items-center justify-between mb-3 cursor-pointer hover:opacity-85 select-none"
+        >
           <div className="flex items-center gap-2">
             <div className="p-1.5 bg-accent/10 rounded-lg">
               <Tag className="w-4 h-4 text-accent" />
             </div>
             <h3 className="font-bold text-sm uppercase tracking-wider text-light-text-secondary dark:text-dark-text-secondary">Tags</h3>
           </div>
-          {selectedTags.length > 0 && (
-            <button
-              onClick={clearTags}
-              className="text-xs font-medium text-accent hover:text-accent-dark transition-colors px-2 py-1 bg-accent/5 rounded-md"
-            >
-              Clear All
-            </button>
-          )}
-        </div>
-
-        {/* Selected Tags (Active Filters) */}
-        {selectedTags.length > 0 && (
-          <div className="mb-4 flex flex-wrap gap-2 animate-fadeIn">
-            {selectedTags.map(tag => (
+          <div className="flex items-center gap-2">
+            {selectedTags.length > 0 && (
               <button
-                key={`active-${tag}`}
-                onClick={() => toggleTag(tag)}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-accent text-white text-xs font-semibold rounded-full shadow-sm hover:bg-accent-dark transition-all transform hover:scale-105"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  clearTags()
+                }}
+                className="text-[10px] font-medium text-accent hover:text-accent-dark transition-colors px-2 py-0.5 bg-accent/5 rounded-md"
               >
-                <span>{tag}</span>
-                <X className="w-3 h-3" />
+                Clear ({selectedTags.length})
               </button>
-            ))}
+            )}
+            <span className="text-xs text-gray-400">{tagsExpanded ? '▼' : '▶'}</span>
           </div>
-        )}
-
-        {/* Tag Search */}
-        <div className="relative mb-4 group">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-light-text-secondary group-focus-within:text-accent transition-colors" />
-          <input
-            type="text"
-            placeholder="Filter tags..."
-            value={tagSearch}
-            onChange={(e) => setTagSearch(e.target.value)}
-            className="w-full pl-9 pr-8 py-2 text-xs bg-light-bg/50 dark:bg-dark-bg/50 border border-light-border dark:border-dark-border rounded-xl focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent transition-all"
-          />
-          {tagSearch && (
-            <button 
-              onClick={() => setTagSearch('')}
-              className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-light-text-secondary hover:text-accent bg-light-bg dark:bg-dark-bg rounded-md shadow-sm"
-            >
-              <X className="w-3 h-3" />
-            </button>
-          )}
         </div>
 
-        {/* Tag Selection Actions */}
-        {tagSearch && filteredTags.length > 0 && (
-          <button
-            onClick={handleSelectAllFiltered}
-            className="w-full mb-4 flex items-center justify-center gap-1.5 py-2 px-3 text-[10px] font-bold uppercase tracking-widest text-accent bg-accent/5 border border-accent/20 rounded-xl hover:bg-accent/10 transition-all active:scale-95"
-          >
-            <Check className="w-3.5 h-3.5" />
-            Select {filteredTags.length} Matching
-          </button>
-        )}
+        {tagsExpanded && (
+          <div className="space-y-4 animate-slideDown">
+            {/* Selected Tags (Active Filters) */}
+            {selectedTags.length > 0 && (
+              <div className="mb-4 flex flex-wrap gap-2 animate-fadeIn">
+                {selectedTags.map(tag => (
+                  <button
+                    key={`active-${tag}`}
+                    onClick={() => toggleTag(tag)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-accent text-white text-xs font-semibold rounded-full shadow-sm hover:bg-accent-dark transition-all transform hover:scale-105"
+                  >
+                    <span>{tag}</span>
+                    <X className="w-3 h-3" />
+                  </button>
+                ))}
+              </div>
+            )}
 
-        {/* Tags List (Pills) */}
-        {allTags.length === 0 ? (
-          <div className="text-center py-4 px-2 border-2 border-dashed border-light-border dark:border-dark-border rounded-2xl">
-             <p className="text-xs text-light-text-secondary dark:text-dark-text-secondary">No tags yet</p>
-          </div>
-        ) : filteredTags.length === 0 ? (
-          <p className="text-xs text-light-text-secondary dark:text-dark-text-secondary py-4 italic text-center">
-            No matching tags found
-          </p>
-        ) : (
-          <div className="flex flex-wrap gap-2 max-h-80 overflow-y-auto pr-1 scrollbar-thin">
-            {filteredTags.map(tag => {
-              const isSelected = selectedTags.includes(tag);
-              if (isSelected) return null; // Don't show in the main list if already in "Active"
-              
-              return (
-                <button
-                  key={tag}
-                  onClick={() => toggleTag(tag)}
-                  className="group flex items-center gap-1.5 px-3 py-1.5 bg-light-bg dark:bg-dark-bg border border-light-border dark:border-dark-border rounded-full text-xs font-medium hover:border-accent hover:text-accent hover:shadow-sm transition-all active:scale-95"
+            {/* Tag Search */}
+            <div className="relative group">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-light-text-secondary group-focus-within:text-accent transition-colors" />
+              <input
+                type="text"
+                placeholder="Filter tags..."
+                value={tagSearch}
+                onChange={(e) => setTagSearch(e.target.value)}
+                className="w-full pl-9 pr-8 py-2 text-xs bg-light-bg/50 dark:bg-dark-bg/50 border border-light-border dark:border-dark-border rounded-xl focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent transition-all"
+              />
+              {tagSearch && (
+                <button 
+                  onClick={() => setTagSearch('')}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-light-text-secondary hover:text-accent bg-light-bg dark:bg-dark-bg rounded-md shadow-sm"
                 >
-                  <span className="max-w-[120px] truncate">{tag}</span>
-                  <span className="px-1.5 py-0.5 bg-light-border dark:bg-dark-border text-[9px] rounded-full group-hover:bg-accent/10 group-hover:text-accent">
-                    {tagCounts[tag]}
-                  </span>
+                  <X className="w-3 h-3" />
                 </button>
-              );
-            })}
+              )}
+            </div>
+
+            {/* Tag Selection Actions */}
+            {tagSearch && filteredTags.length > 0 && (
+              <button
+                onClick={handleSelectAllFiltered}
+                className="w-full flex items-center justify-center gap-1.5 py-2 px-3 text-[10px] font-bold uppercase tracking-widest text-accent bg-accent/5 border border-accent/20 rounded-xl hover:bg-accent/10 transition-all active:scale-95"
+              >
+                <Check className="w-3.5 h-3.5" />
+                Select {filteredTags.length} Matching
+              </button>
+            )}
+
+            {/* Tags List (Pills) */}
+            {allTags.length === 0 ? (
+              <div className="text-center py-4 px-2 border-2 border-dashed border-light-border dark:border-dark-border rounded-2xl">
+                 <p className="text-xs text-light-text-secondary dark:text-dark-text-secondary">No tags yet</p>
+              </div>
+            ) : filteredTags.length === 0 ? (
+              <p className="text-xs text-light-text-secondary dark:text-dark-text-secondary py-4 italic text-center">
+                No matching tags found
+              </p>
+            ) : (
+              <div className="flex flex-wrap gap-2 max-h-48 overflow-y-auto pr-1 scrollbar-thin">
+                {filteredTags.map(tag => {
+                  const isSelected = selectedTags.includes(tag);
+                  if (isSelected) return null; // Don't show in the main list if already in "Active"
+                  
+                  return (
+                    <button
+                      key={tag}
+                      onClick={() => toggleTag(tag)}
+                      className="group flex items-center gap-1.5 px-3 py-1.5 bg-light-bg dark:bg-dark-bg border border-light-border dark:border-dark-border rounded-full text-xs font-medium hover:border-accent hover:text-accent hover:shadow-sm transition-all active:scale-95"
+                    >
+                      <span className="max-w-[120px] truncate">{tag}</span>
+                      <span className="px-1.5 py-0.5 bg-light-border dark:bg-dark-border text-[9px] rounded-full group-hover:bg-accent/10 group-hover:text-accent">
+                        {tagCounts[tag]}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
       </div>
 
-      {/* Timeline Slider */}
-      <TimelineSlider
-        bookmarks={bookmarks}
-        dateRange={dateRange}
-        setDateRange={setDateRange}
-        clearDateRange={clearDateRange}
-      />
+      {/* Timeline Section */}
+      <div className="mb-6 border-t border-light-border/40 dark:border-dark-border/40 pt-4">
+        <div 
+          onClick={() => setTimelineExpanded(!timelineExpanded)}
+          className="flex items-center justify-between mb-3 cursor-pointer hover:opacity-85 select-none"
+        >
+          <div className="flex items-center gap-2">
+            <div className="p-1.5 bg-accent/10 rounded-lg">
+              <Activity className="w-4 h-4 text-accent" />
+            </div>
+            <h3 className="font-bold text-sm uppercase tracking-wider text-light-text-secondary dark:text-dark-text-secondary">Timeline</h3>
+          </div>
+          <div className="flex items-center gap-2">
+            {dateRange.startDate && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  clearDateRange()
+                }}
+                className="text-[10px] font-medium text-accent hover:text-accent-dark transition-colors px-2 py-0.5 bg-accent/5 rounded-md"
+              >
+                Clear
+              </button>
+            )}
+            <span className="text-xs text-gray-400">{timelineExpanded ? '▼' : '▶'}</span>
+          </div>
+        </div>
+
+        {timelineExpanded && (
+          <div className="animate-slideDown">
+            <TimelineSlider
+              bookmarks={bookmarks}
+              dateRange={dateRange}
+              setDateRange={setDateRange}
+              clearDateRange={clearDateRange}
+            />
+          </div>
+        )}
+      </div>
 
       {/* Stats */}
       <div className="pt-6 border-t border-light-border dark:border-dark-border">

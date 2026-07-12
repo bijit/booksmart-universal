@@ -351,4 +351,50 @@ router.post('/reactivate-account', requireAuth, async (req, res) => {
   }
 });
 
+/**
+ * POST /api/auth/feedback
+ * Submit user feedback to database
+ */
+router.post('/feedback', requireAuth, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { type, subject, message } = req.body;
+
+    if (!type || !subject || !message) {
+      return res.status(400).json({
+        error: 'Bad Request',
+        message: 'Type, subject, and message are required'
+      });
+    }
+
+    console.log(`[Feedback] Submitting feedback from user ${userId}...`);
+
+    const { data, error } = await supabaseAdmin
+      .from('user_feedback')
+      .insert({
+        user_id: userId,
+        type,
+        subject,
+        message
+      })
+      .select();
+
+    if (error) {
+      throw error;
+    }
+
+    console.log(`[Feedback] Successfully saved feedback. ID: ${data[0]?.id}`);
+    res.status(201).json({
+      message: 'Feedback submitted successfully',
+      feedbackId: data[0]?.id
+    });
+  } catch (error) {
+    console.error('Feedback submission error:', error);
+    res.status(500).json({
+      error: 'Internal Server Error',
+      message: 'Failed to submit feedback: ' + error.message
+    });
+  }
+});
+
 export default router;
