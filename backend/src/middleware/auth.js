@@ -34,6 +34,24 @@ export async function requireAuth(req, res, next) {
       });
     }
 
+    // Check if account is scheduled for deletion
+    const scheduledDeletionAt = user.user_metadata?.scheduled_deletion_at;
+    if (scheduledDeletionAt) {
+      const allowedPaths = [
+        '/api/auth/reactivate-account',
+        '/api/auth/delete-account',
+        '/api/auth/logout'
+      ];
+      const isAllowed = allowedPaths.some(p => req.originalUrl.startsWith(p));
+      if (!isAllowed) {
+        return res.status(403).json({
+          error: 'Forbidden',
+          message: 'Account is scheduled for deletion. Please reactivate your account to continue using BookSmart.',
+          scheduled_deletion_at: scheduledDeletionAt
+        });
+      }
+    }
+
     // Attach user to request object
     req.user = user;
     next();

@@ -8,13 +8,28 @@ import EmptyState from '../components/EmptyState'
 import ImportBookmarks from '../components/ImportBookmarks'
 import Pagination from '../components/Pagination'
 import BookmarkDetailsModal from '../components/BookmarkDetailsModal'
+import SettingsModal from '../components/SettingsModal'
 import { Virtuoso, VirtuosoGrid } from 'react-virtuoso'
 import useBookmarkStore from '../store/useBookmarkStore'
 import { Sparkles, LayoutGrid, Columns, Globe, ExternalLink, Inbox } from 'lucide-react'
 
 function Dashboard({ darkMode, toggleDarkMode, onLogout }) {
   const [showImport, setShowImport] = useState(false)
+  const [showSettings, setShowSettings] = useState(false)
   const [activeDetailsBookmark, setActiveDetailsBookmark] = useState(null)
+  
+  const [userMetadata, setUserMetadata] = useState(() => {
+    try {
+      const token = localStorage.getItem('authToken')
+      if (token) {
+        const payload = JSON.parse(atob(token.split('.')[1]))
+        return payload.user_metadata || {}
+      }
+    } catch (e) {
+      console.error('Failed to parse user metadata from JWT:', e)
+    }
+    return {}
+  })
   const {
     loading,
     isDeepSearching,
@@ -151,7 +166,23 @@ function Dashboard({ darkMode, toggleDarkMode, onLogout }) {
         toggleDarkMode={toggleDarkMode}
         onLogout={onLogout}
         onOpenImport={() => setShowImport(true)}
+        onOpenSettings={() => setShowSettings(true)}
       />
+
+      {userMetadata?.scheduled_deletion_at && (
+        <div className="w-full bg-yellow-500/10 border-b border-yellow-500/20 px-4 py-3 sm:px-6 lg:px-8 flex flex-wrap items-center justify-between gap-3 z-40 animate-fadeIn">
+          <div className="flex items-center gap-2 text-yellow-800 dark:text-yellow-400 text-xs sm:text-sm">
+            <span className="font-bold">⚠️ Notice:</span>
+            <span>Your account is scheduled for permanent deletion on {new Date(userMetadata.scheduled_deletion_at).toLocaleString()}.</span>
+          </div>
+          <button
+            onClick={() => setShowSettings(true)}
+            className="px-3 py-1 bg-yellow-600 hover:bg-yellow-750 text-white rounded-lg text-xs font-bold transition-all"
+          >
+            Cancel Deletion & Reactivate
+          </button>
+        </div>
+      )}
 
       <div className="flex flex-1">
         {/* Sidebar - Hidden on mobile */}
@@ -534,6 +565,18 @@ function Dashboard({ darkMode, toggleDarkMode, onLogout }) {
           onClose={() => setActiveDetailsBookmark(null)}
         />
       )}
+
+      <SettingsModal
+        isOpen={showSettings}
+        onClose={() => setShowSettings(false)}
+        onLogout={onLogout}
+        userMetadata={userMetadata}
+        onUpdateMetadata={(newMeta) => {
+          setUserMetadata(newMeta)
+          // If we reactivated/deleted, update the localStorage/JWT if needed, or simply let the session reflect it.
+          // We can sync this back into local userMetadata state so the banner updates immediately.
+        }}
+      />
     </div>
   )
 }

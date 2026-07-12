@@ -5,8 +5,9 @@
  */
 
 import { Router } from 'express';
-import { getSupabaseClient } from '../config/supabase.js';
+import { getSupabaseClient, supabaseAdmin } from '../config/supabase.js';
 import { requireAuth } from '../middleware/auth.js';
+import { deleteAllUserPoints } from '../services/qdrant.service.js';
 
 const router = Router();
 
@@ -246,6 +247,106 @@ router.post('/oauth-callback', async (req, res) => {
     res.status(500).json({
       error: 'Internal Server Error',
       message: 'OAuth callback exchange failed'
+    });
+  }
+});
+
+/**
+ * DELETE /api/auth/delete-account
+ * Initiates soft deletion (30 days retention) or immediate account wipe
+ */
+router.delete('/delete-account', requireAuth, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const retentionDays = parseInt(req.query.retentionDays || req.body.retentionDays || '0', 10);
+
+    console.log(`[Auth] Account deletion requested for user ${userId} (retention: ${retentionDays} days)...`);
+
+    if (retentionDays === 30) {
+      // Soft Delete: Set metadata scheduled_deletion_at
+      const scheduledDeletionAt = new Date();
+      scheduledDeletionAt.setDate(scheduledDeletionAt.getDate() + 30);
+
+      const { data, error } = await supabaseAdmin.auth.admin.updateUserById(userId, {
+        user_metadata: {
+          scheduled_deletion_at: scheduledDeletionAt.toISOString()
+        }
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      console.log(`[Auth] User ${userId} scheduled for deletion on ${scheduledDeletionAt}`);
+      return res.json({
+        status: 'pending_deletion',
+        scheduled_deletion_at: scheduledDeletionAt.toISOString(),
+        message: 'Account scheduled for deletion. You have a 30-day grace period to restore your account.'
+      });
+    } else {
+      // Immediate Permanent Delete
+      console.log(`[Auth] Wiping user ${userId} data permanently...`);
+
+      // 1. Delete Qdrant vectors first
+      try {
+        await deleteAllUserPoints(userId);
+        console.log(`[Auth] Deleted Qdrant vectors for ${userId}`);
+      } catch (qdErr) {
+        console.error(`[Auth] Qdrant deletion failed for user ${userId}:`, qdErr);
+        // Continue to delete from auth so user registration state is unblocked
+      }
+
+      // 2. Delete Supabase user (cascades to DB tables via RLS/FKs)
+      const { error } = await supabaseAdmin.auth.admin.deleteUser(userId);
+      if (error) {
+        throw error;
+      }
+
+      console.log(`[Auth] Successfully deleted user account ${userId} permanently.`);
+      return res.json({
+        status: 'deleted',
+        message: 'Your account and all associated data have been permanently deleted.'
+      });
+    }
+  } catch (error) {
+    console.error('Account deletion error:', error);
+    res.status(500).json({
+      error: 'Internal Server Error',
+      message: 'Failed to process account deletion: ' + error.message
+    });
+  }
+});
+
+/**
+ * POST /api/auth/reactivate-account
+ * Restores an account scheduled for deletion
+ */
+router.post('/reactivate-account', requireAuth, async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    console.log(`[Auth] Restoring account for user ${userId}...`);
+
+    const { error } = await supabaseAdmin.auth.admin.updateUserById(userId, {
+      user_metadata: {
+        scheduled_deletion_at: null
+      }
+    });
+
+    if (error) {
+      throw error;
+    }
+
+    console.log(`[Auth] Account for user ${userId} successfully reactivated.`);
+    res.json({
+      status: 'active',
+      message: 'Your account has been successfully reactivated. Welcome back!'
+    });
+  } catch (error) {
+    console.error('Account reactivation error:', error);
+    res.status(500).json({
+      error: 'Internal Server Error',
+      message: 'Failed to reactivate account: ' + error.message
     });
   }
 });

@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
-import { Search, Moon, Sun, LogOut, Grid, List, Clock, Layers, Upload, X, Sparkles, Zap, Brain } from 'lucide-react'
+import { Search, Moon, Sun, LogOut, Grid, List, Clock, Layers, Upload, X, Sparkles, Zap, Brain, Settings } from 'lucide-react'
 import useBookmarkStore from '../store/useBookmarkStore'
 
-function Header({ darkMode, toggleDarkMode, onLogout, onOpenImport }) {
+function Header({ darkMode, toggleDarkMode, onLogout, onOpenImport, onOpenSettings }) {
   const { 
     searchQuery, 
     setSearchQuery, 
@@ -243,6 +243,15 @@ function Header({ darkMode, toggleDarkMode, onLogout, onOpenImport }) {
               ) : (
                 <Moon className="w-5 h-5 text-gray-600" />
               )}
+            </button>
+
+            {/* Settings */}
+            <button
+              onClick={onOpenSettings}
+              className="p-2 rounded-lg hover:bg-light-bg dark:hover:bg-dark-bg transition-colors"
+              title="Account Settings"
+            >
+              <Settings className="w-5 h-5 text-gray-600 dark:text-gray-400" />
             </button>
 
             {/* Logout */}
