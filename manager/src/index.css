@@ -124,14 +124,14 @@
     animation: shimmer 2s infinite linear;
   }
 
-  /* Dot Grid Pattern */
+  /* Hexagon Grid Pattern */
   .bg-dot-grid {
-    background-image: radial-gradient(#e2e8f0 1.5px, transparent 1.5px);
-    background-size: 24px 24px;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='56' height='98'%3E%3Cpath d='M28 64L0 48V16L28 0l28 16v32L28 64zM28 98L0 82V50l28-16 28 16v32L28 98z' fill='none' stroke='%23cbd5e1' stroke-width='0.8'/%3E%3C/svg%3E");
+    background-size: 56px 98px;
   }
-  
+
   .dark .bg-dot-grid {
-    background-image: radial-gradient(#262626 1.5px, transparent 1.5px);
-    background-size: 24px 24px;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='56' height='98'%3E%3Cpath d='M28 64L0 48V16L28 0l28 16v32L28 64zM28 98L0 82V50l28-16 28 16v32L28 98z' fill='none' stroke='%231e293b' stroke-width='0.8'/%3E%3C/svg%3E");
+    background-size: 56px 98px;
   }
 }

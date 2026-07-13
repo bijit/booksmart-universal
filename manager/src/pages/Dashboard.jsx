@@ -164,10 +164,11 @@ function Dashboard({ darkMode, toggleDarkMode, onLogout }) {
 
   return (
     <div className="flex flex-col h-screen overflow-hidden relative bg-dot-grid">
-      {/* Ambient Aurora Glow Blobs */}
+      {/* Ambient Aurora Glow Blobs — more visible */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
-        <div className="absolute top-[15%] left-[20%] w-[350px] h-[350px] rounded-full bg-accent/5 dark:bg-accent-dark/5 blur-[120px]" />
-        <div className="absolute bottom-[25%] right-[5%] w-[450px] h-[450px] rounded-full bg-purple-500/5 dark:bg-purple-500/5 blur-[150px]" />
+        <div className="absolute top-[10%] left-[15%] w-[500px] h-[500px] rounded-full bg-accent/20 dark:bg-accent/15 blur-[130px]" />
+        <div className="absolute bottom-[15%] right-[5%] w-[600px] h-[600px] rounded-full bg-purple-500/15 dark:bg-purple-600/20 blur-[160px]" />
+        <div className="absolute top-[55%] left-[50%] w-[350px] h-[350px] rounded-full bg-indigo-400/10 dark:bg-indigo-500/10 blur-[120px]" />
       </div>
 
       <Header
