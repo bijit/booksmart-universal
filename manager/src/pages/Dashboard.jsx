@@ -19,6 +19,7 @@ function Dashboard({ darkMode, toggleDarkMode, onLogout }) {
   const [showSettings, setShowSettings] = useState(false)
   const [showFeedback, setShowFeedback] = useState(false)
   const [activeDetailsBookmark, setActiveDetailsBookmark] = useState(null)
+  const mainRef = useRef(null)
   
   const [userMetadata, setUserMetadata] = useState(() => {
     try {
@@ -209,7 +210,7 @@ function Dashboard({ darkMode, toggleDarkMode, onLogout }) {
 
 
         {/* Main Content */}
-        <main className="flex-1 h-full overflow-y-auto z-10 bg-transparent scrollbar-thin">
+        <main ref={mainRef} className="flex-1 h-full overflow-y-auto z-10 bg-transparent scrollbar-thin">
           <div className="w-full max-w-7xl mx-auto px-4 py-4 sm:px-6 sm:py-6 lg:px-8 lg:py-8">
 
             {/* Search Header */}
@@ -414,7 +415,7 @@ function Dashboard({ darkMode, toggleDarkMode, onLogout }) {
                   </div>
                 ) : (
                   <VirtuosoGrid
-                    useWindowScroll
+                    customScrollParent={mainRef.current || undefined}
                     data={filteredBookmarks}
                     endReached={loadMoreResults}
                     overscan={400}
@@ -447,7 +448,7 @@ function Dashboard({ darkMode, toggleDarkMode, onLogout }) {
             {filteredBookmarks.length > 0 && viewMode === 'list' && (
               <>
                 <Virtuoso
-                  useWindowScroll
+                  customScrollParent={mainRef.current || undefined}
                   data={filteredBookmarks}
                   endReached={loadMoreResults}
                   overscan={400}
