@@ -10,8 +10,26 @@ function SettingsModal({ isOpen, onClose, onLogout, userMetadata, onUpdateMetada
 
   if (!isOpen) return null
 
-  const userEmail = localStorage.getItem('userEmail') || 'N/A'
-  const userName = localStorage.getItem('userName') || 'User'
+  const getProfileDetails = () => {
+    try {
+      const token = localStorage.getItem('authToken')
+      if (token) {
+        const payload = JSON.parse(atob(token.split('.')[1]))
+        return {
+          email: payload.email || localStorage.getItem('userEmail') || 'N/A',
+          name: payload.user_metadata?.name || localStorage.getItem('userName') || 'User'
+        }
+      }
+    } catch (e) {
+      console.error('Failed to parse profile details from JWT:', e)
+    }
+    return {
+      email: localStorage.getItem('userEmail') || 'N/A',
+      name: localStorage.getItem('userName') || 'User'
+    }
+  }
+
+  const { email: userEmail, name: userName } = getProfileDetails()
   const scheduledDeletionAt = userMetadata?.scheduled_deletion_at
 
   const handleDeactivate = async () => {

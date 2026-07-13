@@ -162,7 +162,7 @@ function Dashboard({ darkMode, toggleDarkMode, onLogout }) {
   }, [fetchPreferences, fetchBookmarks])
 
   return (
-    <div className="flex flex-col min-h-screen relative bg-dot-grid overflow-x-hidden">
+    <div className="flex flex-col h-screen overflow-hidden relative bg-dot-grid">
       {/* Ambient Aurora Glow Blobs */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
         <div className="absolute top-[15%] left-[20%] w-[350px] h-[350px] rounded-full bg-accent/5 dark:bg-accent-dark/5 blur-[120px]" />
@@ -178,7 +178,7 @@ function Dashboard({ darkMode, toggleDarkMode, onLogout }) {
       />
 
       {userMetadata?.scheduled_deletion_at && (
-        <div className="w-full bg-yellow-500/10 border-b border-yellow-500/20 px-4 py-3 sm:px-6 lg:px-8 flex flex-wrap items-center justify-between gap-3 z-40 animate-fadeIn">
+        <div className="w-full bg-yellow-500/10 border-b border-yellow-500/20 px-4 py-3 sm:px-6 lg:px-8 flex flex-wrap items-center justify-between gap-3 z-40 animate-fadeIn flex-shrink-0">
           <div className="flex items-center gap-2 text-yellow-800 dark:text-yellow-400 text-xs sm:text-sm">
             <span className="font-bold">⚠️ Notice:</span>
             <span>Your account is scheduled for permanent deletion on {new Date(userMetadata.scheduled_deletion_at).toLocaleString()}.</span>
@@ -192,10 +192,10 @@ function Dashboard({ darkMode, toggleDarkMode, onLogout }) {
         </div>
       )}
 
-      <div className="flex flex-1">
+      <div className="flex flex-1 overflow-hidden">
         {/* Sidebar - Hidden on mobile */}
         <div
-          className="hidden lg:flex sticky top-16 h-[calc(100vh-64px)] z-30 flex-shrink-0"
+          className="hidden lg:flex h-full z-30 flex-shrink-0 relative overflow-hidden"
           style={{ width: `${sidebarWidth}px` }}
         >
           <Sidebar />
@@ -209,7 +209,7 @@ function Dashboard({ darkMode, toggleDarkMode, onLogout }) {
 
 
         {/* Main Content */}
-        <main className="flex-1">
+        <main className="flex-1 h-full overflow-y-auto z-10 bg-transparent scrollbar-thin">
           <div className="w-full max-w-7xl mx-auto px-4 py-4 sm:px-6 sm:py-6 lg:px-8 lg:py-8">
 
             {/* Search Header */}

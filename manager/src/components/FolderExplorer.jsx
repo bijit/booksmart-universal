@@ -21,7 +21,7 @@ function FolderExplorer() {
     deleteFolder
   } = useBookmarkStore();
 
-  const [expandedFolders, setExpandedFolders] = useState(new Set(['root']));
+  const [expandedFolders, setExpandedFolders] = useState(new Set());
   const [folderSearch, setFolderSearch] = useState('');
 
   // Modal States
