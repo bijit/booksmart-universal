@@ -162,7 +162,13 @@ function Dashboard({ darkMode, toggleDarkMode, onLogout }) {
   }, [fetchPreferences, fetchBookmarks])
 
   return (
-    <div className="flex flex-col min-h-screen">
+    <div className="flex flex-col min-h-screen relative bg-dot-grid overflow-x-hidden">
+      {/* Ambient Aurora Glow Blobs */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
+        <div className="absolute top-[15%] left-[20%] w-[350px] h-[350px] rounded-full bg-accent/5 dark:bg-accent-dark/5 blur-[120px]" />
+        <div className="absolute bottom-[25%] right-[5%] w-[450px] h-[450px] rounded-full bg-purple-500/5 dark:bg-purple-500/5 blur-[150px]" />
+      </div>
+
       <Header
         darkMode={darkMode}
         toggleDarkMode={toggleDarkMode}

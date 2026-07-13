@@ -123,4 +123,15 @@
     background-size: 1000px 100%;
     animation: shimmer 2s infinite linear;
   }
+
+  /* Dot Grid Pattern */
+  .bg-dot-grid {
+    background-image: radial-gradient(#e2e8f0 1.5px, transparent 1.5px);
+    background-size: 24px 24px;
+  }
+  
+  .dark .bg-dot-grid {
+    background-image: radial-gradient(#262626 1.5px, transparent 1.5px);
+    background-size: 24px 24px;
+  }
 }
