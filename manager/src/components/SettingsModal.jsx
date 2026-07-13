@@ -11,21 +11,32 @@ function SettingsModal({ isOpen, onClose, onLogout, userMetadata, onUpdateMetada
   if (!isOpen) return null
 
   const getProfileDetails = () => {
+    let email = ''
+    let name = ''
+
     try {
       const token = localStorage.getItem('authToken')
       if (token) {
         const payload = JSON.parse(atob(token.split('.')[1]))
-        return {
-          email: payload.email || localStorage.getItem('userEmail') || 'N/A',
-          name: payload.user_metadata?.name || localStorage.getItem('userName') || 'User'
-        }
+        email = payload.email || payload.user?.email || ''
+        name = payload.user_metadata?.name || payload.user_metadata?.full_name || payload.name || ''
       }
     } catch (e) {
       console.error('Failed to parse profile details from JWT:', e)
     }
+
+    // Fallbacks to localStorage
+    if (!email) {
+      email = localStorage.getItem('userEmail') || ''
+    }
+    if (!name) {
+      name = localStorage.getItem('userName') || localStorage.getItem('userEmail') || ''
+    }
+
+    // Ultimate placeholders to ensure it is never blank
     return {
-      email: localStorage.getItem('userEmail') || 'N/A',
-      name: localStorage.getItem('userName') || 'User'
+      email: email || 'N/A',
+      name: name || 'User'
     }
   }
 
