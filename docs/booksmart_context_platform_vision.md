@@ -171,17 +171,52 @@ This architecture opens up multiple revenue streams:
 
 ---
 
-## 7. Phased Roadmap
+## 7. Guiding Principle: User-First, Then Platform
 
-### Phase 1: Foundation (Now — Alpha)
-*Already in progress*
+> **The user must be the first and best consumer of their own context data.**
+
+Before BookSmart becomes a platform for third-party apps, it must first become indispensable to the user themselves. There is a clear and deliberate two-stage philosophy:
+
+**Stage 1 — Personal Context Browser (The Vault for Me):**
+The user has a rich, secure, beautifully designed interface to browse, search, and understand *their own* captured context. They can:
+- See what the system has captured about them over time
+- Search semantically across everything ("what do I know about LLMs?", "what did I save last month about startups?")
+- Explore their interest graph — what topics they return to most
+- View timelines of their reading and research activity
+- Understand the full picture of their digital knowledge footprint
+
+This stage has no sharing, no APIs, no third parties. It is about building *trust through value*: the user has to find their Context Vault genuinely useful and trustworthy for themselves before they would ever consider granting anyone else access to it.
+
+**Stage 2 — Context as a Platform (The Vault for Apps):**
+Only once Stage 1 is solid does BookSmart layer in the permissioning and API infrastructure that enables third-party apps to request access to a user's context, subject to explicit, revocable, scoped consent.
+
+This sequencing is both philosophically correct (user sovereignty first) and product-strategically sound (users who trust the vault become advocates who bring apps to it).
+
+---
+
+## 8. Phased Roadmap
+
+### Phase 1: Foundation (Now — Alpha) ✅ In Progress
+*Core capture and search pipeline*
 - ✅ Chrome Extension (context capture)
 - ✅ Manager Dashboard (review & search)
 - ✅ Qdrant vector search
 - ✅ Supabase user management
 - 🔲 Context Vault encryption hardening
 
+### Phase 1.5: Personal Context Browser (Next — Pre-Platform) 🎯 Priority
+*Give users a world-class interface to explore their own context.*
+This is the most important phase before any third-party sharing is introduced.
+- 🔲 **Context Timeline View** — chronological activity stream of what was captured and when
+- 🔲 **Topic / Interest Graph** — visualise what subjects the user engages with most
+- 🔲 **Semantic Search UX** — rich, natural language search over the full context vault ("what do I know about X?")
+- 🔲 **Context Item Detail View** — for each saved item: full metadata, AI summary, related items, and capture rationale
+- 🔲 **"Forgotten Knowledge" Surfacing** — proactively resurface items the user saved long ago that are relevant now
+- 🔲 **Export & Data Portability** — user can download their full vault at any time in open formats
+- 🔲 **Privacy Dashboard** — user sees exactly what data is stored and can selectively delete
+
 ### Phase 2: Context API (Post-Alpha, ~Q3 2026)
+*Unlock third-party access — only after Phase 1.5 is solid.*
 - 🔲 OAuth 2.0 authorization server (context token issuance)
 - 🔲 `/context/*` REST API endpoints
 - 🔲 Consent management UI (in-dashboard)
@@ -202,7 +237,7 @@ This architecture opens up multiple revenue streams:
 
 ---
 
-## 8. Key Risks & Mitigations
+## 9. Key Risks & Mitigations
 
 | Risk | Mitigation |
 | :--- | :--- |
@@ -214,7 +249,7 @@ This architecture opens up multiple revenue streams:
 
 ---
 
-## 9. The Differentiated Positioning
+## 10. The Differentiated Positioning
 
 > **BookSmart is not a bookmark manager.**
 > 
