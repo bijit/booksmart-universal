@@ -54,7 +54,7 @@ function Header({ darkMode, toggleDarkMode, onLogout, onOpenImport, onOpenSettin
   }, [localSearchQuery, setSearchQuery, deepSearchEnabled, searchMode])
 
   return (
-    <header className="sticky top-0 z-50 bg-light-card dark:bg-dark-card border-b border-light-border dark:border-dark-border">
+    <header className="sticky top-0 z-50 bg-white/80 dark:bg-black/30 backdrop-blur-xl border-b border-indigo-200/50 dark:border-white/10">
       <div className="w-full mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between gap-2 sm:gap-4 h-16">
           {/* Logo */}

@@ -34,16 +34,20 @@
 }
 
 @layer components {
-  /* Card styles */
+  /* Card styles — Hybrid: Option D light mode + Option A dark mode */
   .card {
-    @apply bg-light-card dark:bg-dark-card;
-    @apply border border-light-border dark:border-dark-border;
-    @apply rounded-lg shadow-sm;
+    background: linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(238,242,255,0.85) 100%);
+    @apply dark:[background:rgba(255,255,255,0.06)];
+    @apply dark:backdrop-blur-md;
+    @apply border border-indigo-200/60 dark:border-white/10;
+    @apply rounded-lg shadow-sm shadow-indigo-100/50 dark:shadow-none;
     @apply transition-all duration-200;
   }
 
   .card:hover {
-    @apply shadow-md border-accent dark:border-accent-dark;
+    @apply shadow-md shadow-indigo-200/60 dark:shadow-lg dark:shadow-black/30;
+    @apply border-indigo-400/70 dark:border-white/20;
+    @apply dark:bg-white/10;
     transform: translateY(-2px);
   }
 

@@ -60,7 +60,7 @@ function Sidebar() {
   const [timelineExpanded, setTimelineExpanded] = useState(false)
 
   return (
-    <aside className="w-full h-full bg-light-card dark:bg-dark-card border-r border-light-border dark:border-dark-border p-6 overflow-y-auto">
+    <aside className="w-full h-full bg-indigo-50/80 dark:bg-black/30 backdrop-blur-xl border-r border-indigo-200/50 dark:border-white/10 p-6 overflow-y-auto">
       {/* Content Library */}
       <div className="mb-6">
         <div className="flex items-center justify-between mb-3">
