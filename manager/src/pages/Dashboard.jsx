@@ -70,16 +70,17 @@ function Dashboard({ darkMode, toggleDarkMode, onLogout }) {
 
   // Calculate dynamic list header text based on active filters
   let listHeaderText = 'All Bookmarks'
+  let searchScopeText = '' // shown in grey only when searching, represents scope (folder/tags)
   if (searchQuery) {
-    let contextStr = ''
     if (selectedFolder) {
-      contextStr += ` in Folder: ${selectedFolder}`
+      searchScopeText = `in Folder: ${selectedFolder}`
     }
     if (selectedTags && selectedTags.length > 0) {
       const tagsStr = selectedTags.map(t => `#${t}`).join(', ')
-      contextStr += ` matching ${selectedTags.length === 1 ? 'Tag' : 'Tags'}: ${tagsStr}`
+      searchScopeText += `${searchScopeText ? ' · ' : ''}${selectedTags.length === 1 ? 'Tag' : 'Tags'}: ${tagsStr}`
     }
-    listHeaderText = `Search Results: "${searchQuery}"${contextStr}`
+    // The grey h3 only shows scope (not the search term — that's already in the blue h2)
+    listHeaderText = searchScopeText || null
   } else if (showOnlyProcessing) {
     listHeaderText = 'Processing Queue'
   } else if (selectedFolder) {
@@ -314,8 +315,8 @@ function Dashboard({ darkMode, toggleDarkMode, onLogout }) {
               </div>
             )}
 
-            {/* Global Toolbar (Visible as long as there are bookmarks to filter, active search, or processing filter) */}
-            {!loading && !error && (filteredBookmarks.length > 0 || searchQuery || showOnlyProcessing) && (
+            {/* Global Toolbar */}
+            {!loading && !error && (filteredBookmarks.length > 0 || searchQuery || showOnlyProcessing) && listHeaderText && (
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
                 <h3 className="text-lg font-bold text-light-text-secondary dark:text-dark-text-secondary uppercase tracking-wider">
                   {listHeaderText}
