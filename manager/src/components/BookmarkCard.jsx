@@ -208,7 +208,7 @@ function BookmarkCard({ bookmark, layoutMode = 'gallery', onViewDetails }) {
               <RefreshCw className={`w-4 h-4 ${isReindexing ? 'animate-spin' : ''}`} />
             </button>
             <button
-              onClick={() => setIsEditing(true)}
+              onClick={(e) => { e.stopPropagation(); setIsEditing(true); }}
               className="p-1.5 rounded hover:bg-light-bg dark:hover:bg-dark-bg transition-colors"
               title="Edit bookmark"
             >
