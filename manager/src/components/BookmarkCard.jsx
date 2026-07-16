@@ -2,10 +2,8 @@ import { useState } from 'react'
 import { ExternalLink, Trash2, Edit2, Calendar, Clock, Sparkles, ChevronDown, ChevronUp, CheckCircle2, FileText, RefreshCw } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 import useBookmarkStore from '../store/useBookmarkStore'
-import EditBookmarkModal from './EditBookmarkModal'
 function BookmarkCard({ bookmark, layoutMode = 'gallery', onViewDetails }) {
   const [isDeleting, setIsDeleting] = useState(false)
-  const [isEditing, setIsEditing] = useState(false)
   const [isSummarizing, setIsSummarizing] = useState(false)
   const [isReindexing, setIsReindexing] = useState(false)
   const [showSummary, setShowSummary] = useState(false)
@@ -208,9 +206,9 @@ function BookmarkCard({ bookmark, layoutMode = 'gallery', onViewDetails }) {
               <RefreshCw className={`w-4 h-4 ${isReindexing ? 'animate-spin' : ''}`} />
             </button>
             <button
-              onClick={(e) => { e.stopPropagation(); setIsEditing(true); }}
+              onClick={(e) => { e.stopPropagation(); onViewDetails && onViewDetails(bookmark); }}
               className="p-1.5 rounded hover:bg-light-bg dark:hover:bg-dark-bg transition-colors"
-              title="Edit bookmark"
+              title="Edit / add notes"
             >
               <Edit2 className="w-4 h-4" />
             </button>
@@ -223,14 +221,6 @@ function BookmarkCard({ bookmark, layoutMode = 'gallery', onViewDetails }) {
             </button>
           </div>
         </div>
-
-        {/* Modal */}
-        {isEditing && (
-          <EditBookmarkModal
-            bookmark={bookmark}
-            onClose={() => setIsEditing(false)}
-          />
-        )}
 
         {/* SCROLLABLE CONTENT SECTION */}
         <div className="flex-1 overflow-y-auto pr-2 mb-4 scrollbar-thin scrollbar-thumb-gray-200 dark:scrollbar-thumb-gray-800 hover:scrollbar-thumb-gray-300 dark:hover:scrollbar-thumb-gray-700">
