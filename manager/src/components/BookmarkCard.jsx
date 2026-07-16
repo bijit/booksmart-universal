@@ -255,9 +255,12 @@ function BookmarkCard({ bookmark, layoutMode = 'gallery', onViewDetails }) {
             </div>
           )}
 
-          {/* Notes Section */}
+          {/* Notes Section — inline display only, stopPropagation prevents re-opening modal */}
           {bookmark.notes && (
-            <div className="mb-4 p-3 bg-yellow-50/50 dark:bg-yellow-900/10 border border-yellow-200/50 dark:border-yellow-800/30 rounded-lg">
+            <div
+              className="mb-4 p-3 bg-yellow-50/50 dark:bg-yellow-900/10 border border-yellow-200/50 dark:border-yellow-800/30 rounded-lg"
+              onClick={(e) => e.stopPropagation()}
+            >
               <p className="text-[10px] font-bold uppercase tracking-wider text-yellow-700/70 dark:text-yellow-500/70 mb-1 flex items-center gap-1">
                 <Edit2 className="w-2.5 h-2.5" />
                 My Notes

@@ -560,6 +560,7 @@ router.put('/:id', async (req, res) => {
     const { 
       title, 
       tags, 
+      notes,
       folder_id, 
       folder_path, 
       browser,
@@ -594,6 +595,12 @@ router.put('/:id', async (req, res) => {
     const supabaseUpdates = {};
     if (title !== undefined) {
       supabaseUpdates.title = title;
+    }
+    if (notes !== undefined) {
+      supabaseUpdates.notes = notes;
+    }
+    if (tags !== undefined) {
+      supabaseUpdates.tags = tags;
     }
     if (folder_id !== undefined) {
       supabaseUpdates.folder_id = folder_id;
