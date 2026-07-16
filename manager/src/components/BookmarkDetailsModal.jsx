@@ -10,11 +10,12 @@ function BookmarkDetailsModal({ bookmark, onClose }) {
   const [saveSuccess, setSaveSuccess] = useState(false)
   const [isSummarizing, setIsSummarizing] = useState(false)
 
-  // Sync prop changes to local state
+  // Sync when a DIFFERENT bookmark is opened (id changes), but not on every store update
+  // to the same bookmark — that was causing the save loop.
   useEffect(() => {
     setCurrentBookmark(bookmark)
     setNotes(bookmark.notes || '')
-  }, [bookmark])
+  }, [bookmark.id])
 
   // Auto-clear success state
   useEffect(() => {
@@ -27,9 +28,10 @@ function BookmarkDetailsModal({ bookmark, onClose }) {
   const handleSaveNotes = async () => {
     setIsSavingNotes(true)
     try {
-      await updateBookmark(currentBookmark.id, { notes })
+      const updated = await updateBookmark(currentBookmark.id, { notes })
       setSaveSuccess(true)
-      setCurrentBookmark(prev => ({ ...prev, notes }))
+      // Use server response if available, otherwise do a local merge
+      setCurrentBookmark(prev => updated ? { ...prev, ...updated } : { ...prev, notes })
     } catch (err) {
       alert('Failed to save notes: ' + err.message)
     } finally {
