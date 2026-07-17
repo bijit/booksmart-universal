@@ -43,37 +43,61 @@ browser.runtime.onInstalled.addListener((details) => {
 // ── Auth sync: primary path ─────────────────────────────────────────────────
 // The manager web app calls chrome.runtime.sendMessage() right after login.
 // This fires reliably with no race conditions against replaceState().
-browser.runtime.onMessageExternal.addListener(async (message, sender, sendResponse) => {
+browser.runtime.onMessageExternal.addListener((message, sender, sendResponse) => {
   if (message?.type === 'BOOKSMART_AUTH_LOGOUT') {
-    try {
-      await clearAuthData();
-      console.log('[BookSmart] Auth cleared from manager via onMessageExternal (Logout) ✅');
-      updateBadgeCount();
-      sendResponse({ ok: true });
-    } catch (e) {
-      console.error('[BookSmart] onMessageExternal logout failed:', e);
-      sendResponse({ ok: false, error: e.message });
-    }
-    return;
+    clearAuthData()
+      .then(() => {
+        console.log('[BookSmart] Auth cleared from manager via onMessageExternal (Logout) ✅');
+        updateBadgeCount();
+        sendResponse({ ok: true });
+      })
+      .catch((e) => {
+        console.error('[BookSmart] onMessageExternal logout failed:', e);
+        sendResponse({ ok: false, error: e.message });
+      });
+    return true; // Keep channel open for async response
   }
 
-  if (message?.type !== 'BOOKSMART_AUTH_SYNC') return;
+  if (message?.type === 'BOOKSMART_GET_AUTH') {
+    getAuthData()
+      .then((authData) => {
+        sendResponse({
+          ok: true,
+          token: authData[STORAGE_KEYS.AUTH_TOKEN] || null,
+          refreshToken: authData[STORAGE_KEYS.REFRESH_TOKEN] || null,
+          user: authData[STORAGE_KEYS.USER] || null,
+          expiresAt: authData[STORAGE_KEYS.TOKEN_EXPIRES_AT] || null
+        });
+      })
+      .catch((e) => {
+        console.error('[BookSmart] onMessageExternal get auth failed:', e);
+        sendResponse({ ok: false, error: e.message });
+      });
+    return true; // Keep channel open
+  }
 
-  const { token, refreshToken, email, name } = message;
-  if (!token) { sendResponse({ ok: false, error: 'no token' }); return; }
+  if (message?.type === 'BOOKSMART_AUTH_SYNC') {
+    const { token, refreshToken, email, name } = message;
+    if (!token) { sendResponse({ ok: false, error: 'no token' }); return; }
 
-  try {
-    await browser.storage.local.set({
+    const expiresAt = getTokenExpiry(token);
+
+    browser.storage.local.set({
       [STORAGE_KEYS.AUTH_TOKEN]: token,
       [STORAGE_KEYS.REFRESH_TOKEN]: refreshToken || null,
-      [STORAGE_KEYS.USER]: { email, name }
-    });
-    console.log('[BookSmart] Auth synced from manager via onMessageExternal ✅');
-    updateBadgeCount();
-    sendResponse({ ok: true });
-  } catch (e) {
-    console.error('[BookSmart] onMessageExternal auth sync failed:', e);
-    sendResponse({ ok: false, error: e.message });
+      [STORAGE_KEYS.USER]: { email, name },
+      [STORAGE_KEYS.TOKEN_EXPIRES_AT]: expiresAt
+    })
+      .then(() => {
+        console.log('[BookSmart] Auth synced from manager via onMessageExternal ✅');
+        updateBadgeCount();
+        sendResponse({ ok: true });
+      })
+      .catch((e) => {
+        console.error('[BookSmart] onMessageExternal auth sync failed:', e);
+        sendResponse({ ok: false, error: e.message });
+      });
+    return true; // Keep channel open
   }
 });
 
@@ -830,6 +854,11 @@ async function checkAndRefreshToken() {
       } catch (e) {
         console.error('Failed to parse token expiration:', e);
       }
+    }
+
+    // Normalize expiresAt to milliseconds if it was saved in seconds
+    if (expiresAt && expiresAt < 10000000000) {
+      expiresAt = expiresAt * 1000;
     }
 
     // Refresh if within 45 minutes of expiry (or if no expiration was found to be safe)

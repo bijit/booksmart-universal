@@ -16,11 +16,16 @@ export const STORAGE_KEYS = {
 export async function saveAuthData(data) {
   try {
     const current = await browser.storage.local.get([STORAGE_KEYS.USER]);
+    // Supabase returns expires_at in seconds. Convert to milliseconds.
+    const expiresAt = data.session.expires_at
+      ? (data.session.expires_at < 10000000000 ? data.session.expires_at * 1000 : data.session.expires_at)
+      : 0;
+
     const storageData = {
       [STORAGE_KEYS.AUTH_TOKEN]: data.session.access_token,
       [STORAGE_KEYS.REFRESH_TOKEN]: data.session.refresh_token,
       [STORAGE_KEYS.USER]: data.user || current[STORAGE_KEYS.USER] || null,
-      [STORAGE_KEYS.TOKEN_EXPIRES_AT]: data.session.expires_at
+      [STORAGE_KEYS.TOKEN_EXPIRES_AT]: expiresAt
     };
     await browser.storage.local.set(storageData);
     console.log('[Storage] Auth data saved successfully');

@@ -74,9 +74,77 @@ export function syncWithExtension(token, refreshToken) {
   }
 }
 
+/**
+ * Ask the extension for its current credentials.
+ * If the extension has a newer token, update local storage and return it.
+ */
+export async function fetchCredentialsFromExtension() {
+  const extensionId = localStorage.getItem('booksmartExtensionId')
+  if (!extensionId || typeof chrome === 'undefined' || !chrome.runtime?.sendMessage) {
+    return null
+  }
+
+  return new Promise((resolve) => {
+    try {
+      chrome.runtime.sendMessage(
+        extensionId,
+        { type: 'BOOKSMART_GET_AUTH' },
+        (response) => {
+          if (chrome.runtime.lastError) {
+            console.log('[Auth] Extension not responding or not connectable:', chrome.runtime.lastError.message)
+            resolve(null)
+            return
+          }
+
+          if (response && response.ok && response.token) {
+            const currentToken = localStorage.getItem('authToken')
+            
+            const getExpiry = (t) => {
+              try {
+                return JSON.parse(atob(t.split('.')[1])).exp * 1000
+              } catch (e) {
+                return 0
+              }
+            }
+
+            const extExpiry = getExpiry(response.token)
+            const localExpiry = getExpiry(currentToken)
+
+            if (extExpiry > localExpiry) {
+              console.log('[Auth] Found newer token in extension. Syncing down.')
+              localStorage.setItem('authToken', response.token)
+              if (response.refreshToken) {
+                localStorage.setItem('refreshToken', response.refreshToken)
+              }
+              if (response.user) {
+                if (response.user.email) localStorage.setItem('userEmail', response.user.email)
+                if (response.user.name) localStorage.setItem('userName', response.user.name)
+              }
+              window.dispatchEvent(new Event('storage'))
+              resolve(response.token)
+              return
+            }
+          }
+          resolve(null)
+        }
+      )
+    } catch (e) {
+      console.warn('[Auth] Error getting credentials from extension:', e)
+      resolve(null)
+    }
+  })
+}
+
 let activeRefreshPromise = null
 
 export async function refreshSession() {
+  // First, check if the extension already has a newer token
+  const syncedToken = await fetchCredentialsFromExtension()
+  if (syncedToken && !isTokenExpired(syncedToken)) {
+    console.log('[Auth] Skipped refresh session because we synced a fresh token from extension.')
+    return syncedToken
+  }
+
   const refreshToken = localStorage.getItem('refreshToken')
   if (!refreshToken) return null
 
@@ -155,7 +223,15 @@ export async function refreshSession() {
  *     "Invalid folder name" or "URL token expired".
  */
 export async function authenticatedFetch(url, options = {}) {
+  // Try to sync with extension first if our token is expired/expiring soon
   let token = localStorage.getItem('authToken')
+  if (token && isTokenExpired(token)) {
+    const syncedToken = await fetchCredentialsFromExtension()
+    if (syncedToken) {
+      token = syncedToken
+    }
+  }
+
   const refreshToken = localStorage.getItem('refreshToken')
 
   // Pre-request proactive refresh
