@@ -111,6 +111,7 @@ browser.runtime.onMessageExternal.addListener((message, sender, sendResponse) =>
       .then(() => {
         console.log('[BookSmart] Auth synced from manager via onMessageExternal ✅');
         updateBadgeCount();
+        flushPendingBookmarks();
         sendResponse({ ok: true });
       })
       .catch((e) => {
@@ -447,7 +448,35 @@ async function handleNewBookmark(bookmark) {
   try {
     const authData = await getAuthData();
     if (!authData[STORAGE_KEYS.AUTH_TOKEN]) {
-      console.log('User not authenticated, skipping bookmark sync');
+      console.log('[BookSmart] User not authenticated. Queueing bookmark for offline sync...');
+      const extracted = await extractContentFromActiveTab(bookmark.url);
+      const folderPath = await getFolderPath(bookmark.parentId);
+
+      const bookmarkData = {
+        url: bookmark.url,
+        title: bookmark.title || null,
+        folder_id: bookmark.parentId,
+        folder_path: folderPath,
+        browser: await getBrowserInfo(),
+        created_at: new Date(bookmark.dateAdded || Date.now()).toISOString()
+      };
+
+      if (extracted && extracted.success) {
+        bookmarkData.extractedContent = extracted.content;
+        bookmarkData.extractedTitle = extracted.title;
+        bookmarkData.extractedExcerpt = extracted.excerpt;
+        bookmarkData.extractedMethod = extracted.method;
+        bookmarkData.extractedLength = extracted.length;
+        if (extracted.coverImage) bookmarkData.cover_image = extracted.coverImage;
+        if (extracted.extractedImages && extracted.extractedImages.length > 0) {
+          bookmarkData.extracted_images = extracted.extractedImages;
+        }
+      }
+
+      const { pending_sync_bookmarks = [] } = await browser.storage.local.get(['pending_sync_bookmarks']);
+      pending_sync_bookmarks.push(bookmarkData);
+      await browser.storage.local.set({ pending_sync_bookmarks });
+      console.log('[BookSmart] Bookmark queued successfully:', bookmark.url);
       return;
     }
 
@@ -597,6 +626,13 @@ browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }).catch(error => {
       sendResponse({ success: false, error: error.message });
     });
+    return true;
+  }
+
+  if (message.action === 'flushPendingBookmarks') {
+    flushPendingBookmarks()
+      .then(() => sendResponse({ success: true }))
+      .catch((err) => sendResponse({ success: false, error: err.message }));
     return true;
   }
 
@@ -862,7 +898,12 @@ async function checkAndRefreshToken() {
     const refreshToken = authData[STORAGE_KEYS.REFRESH_TOKEN];
     let expiresAt = authData[STORAGE_KEYS.TOKEN_EXPIRES_AT] || 0;
 
-    if (!refreshToken) return;
+    // Proactively flush any offline queued bookmarks if we are authenticated
+    if (token) {
+      flushPendingBookmarks();
+    }
+
+    if (!refreshToken) return null;
 
     // Fallback: If expiresAt is missing but we have a token, parse the expiration directly from JWT payload
     if (!expiresAt && token) {
@@ -916,3 +957,46 @@ browser.alarms.onAlarm.addListener(async (alarm) => {
 checkAndRefreshToken();
 
 console.log('BookSmart background service worker initialized');
+
+// Flush offline queued bookmarks to the backend database
+async function flushPendingBookmarks() {
+  try {
+    const authData = await getAuthData();
+    if (!authData[STORAGE_KEYS.AUTH_TOKEN]) return;
+
+    const { pending_sync_bookmarks = [] } = await browser.storage.local.get(['pending_sync_bookmarks']);
+    if (pending_sync_bookmarks.length === 0) return;
+
+    console.log(`[BookSmart] Syncing ${pending_sync_bookmarks.length} offline queued bookmarks to backend...`);
+    
+    const remaining = [];
+    let isSessionDead = false;
+
+    for (const bookmarkData of pending_sync_bookmarks) {
+      if (isSessionDead) {
+        remaining.push(bookmarkData);
+        continue;
+      }
+
+      try {
+        await bookmarks.create(bookmarkData);
+      } catch (err) {
+        console.error(`[BookSmart] Failed to sync queued bookmark ${bookmarkData.url}:`, err);
+        if (err.status === 401) {
+          isSessionDead = true;
+          remaining.push(bookmarkData);
+        }
+        // Discard duplicates or format validation errors to prevent queue deadlocks
+      }
+    }
+
+    if (remaining.length > 0) {
+      await browser.storage.local.set({ pending_sync_bookmarks: remaining });
+    } else {
+      await browser.storage.local.remove(['pending_sync_bookmarks']);
+      console.log('[BookSmart] All offline queued bookmarks synced successfully.');
+    }
+  } catch (error) {
+    console.error('[BookSmart] Error flushing pending bookmarks:', error);
+  }
+}

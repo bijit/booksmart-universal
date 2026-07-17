@@ -177,6 +177,7 @@ async function handleLogin(e) {
   try {
     const data = await auth.login(email, password);
     await saveAuthData(data);
+    browser.runtime.sendMessage({ action: 'flushPendingBookmarks' });
     showMainScreen();
     loadRecentBookmarks();
   } catch (error) {
@@ -195,6 +196,7 @@ async function handleRegister(e) {
   try {
     const data = await auth.register(name, email, password);
     await saveAuthData(data);
+    browser.runtime.sendMessage({ action: 'flushPendingBookmarks' });
     showMainScreen();
     loadRecentBookmarks();
   } catch (error) {
