@@ -135,10 +135,62 @@ export async function fetchCredentialsFromExtension() {
   })
 }
 
+/**
+ * Ask the extension to perform a token refresh on our behalf.
+ * This serializes all refresh requests through the extension to prevent race conditions.
+ */
+export async function refreshCredentialsInExtension() {
+  const extensionId = localStorage.getItem('booksmartExtensionId')
+  if (!extensionId || typeof chrome === 'undefined' || !chrome.runtime?.sendMessage) {
+    return null
+  }
+
+  return new Promise((resolve) => {
+    try {
+      chrome.runtime.sendMessage(
+        extensionId,
+        { type: 'BOOKSMART_REFRESH_AUTH' },
+        (response) => {
+          if (chrome.runtime.lastError) {
+            console.log('[Auth] Extension not connectable for refresh:', chrome.runtime.lastError.message)
+            resolve(null)
+            return
+          }
+
+          if (response && response.ok && response.token) {
+            console.log('[Auth] Extension refreshed token on our behalf. Syncing down.')
+            localStorage.setItem('authToken', response.token)
+            if (response.refreshToken) {
+              localStorage.setItem('refreshToken', response.refreshToken)
+            }
+            if (response.user) {
+              if (response.user.email) localStorage.setItem('userEmail', response.user.email)
+              if (response.user.name) localStorage.setItem('userName', response.user.name)
+            }
+            window.dispatchEvent(new Event('storage'))
+            resolve(response.token)
+          } else {
+            resolve(null)
+          }
+        }
+      )
+    } catch (e) {
+      console.warn('[Auth] Error delegating refresh to extension:', e)
+      resolve(null)
+    }
+  })
+}
+
 let activeRefreshPromise = null
 
 export async function refreshSession() {
-  // First, check if the extension already has a newer token
+  // 1. Delegate the refresh to the extension first to prevent any race condition
+  const delegatedToken = await refreshCredentialsInExtension()
+  if (delegatedToken) {
+    return delegatedToken
+  }
+
+  // 2. Fallback: check if the extension already has a newer token
   const syncedToken = await fetchCredentialsFromExtension()
   if (syncedToken && !isTokenExpired(syncedToken)) {
     console.log('[Auth] Skipped refresh session because we synced a fresh token from extension.')

@@ -76,6 +76,25 @@ browser.runtime.onMessageExternal.addListener((message, sender, sendResponse) =>
     return true; // Keep channel open
   }
 
+  if (message?.type === 'BOOKSMART_REFRESH_AUTH') {
+    checkAndRefreshToken()
+      .then(async () => {
+        const authData = await getAuthData();
+        sendResponse({
+          ok: true,
+          token: authData[STORAGE_KEYS.AUTH_TOKEN] || null,
+          refreshToken: authData[STORAGE_KEYS.REFRESH_TOKEN] || null,
+          user: authData[STORAGE_KEYS.USER] || null,
+          expiresAt: authData[STORAGE_KEYS.TOKEN_EXPIRES_AT] || null
+        });
+      })
+      .catch((e) => {
+        console.error('[BookSmart] onMessageExternal refresh auth failed:', e);
+        sendResponse({ ok: false, error: e.message });
+      });
+    return true; // Keep channel open
+  }
+
   if (message?.type === 'BOOKSMART_AUTH_SYNC') {
     const { token, refreshToken, email, name } = message;
     if (!token) { sendResponse({ ok: false, error: 'no token' }); return; }
@@ -809,7 +828,7 @@ async function syncTokenToManagerTabs(token, refreshToken) {
 
     // Get current extension user email
     const currentAuth = await getAuthData();
-    const extEmail = currentAuth[STORAGE_KEYS.USER]?.email;
+    const extEmail = currentAuth[STORAGE_KEYS.USER]?.email || null;
 
     for (const tab of managerTabs) {
       console.log(`[BookSmart] Syncing new token to active manager tab ${tab.id}`);
@@ -871,10 +890,13 @@ async function checkAndRefreshToken() {
       // Propagate new token to all open manager tabs
       if (data.session?.access_token) {
         await syncTokenToManagerTabs(data.session.access_token, data.session.refresh_token);
+        return data.session.access_token;
       }
     }
+    return token;
   } catch (error) {
     console.error('Error in token refresh:', error);
+    return null;
   }
 }
 
