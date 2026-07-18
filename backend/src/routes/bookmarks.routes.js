@@ -355,6 +355,106 @@ router.get('/folders', async (req, res) => {
 });
 
 /**
+ * POST /api/bookmarks/folders/sync-batch
+ * Batch update bookmark folder IDs and folder paths
+ */
+router.post('/folders/sync-batch', async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { updates } = req.body; // Array of { id, folder_id, folder_path }
+
+    if (!Array.isArray(updates)) {
+      return res.status(400).json({
+        error: 'Bad Request',
+        message: 'updates must be an array'
+      });
+    }
+
+    console.log(`[Folders Sync] Received batch update request for ${updates.length} bookmarks for user ${userId}`);
+
+    const { supabaseAdmin } = await import('../config/supabase.js');
+    
+    // Process updates in batches of 100 in parallel
+    const batchSize = 100;
+    let successCount = 0;
+    
+    for (let i = 0; i < updates.length; i += batchSize) {
+      const batch = updates.slice(i, i + batchSize);
+      
+      // Fetch qdrant_point_id from database to update Qdrant as well
+      const ids = batch.map(item => item.id);
+      const { data: dbItems } = await supabaseAdmin
+        .from('bookmarks')
+        .select('id, qdrant_point_id')
+        .in('id', ids)
+        .eq('user_id', userId);
+        
+      const qdrantPointMap = new Map((dbItems || []).map(x => [x.id, x.qdrant_point_id]));
+      const qdrantUpdates = [];
+      
+      const results = await Promise.all(batch.map(async (item) => {
+        try {
+          const { error } = await supabaseAdmin
+            .from('bookmarks')
+            .update({
+              folder_id: item.folder_id || null,
+              folder_path: item.folder_path || null
+            })
+            .eq('id', item.id)
+            .eq('user_id', userId);
+            
+          if (error) {
+            console.error(`[Folders Sync] Error updating bookmark ${item.id}:`, error.message);
+            return false;
+          }
+          
+          const qdrant_point_id = qdrantPointMap.get(item.id);
+          if (qdrant_point_id) {
+            qdrantUpdates.push({
+              id: item.id,
+              qdrant_point_id,
+              newPath: item.folder_path
+            });
+          }
+          return true;
+        } catch (err) {
+          console.error(`[Folders Sync] Exception updating bookmark ${item.id}:`, err.message);
+          return false;
+        }
+      }));
+      
+      // Update in Qdrant asynchronously
+      if (qdrantUpdates.length > 0) {
+        try {
+          const { updateQdrantFolderPaths } = await import('../services/qdrant.service.js');
+          updateQdrantFolderPaths(userId, qdrantUpdates).catch(err => {
+            console.error('[Folders Sync] Failed to update Qdrant payloads:', err);
+          });
+        } catch (err) {
+          console.error('[Folders Sync] Failed to import Qdrant service:', err);
+        }
+      }
+      
+      successCount += results.filter(Boolean).length;
+    }
+
+    console.log(`[Folders Sync] Successfully batch updated ${successCount}/${updates.length} bookmarks`);
+
+    res.json({
+      success: true,
+      updatedCount: successCount
+    });
+
+  } catch (error) {
+    console.error('Batch sync folders error:', error);
+    return res.status(500).json({
+      error: 'Internal Server Error',
+      message: 'Failed to batch sync folders'
+    });
+  }
+});
+
+/**
  * PUT /api/bookmarks/folders/rename
  * Rename a folder (and all its subfolders)
  */

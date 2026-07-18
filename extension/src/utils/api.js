@@ -191,6 +191,12 @@ export const bookmarks = {
     apiClient('/bookmarks/analyze', {
       method: 'POST',
       body: JSON.stringify(data)
+    }),
+
+  syncFoldersBatch: (updates) =>
+    apiClient('/bookmarks/folders/sync-batch', {
+      method: 'POST',
+      body: JSON.stringify({ updates })
     })
 };
 

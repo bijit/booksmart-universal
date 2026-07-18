@@ -813,25 +813,56 @@ async function handleFullFolderSync() {
     browser.action.setBadgeText({ text: '...' });
     browser.action.setBadgeBackgroundColor({ color: '#3B82F6' });
 
-    let updatedCount = 0;
+    // Fetch all bookmarks from BookSmart in paginated chunks
+    const dbBookmarks = [];
+    let offset = 0;
+    const limit = 1000;
+    while (true) {
+      console.log(`[BookSmart] Sync: Fetching database bookmarks chunk offset=${offset}`);
+      const data = await bookmarks.list({ limit, offset });
+      if (!data.bookmarks || data.bookmarks.length === 0) break;
+      dbBookmarks.push(...data.bookmarks);
+      if (data.bookmarks.length < limit) break;
+      offset += limit;
+    }
+    console.log(`[BookSmart] Fetched ${dbBookmarks.length} total bookmarks from database`);
 
+    // Map by URL for fast local lookups
+    const dbUrlMap = new Map();
+    for (const bm of dbBookmarks) {
+      if (bm.url) {
+        dbUrlMap.set(bm.url, bm);
+      }
+    }
+
+    const updatesNeeded = [];
     for (const bookmark of allBookmarks) {
       const folderPath = await getFolderPath(bookmark.parentId);
-
-      // Check if we have this bookmark in our DB
-      const searchData = await bookmarks.list({ url: bookmark.url });
-      if (searchData.bookmarks && searchData.bookmarks.length > 0) {
-        const dbBookmark = searchData.bookmarks[0];
-        // Only update if metadata is missing or different
-        if (!dbBookmark.folder_path || dbBookmark.folder_path !== folderPath) {
-          await bookmarks.update(dbBookmark.id, {
+      const dbBookmark = dbUrlMap.get(bookmark.url);
+      
+      if (dbBookmark) {
+        // Normalize folder paths (empty string vs null)
+        const normalizedDbPath = dbBookmark.folder_path || '';
+        const normalizedFolderPath = folderPath || '';
+        
+        if (normalizedDbPath !== normalizedFolderPath || dbBookmark.folder_id !== bookmark.parentId) {
+          updatesNeeded.push({
+            id: dbBookmark.id,
             folder_id: bookmark.parentId,
-            folder_path: folderPath,
-            browser: await getBrowserInfo()
+            folder_path: folderPath || null
           });
-
-          updatedCount++;
         }
+      }
+    }
+
+    let updatedCount = 0;
+    if (updatesNeeded.length > 0) {
+      console.log(`[BookSmart] Sending ${updatesNeeded.length} folder updates to batch endpoint...`);
+      const syncResult = await bookmarks.syncFoldersBatch(updatesNeeded);
+      if (syncResult && syncResult.success) {
+        updatedCount = syncResult.updatedCount || updatesNeeded.length;
+      } else {
+        throw new Error(syncResult?.error || 'Batch sync failed on server');
       }
     }
 
