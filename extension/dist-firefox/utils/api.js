@@ -6,6 +6,8 @@
 import '../config.js';
 const API_BASE_URL = globalThis.API_BASE_URL;
 
+let activeRefreshPromise = null;
+
 /**
  * Self-healing token check for extension API client.
  * Ensures the token is always valid before any network call.
@@ -35,30 +37,47 @@ async function checkAndRefreshTokenInApi() {
 
     // Refresh if expired or expiring within 5 minutes
     if (!expiresAt || expiresAt - Date.now() < 300000) {
-      console.log('[API Client] Token expired or expiring soon, refreshing in background...');
-      const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ refresh_token })
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        if (data.session?.access_token) {
-          const newExpiresAt = data.session.expires_at
-            ? (data.session.expires_at < 10000000000 ? data.session.expires_at * 1000 : data.session.expires_at)
-            : 0;
-
-          await browser.storage.local.set({
-            'auth_token': data.session.access_token,
-            'refresh_token': data.session.refresh_token,
-            'token_expires_at': newExpiresAt
-          });
-          console.log('[API Client] Token refreshed successfully.');
-          return data.session.access_token;
-        }
+      if (activeRefreshPromise) {
+        console.log('[API Client] Refresh already in progress, waiting...');
+        return activeRefreshPromise;
       }
-      console.warn('[API Client] Token refresh failed.');
+
+      activeRefreshPromise = (async () => {
+        try {
+          console.log('[API Client] Token expired or expiring soon, refreshing in background...');
+          const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ refresh_token })
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            if (data.session?.access_token) {
+              const newExpiresAt = data.session.expires_at
+                ? (data.session.expires_at < 10000000000 ? data.session.expires_at * 1000 : data.session.expires_at)
+                : 0;
+
+              await browser.storage.local.set({
+                'auth_token': data.session.access_token,
+                'refresh_token': data.session.refresh_token,
+                'token_expires_at': newExpiresAt
+              });
+              console.log('[API Client] Token refreshed successfully.');
+              return data.session.access_token;
+            }
+          }
+          console.warn('[API Client] Token refresh failed.');
+          return auth_token;
+        } catch (err) {
+          console.error('[API Client] Error refreshing token via fetch:', err);
+          return auth_token;
+        } finally {
+          activeRefreshPromise = null;
+        }
+      })();
+
+      return activeRefreshPromise;
     }
     return auth_token;
   } catch (error) {

@@ -890,56 +890,70 @@ async function syncTokenToManagerTabs(token, refreshToken) {
   }
 }
 
+let activeBackgroundRefreshPromise = null;
+
 // Token refresh logic using persistent browser alarms
 async function checkAndRefreshToken() {
-  try {
-    const authData = await getAuthData();
-    const token = authData[STORAGE_KEYS.AUTH_TOKEN];
-    const refreshToken = authData[STORAGE_KEYS.REFRESH_TOKEN];
-    let expiresAt = authData[STORAGE_KEYS.TOKEN_EXPIRES_AT] || 0;
-
-    // Proactively flush any offline queued bookmarks if we are authenticated
-    if (token) {
-      flushPendingBookmarks();
-    }
-
-    if (!refreshToken) return null;
-
-    // Fallback: If expiresAt is missing but we have a token, parse the expiration directly from JWT payload
-    if (!expiresAt && token) {
-      try {
-        const payload = JSON.parse(atob(token.split('.')[1]));
-        if (payload.exp) {
-          expiresAt = payload.exp * 1000;
-        }
-      } catch (e) {
-        console.error('Failed to parse token expiration:', e);
-      }
-    }
-
-    // Normalize expiresAt to milliseconds if it was saved in seconds
-    if (expiresAt && expiresAt < 10000000000) {
-      expiresAt = expiresAt * 1000;
-    }
-
-    // Refresh if within 45 minutes of expiry (or if no expiration was found to be safe)
-    if (!expiresAt || expiresAt - Date.now() < 2700000) {
-      console.log('Token expiring soon, refreshing in background service worker...');
-      const data = await auth.refresh(refreshToken);
-      await saveAuthData(data);
-      console.log('Token refreshed successfully');
-
-      // Propagate new token to all open manager tabs
-      if (data.session?.access_token) {
-        await syncTokenToManagerTabs(data.session.access_token, data.session.refresh_token);
-        return data.session.access_token;
-      }
-    }
-    return token;
-  } catch (error) {
-    console.error('Error in token refresh:', error);
-    return null;
+  if (activeBackgroundRefreshPromise) {
+    console.log('[Background] Token refresh already in progress, waiting...');
+    return activeBackgroundRefreshPromise;
   }
+
+  activeBackgroundRefreshPromise = (async () => {
+    try {
+      const authData = await getAuthData();
+      let token = authData[STORAGE_KEYS.AUTH_TOKEN];
+      const refreshToken = authData[STORAGE_KEYS.REFRESH_TOKEN];
+      let expiresAt = authData[STORAGE_KEYS.TOKEN_EXPIRES_AT] || 0;
+
+      if (!refreshToken) return null;
+
+      // Fallback: If expiresAt is missing but we have a token, parse the expiration directly from JWT payload
+      if (!expiresAt && token) {
+        try {
+          const payload = JSON.parse(atob(token.split('.')[1]));
+          if (payload.exp) {
+            expiresAt = payload.exp * 1000;
+          }
+        } catch (e) {
+          console.error('Failed to parse token expiration:', e);
+        }
+      }
+
+      // Normalize expiresAt to milliseconds if it was saved in seconds
+      if (expiresAt && expiresAt < 10000000000) {
+        expiresAt = expiresAt * 1000;
+      }
+
+      // Refresh if within 45 minutes of expiry (or if no expiration was found to be safe)
+      if (!expiresAt || expiresAt - Date.now() < 2700000) {
+        console.log('Token expiring soon, refreshing in background service worker...');
+        const data = await auth.refresh(refreshToken);
+        await saveAuthData(data);
+        console.log('Token refreshed successfully');
+
+        // Propagate new token to all open manager tabs
+        if (data.session?.access_token) {
+          token = data.session.access_token;
+          await syncTokenToManagerTabs(data.session.access_token, data.session.refresh_token);
+        }
+      }
+
+      // Proactively flush any offline queued bookmarks if we are authenticated
+      if (token) {
+        flushPendingBookmarks();
+      }
+
+      return token;
+    } catch (error) {
+      console.error('Error in token refresh:', error);
+      return null;
+    } finally {
+      activeBackgroundRefreshPromise = null;
+    }
+  })();
+
+  return activeBackgroundRefreshPromise;
 }
 
 // Create the alarm
