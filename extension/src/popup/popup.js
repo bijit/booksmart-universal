@@ -119,6 +119,10 @@ function setupEventListeners() {
     if (currentSearchMode === 'instant') {
       handleLocalSearch(value);
     } else {
+      bookmarksList.innerHTML = '';
+      hideEmpty();
+      showLoading();
+
       clearTimeout(searchTimeout);
       searchTimeout = setTimeout(() => {
         handleDeepSearch(value);
@@ -319,7 +323,7 @@ async function handleDeepSearch(query) {
 function displayBookmarks(bookmarks, isSearch = false) {
   hideLoading();
   if (bookmarks.length === 0) {
-    showEmpty();
+    showEmpty(isSearch);
     return;
   }
   hideEmpty();
@@ -506,9 +510,19 @@ function hideLoading() {
   loadingState.classList.add('hidden');
   bookmarksList.classList.remove('hidden');
 }
-function showEmpty() {
+function showEmpty(isSearch = false) {
   emptyState.classList.remove('hidden');
   bookmarksList.classList.add('hidden');
+  
+  if (isSearch) {
+    if (importFromEmptyBtn) importFromEmptyBtn.classList.add('hidden');
+    const emptyText = emptyState.querySelector('p');
+    if (emptyText) emptyText.textContent = 'No matching bookmarks found.';
+  } else {
+    if (importFromEmptyBtn) importFromEmptyBtn.classList.remove('hidden');
+    const emptyText = emptyState.querySelector('p');
+    if (emptyText) emptyText.textContent = 'No bookmarks found.';
+  }
 }
 function hideEmpty() {
   emptyState.classList.add('hidden');
