@@ -36,8 +36,6 @@ const semanticSearchTab = document.getElementById('semanticSearchTab');
 
 let allRecentBookmarks = []; // Cache for instant local search
 
-const aiOverviewSection = document.getElementById('aiOverviewSection');
-const aiAnswer = document.getElementById('aiAnswer');
 const currentPageSection = document.getElementById('currentPageSection');
 const currentPageTitle = document.getElementById('currentPageTitle');
 const currentPageUrl = document.getElementById('currentPageUrl');
@@ -252,7 +250,6 @@ async function handleLogout() {
 async function loadRecentBookmarks() {
   showLoading();
   resultsTitle.classList.add('hidden');
-  aiOverviewSection.classList.add('hidden');
   currentPageSection.classList.remove('hidden');
 
   try {
