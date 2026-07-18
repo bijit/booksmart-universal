@@ -30,6 +30,9 @@ const logoutBtn = document.getElementById('logoutBtnTop');
 const syncFoldersBtn = document.getElementById('syncFoldersBtn');
 const resultsTitle = document.getElementById('resultsTitle');
 const deepSearchIndicator = document.getElementById('deepSearchIndicator');
+const searchModeToggle = document.getElementById('searchModeToggle');
+const instantSearchTab = document.getElementById('instantSearchTab');
+const semanticSearchTab = document.getElementById('semanticSearchTab');
 
 let allRecentBookmarks = []; // Cache for instant local search
 
@@ -98,28 +101,62 @@ function setupEventListeners() {
   });
 
   let searchTimeout;
-  searchInput.addEventListener('input', (e) => {
-    const value = e.target.value;
-    if (value) {
+  let currentSearchMode = 'instant';
+
+  function updateSearch() {
+    const value = searchInput.value;
+    if (value.trim()) {
       clearSearchBtn.classList.remove('hidden');
+      searchModeToggle.classList.remove('hidden');
     } else {
       clearSearchBtn.classList.add('hidden');
+      searchModeToggle.classList.add('hidden');
       deepSearchIndicator.classList.add('hidden');
+      resultsTitle.classList.add('hidden');
+      currentPageSection.classList.remove('hidden');
+      displayBookmarks(allRecentBookmarks);
+      return;
     }
 
-    // 1. Instant Local Search
-    handleLocalSearch(value);
+    if (currentSearchMode === 'instant') {
+      handleLocalSearch(value);
+    } else {
+      clearTimeout(searchTimeout);
+      searchTimeout = setTimeout(() => {
+        handleDeepSearch(value);
+      }, 500);
+    }
+  }
 
-    // 2. Debounced Deep Search
-    clearTimeout(searchTimeout);
-    searchTimeout = setTimeout(() => {
-      handleDeepSearch(value);
-    }, 600);
+  searchInput.addEventListener('input', updateSearch);
+
+  instantSearchTab.addEventListener('click', () => {
+    currentSearchMode = 'instant';
+    instantSearchTab.classList.add('active');
+    semanticSearchTab.classList.remove('active');
+    updateSearch();
+  });
+
+  semanticSearchTab.addEventListener('click', () => {
+    currentSearchMode = 'semantic';
+    semanticSearchTab.classList.add('active');
+    instantSearchTab.classList.remove('active');
+    updateSearch();
+  });
+
+  searchInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && currentSearchMode === 'semantic') {
+      clearTimeout(searchTimeout);
+      handleDeepSearch(searchInput.value);
+    }
   });
 
   clearSearchBtn.addEventListener('click', () => {
     searchInput.value = '';
     clearSearchBtn.classList.add('hidden');
+    searchModeToggle.classList.add('hidden');
+    resultsTitle.classList.add('hidden');
+    currentPageSection.classList.remove('hidden');
     loadRecentBookmarks();
   });
 
@@ -263,16 +300,12 @@ async function handleDeepSearch(query) {
   deepSearchIndicator.classList.remove('hidden');
 
   try {
-    const options = { query: trimmedQuery };
+    const options = { 
+      query: trimmedQuery,
+      searchType: 'hybrid',
+      generateAnswer: false // Disable AI answer overview generation for speed
+    };
     const data = await search.query(options);
-
-    // Handle AI Answer
-    if (data.answer) {
-      aiAnswer.innerHTML = data.answer.answer.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-      aiOverviewSection.classList.remove('hidden');
-    } else {
-      aiOverviewSection.classList.add('hidden');
-    }
 
     displayBookmarks(data.results || [], true);
   } catch (error) {

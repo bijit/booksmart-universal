@@ -1393,3 +1393,58 @@ input:checked + .slider:before {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* Search Mode Toggle tabs */
+.search-mode-toggle {
+  display: flex;
+  background: #F3F4F6;
+  padding: 2px;
+  border-radius: 8px;
+  margin-top: 8px;
+  border: 1px solid #E5E7EB;
+}
+
+.search-tab {
+  flex: 1;
+  text-align: center;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #4B5563;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.search-tab.active {
+  background: #FFFFFF;
+  color: #111827;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+}
+
+.search-tab:hover:not(.active) {
+  color: #374151;
+  background: rgba(0, 0, 0, 0.02);
+}
+
+/* Dark mode overrides for search toggle */
+.dark .search-mode-toggle {
+  background: #1F2937;
+  border-color: #374151;
+}
+
+.dark .search-tab {
+  color: #9CA3AF;
+}
+
+.dark .search-tab.active {
+  background: #374151;
+  color: #F9FAFB;
+}
+
+.dark .search-tab:hover:not(.active) {
+  color: #E5E7EB;
+  background: rgba(255, 255, 255, 0.02);
+}
