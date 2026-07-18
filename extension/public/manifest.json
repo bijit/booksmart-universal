@@ -23,9 +23,6 @@
     "service_worker": "background.js",
     "type": "module"
   },
-  "chrome_url_overrides": {
-    "bookmarks": "bookmarks.html"
-  },
   "action": {
     "default_popup": "popup.html",
     "default_icon": {
