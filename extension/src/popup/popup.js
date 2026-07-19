@@ -558,7 +558,7 @@ async function handleImport() {
         });
       } else if (node.children) {
         let newPath = currentPath;
-        if (node.title && node.id !== '0') {
+        if (node.title && node.id !== '0' && node.id !== '1') {
            newPath = currentPath ? `${currentPath} > ${node.title}` : node.title;
         }
         node.children.forEach(child => traverse(child, newPath));

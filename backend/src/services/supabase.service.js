@@ -645,19 +645,35 @@ export async function deleteAllUserBookmarks(userId) {
  */
 export async function getUserUniqueFolderPaths(userId) {
   try {
-    const { data, error } = await supabaseAdmin
-      .from('bookmarks')
-      .select('folder_path')
-      .eq('user_id', userId)
-      .not('folder_path', 'is', null);
+    const uniquePaths = new Set();
+    let from = 0;
+    const limit = 1000;
 
-    if (error) {
-      throw error;
+    while (true) {
+      const { data, error } = await supabaseAdmin
+        .from('bookmarks')
+        .select('folder_path')
+        .eq('user_id', userId)
+        .not('folder_path', 'is', null)
+        .range(from, from + limit - 1);
+
+      if (error) {
+        throw error;
+      }
+
+      if (!data || data.length === 0) break;
+
+      data.forEach(d => {
+        if (d.folder_path) {
+          uniquePaths.add(d.folder_path);
+        }
+      });
+
+      if (data.length < limit) break;
+      from += limit;
     }
 
-    // Extract unique paths and filter out empty strings
-    const uniquePaths = [...new Set(data.map(d => d.folder_path))].filter(Boolean);
-    return uniquePaths;
+    return Array.from(uniquePaths);
 
   } catch (error) {
     console.error('Error fetching unique folder paths from Supabase:', error);
