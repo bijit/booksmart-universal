@@ -134,3 +134,20 @@ Synthesizes the user's daily saved bookmarks and research trails into a 3-minute
 ### C. UX Controls
 * **Mini-Player Bar**: Sticky audio controls at the bottom of the Manager app with scrubber, playback speed selector, and bookmark citations.
 * **Extension Background Audio**: Background service worker audio playback allowing users to listen to summaries while browsing other tabs.
+
+## 12. Chat with BookSmart: Conversational Voice & Task Agent (Multi-Turn Epistemic Memory)
+
+This feature enables an interactive conversational copilot (spoken or written) that maintains state across multi-turn queries, allowing users to give ordinal and relational commands over their library (e.g. *"Find 3 butter chicken recipes" -> "Read the ingredients for the second one" -> "Which has better reviews out of the 1st and 2nd?"*).
+
+### A. Technical Pillars
+1. **Conversational Entity Reference Resolution**: Maintains session memory linking ordinal references ("item 1", "the 2nd recipe") to active `bookmark_id`s in current context.
+2. **Agentic Tool Use & Function Calling**: LLM invokes structured API tools:
+   * `search_library(query, category)`
+   * `extract_section(bookmark_id, section_type)` (e.g., ingredients, code blocks, citations, methodology)
+   * `compare_metadata(bookmark_ids, criteria)` (ratings, dates, prices)
+3. **Speech-to-Speech Streaming (Hands-Free Mode)**: Web Speech API / OpenAI Whisper (STT) combined with OpenAI TTS / Web Speech for continuous hands-free interaction.
+
+### B. High-Value Use Cases
+* **🍳 Hands-Free Cooking Assistant**: *"Read step 3,"* *"Substitute heavy cream,"* *"Read ingredient list for recipe #2."*
+* **🔬 Research & Literature Review**: *"Find 3 papers on Qdrant,"* *"Read methodology for paper #1,"* *"Which was published most recently?"*
+* **🛒 Spec & Product Comparisons**: *"Find the 3 bookmarked laptops,"* *"Which one has 32GB RAM under $1,200?"*

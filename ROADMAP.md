@@ -25,3 +25,8 @@
 - **Neural AI Voices (Pro)**: OpenAI TTS (`nova`, `onyx`, `alloy`) and ElevenLabs integration for human-grade audio playback.
 - **AI Daily Audio Briefings**: Generated 3-minute morning audio podcasts compiling the user's daily saved research.
 - **Sticky Audio Mini-Player**: Bottom media player bar with variable speed controls (1.0x to 2.0x).
+
+### 6) Conversational Voice & Task Agent (Multi-Turn Execution)
+- **Multi-Turn Ordinal Reference Resolution**: Tracks active entity lists across voice/text turns (e.g. resolving "the second recipe" or "compare 1st and 2nd").
+- **Agentic Function Calling**: Invokes backend tools to search library, extract DOM sections (ingredients, code blocks), and compare metadata.
+- **Hands-Free Cooking / Research Mode**: Speech-to-Text and continuous voice wake for hands-free tasks.
