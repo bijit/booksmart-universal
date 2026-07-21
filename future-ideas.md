@@ -77,4 +77,26 @@ This feature transforms the user's private bookmark database into an active, con
 4. **Injection/Redirect:** The background worker updates the active tab URL with the advanced query parameter (e.g., `window.location.href = 'https://www.google.com/search?q=' + encodeURIComponent(data.refinedWebQuery)`), forcing a Google search reload with highly refined search terms.
 5. **Conversational Grounding:** If the user is on ChatGPT or Gemini web clients, the extension content script intercepts the textarea/prompt box and injects a clipboard-ready context block: *"I am researching [query]. Here is what I already know from my library: [brief synthesized list of papers/concepts]. Find new information that builds on this."*
 
+## 9. Conversational & Multi-Turn Natural Language Query Capture (AI Search Trails)
 
+This feature empowers BookSmart to capture conversational, multi-turn, natural language search sessions from modern search and AI web applications (Google Search / AI Overviews, ChatGPT, Claude, Perplexity, and Gemini).
+
+### A. Core Concept & Value Proposition
+Today, user intent is fragmented across AI platforms—OpenAI has ChatGPT logs, Google has Search History, and Anthropic has Claude history. BookSmart acts as a **neutral, unified context aggregator** by capturing these multi-turn interactions directly from the browser tab and storing them in the user's encrypted Context Vault.
+
+Instead of just saving a destination URL (e.g., `github.com/facebook/memlab`), BookSmart captures the **problem-solving journey** leading up to it:
+* **Turn 1:** *"What causes memory leaks in Node service workers?"*
+* **Turn 2:** *"How to take a V8 heap snapshot programmatically?"*
+* **Turn 3:** *"Compare memlab vs clinic.js"*
+* **Saved Bookmark:** `https://github.com/facebook/memlab`
+
+Six months later, when reviewing the bookmark, BookSmart shows: *"Saved while researching Node service worker memory leaks across Google & Perplexity on July 20th."*
+
+### B. Capture Mechanisms in Chrome Extension
+Content scripts utilize three non-intrusive, zero-overhead browser hooks:
+1. **URL Parameter Parsing:** Extracts `?q=...` parameters from Google, Bing, and DuckDuckGo instantly on page load.
+2. **DOM Event Listeners:** Attaches to `submit` events and `Enter` keypresses on search bars and chat textareas.
+3. **MutationObservers for AI Chat Interfaces:** Listens for DOM mutations on ChatGPT (`chatgpt.com`), Claude (`claude.ai`), and Perplexity (`perplexity.ai`) to capture multi-turn prompt & response node pairs.
+
+### C. Data Schema & Encryption
+Search threads are structured as `ContextThread` records containing query chains, platform origins, timestamps, and associated bookmark IDs. payloads are encrypted client-side using **AES-256-GCM** before being dispatched to the database, ensuring zero-knowledge privacy.
