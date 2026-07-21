@@ -100,3 +100,21 @@ Content scripts utilize three non-intrusive, zero-overhead browser hooks:
 
 ### C. Data Schema & Encryption
 Search threads are structured as `ContextThread` records containing query chains, platform origins, timestamps, and associated bookmark IDs. payloads are encrypted client-side using **AES-256-GCM** before being dispatched to the database, ensuring zero-knowledge privacy.
+
+## 10. BookSmart Grounded Search & Context Workbench (BYOK)
+
+This premium feature transforms BookSmart from a search/reading memory vault into a **Context Workbench**—assembling past research, knowledge gaps, and bookmarked insights to ground new AI searches using the user's own API keys (OpenAI, Anthropic, Perplexity, Gemini, Local LLMs) at zero markup cost.
+
+### A. Bring Your Own Key (BYOK) Security Architecture
+* **Client-Side Storage**: Users input raw API keys (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `PERPLEXITY_API_KEY`, etc.) which are encrypted locally using AES-256-GCM via the Web Crypto API.
+* **Direct Proxy Execution**: LLM/Search API requests are dispatched directly from the client extension/browser to provider endpoints, ensuring API keys never touch BookSmart backend servers.
+
+### B. Context Orchestration & Prompt Construction Engine
+Before executing a new query across any selected LLM, BookSmart runs a 3-step pipeline:
+1. **Memory Retrieval**: Runs hybrid vector + temporal search across the user's vault to pull top 5-10 relevant bookmarks, notes, and past search threads.
+2. **Context Inspector ("Glass Box" Privacy)**: Displays a transparent UI drawer showing the exact chunks of personal context attached, allowing users to uncheck unwanted items.
+3. **Grounded Prompt Assembly**: Injects background context, user knowledge state, and specific knowledge gaps into a structured system prompt, preventing the AI from repeating basic concepts the user already understands.
+
+### C. Execution Modes & Supported Providers
+* **Mode A (Manager Dashboard Workbench)**: A unified search & chat interface inside BookSmart with a model dropdown selector (`GPT-4o`, `Claude 3.5 Sonnet`, `Perplexity Sonar`, `Gemini 1.5 Pro`, `Local Llama 3 via Ollama`) and a side-by-side bookmark citation panel.
+* **Mode B (Native Interface Assistant)**: Injects an *"Attach BookSmart Context"* button into `chatgpt.com`, `perplexity.ai`, and `google.com` to prepend optimal vault context with one click.

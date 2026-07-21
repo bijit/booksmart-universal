@@ -59,6 +59,13 @@ A governed API layer that allows third-party AI apps to *request* context from t
 - Access is time-bound, revocable, and fully audited
 - Context is served in a structured, model-agnostic format (JSON-LD / MCP-compatible)
 
+### 2.4 Ground & Execute (The Context Workbench — BYOK)
+A premium user interface that transforms BookSmart into a **Personal AI Workbench**:
+- Users supply their own API keys (OpenAI, Anthropic, Perplexity, Gemini, Local LLMs) stored with client-side encryption (AES-256-GCM).
+- BookSmart automatically retrieves relevant personal memory, reading history, and knowledge gaps before firing queries.
+- Assembles a structured, grounded system prompt and dispatches it directly to the provider endpoint at zero markup cost.
+- Provides a "Context Inspector" drawer so users can review and uncheck specific memory chunks before sending.
+
 ---
 
 ## 3. The Competitive & Conceptual Landscape
