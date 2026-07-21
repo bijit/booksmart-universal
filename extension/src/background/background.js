@@ -258,34 +258,35 @@ async function getOrCreateInboxFolder() {
   }
 }
 
-// Listen to new bookmarks being created
+// Rate-limiting tracking for Chrome creation events (protects against bulk import storms)
+let lastCreatedTimestamp = 0;
+let createdCountInWindow = 0;
+const BULK_THRESHOLD_COUNT = 15;
+const BULK_WINDOW_MS = 3000;
+
+// Listen to new bookmarks being created (Mobile, Other Devices, or Active Tab)
 browser.bookmarks.onCreated.addListener(async (id, bookmark) => {
   console.log('New bookmark created:', bookmark);
   if (!bookmark.url) return;
 
-  // Sync Protection: check if the bookmarked URL is open in any browser tab
-  try {
-    const tabs = await browser.tabs.query({});
-    const isUrlOpen = tabs.some(tab => {
-      if (!tab.url) return false;
-      // Strip trailing slashes for loose comparison
-      const cleanTabUrl = tab.url.replace(/\/$/, '');
-      const cleanBookmarkUrl = bookmark.url.replace(/\/$/, '');
-      return cleanTabUrl === cleanBookmarkUrl;
-    });
-
-    if (!isUrlOpen) {
-      console.log('[BookSmart] Ignoring background bookmark creation event (likely triggered by Chrome Sync):', bookmark.url);
-      return;
-    }
-  } catch (tabError) {
-    console.warn('[BookSmart] Error querying tabs for sync validation, proceeding:', tabError.message);
-  }
-
-  // Skip bookmarks that WE just created to avoid double-syncing
+  // 1. Skip bookmarks that WE (BookSmart) just created/moved locally to avoid double-syncing
   if (hasSelfModifiedUrl(bookmark.url)) {
     deleteSelfModifiedUrl(bookmark.url);
     console.log('[BookSmart] Skipping self-created bookmark (already in BookSmart):', bookmark.url);
+    return;
+  }
+
+  // 2. Storm Guard: Detect mass import/restore operations (e.g. >15 bookmarks created in 3s)
+  const now = Date.now();
+  if (now - lastCreatedTimestamp < BULK_WINDOW_MS) {
+    createdCountInWindow++;
+  } else {
+    lastCreatedTimestamp = now;
+    createdCountInWindow = 1;
+  }
+
+  if (createdCountInWindow > BULK_THRESHOLD_COUNT) {
+    console.log('[BookSmart] Bulk bookmark creation storm detected (>15 items in 3s). Skipping individual auto-ingest:', bookmark.url);
     return;
   }
 
@@ -313,22 +314,10 @@ browser.bookmarks.onRemoved.addListener(async (id, removeInfo) => {
   console.log('Bookmark removed:', id, removeInfo);
   if (!removeInfo.node || !removeInfo.node.url) return;
 
-  // Sync Protection: check if the bookmarked URL is open in any browser tab
-  try {
-    const tabs = await browser.tabs.query({});
-    const isUrlOpen = tabs.some(tab => {
-      if (!tab.url) return false;
-      const cleanTabUrl = tab.url.replace(/\/$/, '');
-      const cleanBookmarkUrl = removeInfo.node.url.replace(/\/$/, '');
-      return cleanTabUrl === cleanBookmarkUrl;
-    });
-
-    if (!isUrlOpen) {
-      console.log('[BookSmart] Ignoring background bookmark removal event (likely triggered by Chrome Sync):', removeInfo.node.url);
-      return;
-    }
-  } catch (tabError) {
-    console.warn('[BookSmart] Error querying tabs for sync validation on delete, proceeding:', tabError.message);
+  // Skip self-modified deletions
+  if (hasSelfModifiedUrl(removeInfo.node.url)) {
+    deleteSelfModifiedUrl(removeInfo.node.url);
+    return;
   }
 
   await handleDeletedBookmark(removeInfo.node.url);
