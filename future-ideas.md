@@ -118,3 +118,19 @@ Before executing a new query across any selected LLM, BookSmart runs a 3-step pi
 ### C. Execution Modes & Supported Providers
 * **Mode A (Manager Dashboard Workbench)**: A unified search & chat interface inside BookSmart with a model dropdown selector (`GPT-4o`, `Claude 3.5 Sonnet`, `Perplexity Sonar`, `Gemini 1.5 Pro`, `Local Llama 3 via Ollama`) and a side-by-side bookmark citation panel.
 * **Mode B (Native Interface Assistant)**: Injects an *"Attach BookSmart Context"* button into `chatgpt.com`, `perplexity.ai`, and `google.com` to prepend optimal vault context with one click.
+
+## 11. AI Text-to-Speech (TTS) & Daily Audio Briefings (Accessibility & Commute Mode)
+
+This feature adds high-fidelity audio capabilities to BookSmart, transforming saved bookmarks, AI summaries, and research trails into a hands-free auditory experience for users on their commutes, exercising, or managing reading difficulties (dyslexia, ADHD, eye strain).
+
+### A. Dual-Tier Implementation
+* **Tier 1: Free Browser Native TTS (Web Speech API)**: Uses `window.speechSynthesis` for zero-cost, offline, instant playback of TL;DRs and summaries in the dashboard and extension.
+* **Tier 2: Pro Neural AI Voices (OpenAI TTS & ElevenLabs)**: Uses OpenAI `tts-1` (`nova`, `onyx`, `alloy`) or ElevenLabs for hyper-realistic human voice playback, variable speeds (1.0x - 2.0x), and audio streaming.
+
+### B. Pro Feature: "AI Daily Audio Briefing"
+Synthesizes the user's daily saved bookmarks and research trails into a 3-minute personalized audio digest:
+*"Good morning! Here is your 3-minute BookSmart Audio Briefing. Today you saved 3 papers on hybrid search and 1 update on React 19..."*
+
+### C. UX Controls
+* **Mini-Player Bar**: Sticky audio controls at the bottom of the Manager app with scrubber, playback speed selector, and bookmark citations.
+* **Extension Background Audio**: Background service worker audio playback allowing users to listen to summaries while browsing other tabs.
