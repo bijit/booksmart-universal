@@ -107,6 +107,18 @@ export async function createBookmarkRecord(userId, bookmarkData) {
     return data;
 
   } catch (error) {
+    // Gracefully handle database unique constraint violations (Postgres code 23505)
+    // to prevent duplicate ingestion failures when concurrent device syncs race
+    if (error.code === '23505') {
+      console.log(`[Supabase] Unique constraint violation caught for URL: ${bookmarkData.url}. Fetching existing record...`);
+      try {
+        const existing = await getBookmarkByUrl(userId, bookmarkData.url);
+        if (existing) return existing;
+      } catch (fetchErr) {
+        console.error('Failed to resolve existing bookmark after unique constraint hit:', fetchErr);
+      }
+    }
+
     console.error('Error creating bookmark record in Supabase:', error);
     throw new Error(`Failed to create bookmark record: ${error.message}`);
   }
