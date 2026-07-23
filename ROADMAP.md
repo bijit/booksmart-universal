@@ -30,3 +30,10 @@
 - **Multi-Turn Ordinal Reference Resolution**: Tracks active entity lists across voice/text turns (e.g. resolving "the second recipe" or "compare 1st and 2nd").
 - **Agentic Function Calling**: Invokes backend tools to search library, extract DOM sections (ingredients, code blocks), and compare metadata.
 - **Hands-Free Cooking / Research Mode**: Speech-to-Text and continuous voice wake for hands-free tasks.
+
+### 7) Chrome Native AI Skills & On-Device Context Provisioning
+- **Progressive Enhancement Wrapper**: Run on-device Gemini Nano tasks when flags are present, falling back to GCP cloud.
+- **On-Device Embeddings (`ai.textEmbedding`)**: Vectorize user content locally in IndexedDB to enable zero-network, local semantic search.
+- **Context Injection to Third-Party AI**: Automatically inject relevant, summarized BookSmart search snippets into active ChatGPT, Claude, or Google Doc sessions.
+- **Offline Client Summarizer (`ai.summarizer`)**: Generate TL;DR summaries entirely client-side when working offline.
+

@@ -151,3 +151,19 @@ This feature enables an interactive conversational copilot (spoken or written) t
 * **🍳 Hands-Free Cooking Assistant**: *"Read step 3,"* *"Substitute heavy cream,"* *"Read ingredient list for recipe #2."*
 * **🔬 Research & Literature Review**: *"Find 3 papers on Qdrant,"* *"Read methodology for paper #1,"* *"Which was published most recently?"*
 * **🛒 Spec & Product Comparisons**: *"Find the 3 bookmarked laptops,"* *"Which one has 32GB RAM under $1,200?"*
+
+## 13. Chrome Native AI Skills Integration & Context Provisioning
+
+This feature establishes BookSmart as a local, private context broker feeding Chrome's built-in on-device AI APIs (Gemini Nano) directly to enrich third-party AI sessions.
+
+### A. Integrated Browser Skills
+1. **On-Device Embeddings (`ai.textEmbedding`)**: Generates vector representations of user queries and saved materials locally within the extension, storing them in IndexedDB for 100ms offline semantic search.
+2. **Context-Aware Prompt API (`ai.assistant` / `window.ai`)**: Seeds local Gemini Nano chat sessions with relevant pieces of the user's research memory as background context.
+3. **Local Writer/Rewriter (`ai.writer` / `ai.rewriter`)**: Uses retrieved library context to assist in composing factual, style-consistent drafts directly in webpage input fields (Gmail, GitHub, StackOverflow).
+4. **Offline Summarizer (`ai.summarizer`)**: Summarizes and tags bookmarked pages locally on the client when offline or to reduce cloud token costs.
+
+### B. Context Provisioning Flow
+* **Detection**: Check browser features dynamically using a progressive enhancement wrapper.
+* **Extraction & Embed**: Vectorize text on-device using local GPU/NPU via `ai.textEmbedding`.
+* **Injection**: Ingest client-side context directly into active tabs (ChatGPT, Claude, search queries) based on local semantic match queries.
+
