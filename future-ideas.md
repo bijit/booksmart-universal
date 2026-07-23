@@ -167,3 +167,18 @@ This feature establishes BookSmart as a local, private context broker feeding Ch
 * **Extraction & Embed**: Vectorize text on-device using local GPU/NPU via `ai.textEmbedding`.
 * **Injection**: Ingest client-side context directly into active tabs (ChatGPT, Claude, search queries) based on local semantic match queries.
 
+## 14. Contextual AI Skill Anchors (Dynamic Action Cards)
+
+This feature shifts BookSmart from a passive reader layout into an active research and learning partner. The Reader and Details UI dynamically surfaces content-tailored "AI Skill Cards" based on the bookmark's classification.
+
+### A. Dynamic Skill Card Deck
+* **Opinion / Editorial**: Surfacing the **Devil's Advocate (Opposing View)** card, which uses Gemini/local LLMs to draft structured counter-arguments to prevent confirmation bias.
+* **Technical Docs / Tutorials**: Surfacing the **Interactive Study Guide** card, which generates quick flashcards, summary quizzes, or practice questions to test retention.
+* **Academic Papers**: Surfacing the **Methodology Critique** card, analyzing sample sizes, assumptions, and identifying reference gaps.
+* **Software / Code Tutorials**: Surfacing the **Code Auditor** card, identifying potential edge cases, syntax bugs, or security vulnerabilities in raw code snippets on the page.
+
+### B. Storage & Sharing Workflow
+1. **Execution**: User clicks the dynamic card to generate the asset locally or via cloud.
+2. **Notes Persistence**: The generated study guide or opposing critique is saved directly as a nested annotation card under the main bookmark.
+3. **Collaborative Sharing**: Option to compile the original article side-by-side with the generated opposing views or quizzes into a beautiful, shareable markdown page link.
+

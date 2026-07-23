@@ -37,3 +37,11 @@
 - **Context Injection to Third-Party AI**: Automatically inject relevant, summarized BookSmart search snippets into active ChatGPT, Claude, or Google Doc sessions.
 - **Offline Client Summarizer (`ai.summarizer`)**: Generate TL;DR summaries entirely client-side when working offline.
 
+### 8) Contextual AI Skill Anchors (Dynamic Action Cards)
+- **Content Classification**: Tag content types during ingestion (opinion, tutorial, research paper, recipe).
+- **Devil's Advocate (Opposing View)**: Generate local counter-arguments to essays/articles to round out research.
+- **Interactive Study Guides**: Generate retention quizzes or flashcard overlays on educational documents.
+- **Deductive Code Auditor**: Review code snippets in bookmarked coding tutorials for bugs and vulnerabilities.
+- **Persistence & Export**: Save generated skill cards directly to bookmark notes or export as shareable Markdown summaries.
+
+
